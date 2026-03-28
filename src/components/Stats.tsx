@@ -18,7 +18,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Aguardando",
       value: String(stats.aguardando),
       icon: "⏳",
-      bg: "bg-amber-50 border-amber-200",
+      bg: "bg-[linear-gradient(145deg,rgba(255,251,235,0.96),rgba(255,255,255,0.92))] border-amber-200/70",
       text: "text-amber-700",
       valueColor: "text-amber-600",
     },
@@ -26,7 +26,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Em Atendimento",
       value: String(stats.emAtendimento),
       icon: "🔧",
-      bg: "bg-blue-50 border-blue-200",
+      bg: "bg-[linear-gradient(145deg,rgba(239,246,255,0.96),rgba(255,255,255,0.92))] border-blue-200/70",
       text: "text-blue-700",
       valueColor: "text-blue-600",
     },
@@ -34,7 +34,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Finalizados",
       value: String(stats.finalizado),
       icon: "✅",
-      bg: "bg-emerald-50 border-emerald-200",
+      bg: "bg-[linear-gradient(145deg,rgba(236,253,245,0.96),rgba(255,255,255,0.92))] border-emerald-200/70",
       text: "text-emerald-700",
       valueColor: "text-emerald-600",
     },
@@ -42,7 +42,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Urgentes",
       value: String(stats.urgentes),
       icon: "🚨",
-      bg: "bg-red-50 border-red-200",
+      bg: "bg-[linear-gradient(145deg,rgba(254,242,242,0.96),rgba(255,255,255,0.92))] border-red-200/70",
       text: "text-red-700",
       valueColor: "text-red-600",
     },
@@ -50,7 +50,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Tempo Médio",
       value: mediaMin !== null ? formatEstimateMinutes(mediaMin) : "—",
       icon: "⏱️",
-      bg: "bg-indigo-50 border-indigo-200",
+      bg: "bg-[linear-gradient(145deg,rgba(238,242,255,0.96),rgba(255,255,255,0.92))] border-indigo-200/70",
       text: "text-indigo-700",
       valueColor: "text-indigo-600",
       subtitle:
@@ -65,17 +65,17 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`rounded-xl border ${card.bg} p-3 sm:p-4 transition-all hover:shadow-md ${
+          className={`fade-up rounded-[26px] border ${card.bg} p-3.5 shadow-[0_16px_32px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,23,42,0.1)] sm:p-4 ${
             card.label === "Tempo Médio" ? "col-span-2 sm:col-span-1" : ""
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg sm:text-xl">{card.icon}</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/85 text-lg shadow-sm sm:text-xl">{card.icon}</span>
             <span className={`text-xs font-medium ${card.text} sm:text-sm`}>
               {card.label}
             </span>
           </div>
-          <p className={`mt-1 text-2xl font-bold ${card.valueColor} sm:text-3xl`}>
+          <p className={`mt-3 text-2xl font-black tracking-tight ${card.valueColor} sm:text-3xl`}>
             {card.value}
           </p>
           {"subtitle" in card && card.subtitle && (

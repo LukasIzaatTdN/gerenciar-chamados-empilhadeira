@@ -31,25 +31,25 @@ export default function Header({
       : "border-amber-200/40 bg-amber-500/15 text-amber-50";
 
   return (
-    <header className="bg-gradient-to-r from-amber-500 via-orange-500 to-orange-600 shadow-lg">
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+    <header className="sticky top-0 z-20 border-b border-white/60 bg-[linear-gradient(135deg,rgba(251,191,36,0.94),rgba(249,115,22,0.94))] shadow-[0_14px_34px_rgba(249,115,22,0.18)] backdrop-blur-xl">
+      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-sm">
               <span className="text-2xl">🏗️</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white sm:text-2xl">
+              <h1 className="text-xl font-black tracking-tight text-white sm:text-2xl">
                 Painel Empilhadeira
               </h1>
-              <p className="text-xs text-orange-100 sm:text-sm">
-                Gerenciamento de Chamados
+              <p className="text-xs text-orange-50/90 sm:text-sm">
+                Operacao agil para patio, docas e estoque
               </p>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
             <div
-              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm sm:self-auto ${syncBadgeClassName}`}
+              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm sm:self-auto ${syncBadgeClassName}`}
             >
               <span
                 className={`inline-block h-2.5 w-2.5 rounded-full ${
@@ -59,7 +59,7 @@ export default function Header({
               {syncLabel}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex">
             {/* Notification Center */}
             <NotificationCenter
               notifications={notifications}

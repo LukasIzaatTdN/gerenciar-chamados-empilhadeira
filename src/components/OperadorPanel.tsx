@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import type { Chamado, Setor } from "../types/chamado";
-import { SETORES } from "../types/chamado";
 import type { AppNotification } from "../types/notification";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
@@ -71,6 +70,19 @@ export default function OperadorPanel({
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
+
+  const setoresDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          chamados
+            .map((c) => c.setor.trim())
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b, "pt-BR"))
+        )
+      ),
+    [chamados]
+  );
 
   // Categorize chamados
   const pendentes = useMemo(
@@ -314,7 +326,7 @@ export default function OperadorPanel({
             >
               Todos
             </button>
-            {SETORES.map((setor) => (
+            {setoresDisponiveis.map((setor) => (
               <button
                 key={setor}
                 onClick={() => setFilterSetor(setor)}

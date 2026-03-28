@@ -1,13 +1,4 @@
-export type Setor =
-  | "Doca 1"
-  | "Doca 2"
-  | "Estoque A"
-  | "Estoque B"
-  | "Corredor 1"
-  | "Corredor 2"
-  | "Corredor 3"
-  | "Expedição"
-  | "Área Externa";
+export type Setor = string;
 
 export type TipoServico = "Descarga" | "Reposição" | "Retirada" | "Movimentação";
 
@@ -27,18 +18,6 @@ export interface Chamado {
   iniciado_em: string | null;
   finalizado_em: string | null;
 }
-
-export const SETORES: Setor[] = [
-  "Doca 1",
-  "Doca 2",
-  "Estoque A",
-  "Estoque B",
-  "Corredor 1",
-  "Corredor 2",
-  "Corredor 3",
-  "Expedição",
-  "Área Externa",
-];
 
 export const TIPOS_SERVICO: TipoServico[] = [
   "Descarga",

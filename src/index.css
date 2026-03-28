@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+:root {
+  --app-bg: #f3f4f6;
+  --surface-primary: rgba(255, 255, 255, 0.88);
+  --surface-secondary: rgba(255, 255, 255, 0.7);
+  --border-soft: rgba(148, 163, 184, 0.16);
+  --text-strong: #0f172a;
+  --text-muted: #64748b;
+  --brand-amber: #f59e0b;
+  --brand-orange: #f97316;
+  --brand-slate: #0f172a;
+  --status-waiting: #f59e0b;
+  --status-progress: #2563eb;
+  --status-done: #10b981;
+  --status-urgent: #ef4444;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 20%),
+    linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
+  color: var(--text-strong);
+}
+
+body {
+  min-height: 100vh;
+  background: transparent;
+  color: var(--text-strong);
+}
+
 @keyframes animate-in {
   from {
     opacity: 0;
@@ -13,6 +43,53 @@
 
 .animate-in {
   animation: animate-in 0.2s ease-out;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.28s ease-out both;
+}
+
+.breathe {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.glass-card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    0 12px 24px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(18px);
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px);
+}
+
+.touch-target {
+  min-height: 48px;
 }
 
 @keyframes toast-progress {
@@ -37,4 +114,10 @@
 .max-h-80::-webkit-scrollbar-track,
 .max-h-96::-webkit-scrollbar-track {
   background: transparent;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding-bottom: max(88px, env(safe-area-inset-bottom));
+  }
 }
