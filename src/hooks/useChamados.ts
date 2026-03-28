@@ -1,8 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { Chamado, Setor, TipoServico, Prioridade, Status } from "../types/chamado";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "../config/firebase";
 
 const STORAGE_KEY = "chamados_empilhadeira";
+const CHAMADOS_COLLECTION = "chamados";
 
 function loadChamados(): Chamado[] {
   try {
@@ -63,13 +74,38 @@ export interface ChamadoCallbacks {
 export function useChamados(callbacks?: ChamadoCallbacks) {
   const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados());
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("Todos");
+  const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
-    saveChamados(chamados);
-  }, [chamados]);
+    if (!isRemoteSyncEnabled) {
+      saveChamados(chamados);
+    }
+  }, [chamados, isRemoteSyncEnabled]);
 
-  // Sync across tabs / panels
   useEffect(() => {
+    if (isRemoteSyncEnabled && db) {
+      const chamadosQuery = query(collection(db, CHAMADOS_COLLECTION));
+      return onSnapshot(chamadosQuery, (snapshot) => {
+        const remoteChamados = snapshot.docs.map((snapshotDoc) => {
+          const data = snapshotDoc.data() as Partial<Chamado>;
+          return {
+            id: data.id ?? snapshotDoc.id,
+            solicitante_nome: data.solicitante_nome ?? "",
+            setor: data.setor as Setor,
+            tipo_servico: data.tipo_servico as TipoServico,
+            prioridade: data.prioridade as Prioridade,
+            status: (data.status as Status) ?? "Aguardando",
+            operador_nome: data.operador_nome ?? null,
+            criado_em: data.criado_em ?? new Date().toISOString(),
+            iniciado_em: data.iniciado_em ?? null,
+            finalizado_em: data.finalizado_em ?? null,
+          };
+        });
+
+        setChamados(sortChamados(remoteChamados));
+      });
+    }
+
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
@@ -79,12 +115,14 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         }
       }
     }
+
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [isRemoteSyncEnabled]);
 
-  // Poll for changes every 2 seconds (for same-tab reactivity via localStorage)
   useEffect(() => {
+    if (isRemoteSyncEnabled) return;
+
     const interval = setInterval(() => {
       const current = loadChamados();
       setChamados((prev) => {
@@ -94,11 +132,12 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return prev;
       });
     }, 2000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [isRemoteSyncEnabled]);
 
   const criarChamado = useCallback(
-    (input: NovoChamadoInput) => {
+    async (input: NovoChamadoInput) => {
       const novo: Chamado = {
         id: uuidv4(),
         solicitante_nome: input.solicitante_nome,
@@ -111,35 +150,65 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         iniciado_em: null,
         finalizado_em: null,
       };
-      setChamados((prev) => [...prev, novo]);
+
+      if (db) {
+        await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
+      } else {
+        setChamados((prev) => [...prev, novo]);
+      }
+
       callbacks?.onCriado?.(novo);
     },
     [callbacks]
   );
 
   const assumirChamado = useCallback(
-    (id: string, operadorNome: string) => {
+    async (id: string, operadorNome: string) => {
+      if (db) {
+        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          operador_nome: operadorNome,
+        });
+        const chamado = chamados.find((c) => c.id === id);
+        if (chamado) {
+          callbacks?.onAssumido?.({ ...chamado, operador_nome: operadorNome }, operadorNome);
+        }
+        return;
+      }
+
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id ? { ...c, operador_nome: operadorNome } : c
         );
         const chamado = updated.find((c) => c.id === id);
         if (chamado) {
-          // Defer callback to avoid setState-in-render
           setTimeout(() => callbacks?.onAssumido?.(chamado, operadorNome), 0);
         }
         return updated;
       });
     },
-    [callbacks]
+    [callbacks, chamados]
   );
 
   const iniciarAtendimento = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      const iniciado_em = new Date().toISOString();
+
+      if (db) {
+        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          status: "Em atendimento" as Status,
+          iniciado_em,
+        });
+        const chamado = chamados.find((c) => c.id === id);
+        if (chamado) {
+          callbacks?.onIniciado?.({ ...chamado, status: "Em atendimento", iniciado_em });
+        }
+        return;
+      }
+
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Em atendimento" as Status, iniciado_em: new Date().toISOString() }
+            ? { ...c, status: "Em atendimento" as Status, iniciado_em }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
@@ -149,15 +218,29 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return updated;
       });
     },
-    [callbacks]
+    [callbacks, chamados]
   );
 
   const finalizarChamado = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      const finalizado_em = new Date().toISOString();
+
+      if (db) {
+        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          status: "Finalizado" as Status,
+          finalizado_em,
+        });
+        const chamado = chamados.find((c) => c.id === id);
+        if (chamado) {
+          callbacks?.onFinalizado?.({ ...chamado, status: "Finalizado", finalizado_em });
+        }
+        return;
+      }
+
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Finalizado" as Status, finalizado_em: new Date().toISOString() }
+            ? { ...c, status: "Finalizado" as Status, finalizado_em }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
@@ -167,12 +250,20 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return updated;
       });
     },
-    [callbacks]
+    [callbacks, chamados]
   );
 
-  const excluirChamado = useCallback((id: string) => {
-    setChamados((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+  const excluirChamado = useCallback(
+    async (id: string) => {
+      if (db) {
+        await deleteDoc(doc(db, CHAMADOS_COLLECTION, id));
+        return;
+      }
+
+      setChamados((prev) => prev.filter((c) => c.id !== id));
+    },
+    []
+  );
 
   const chamadosFiltrados = sortChamados(
     filterStatus === "Todos"
