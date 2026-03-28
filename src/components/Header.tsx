@@ -9,6 +9,7 @@ interface HeaderProps {
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
+  syncMode: "firebase" | "local";
 }
 
 export default function Header({
@@ -19,11 +20,20 @@ export default function Header({
   onMarkAsRead,
   onMarkAllAsRead,
   onClearAll,
+  syncMode,
 }: HeaderProps) {
+  const syncLabel =
+    syncMode === "firebase" ? "Firebase ativo" : "Modo local";
+
+  const syncBadgeClassName =
+    syncMode === "firebase"
+      ? "border-emerald-200/40 bg-emerald-500/15 text-emerald-50"
+      : "border-amber-200/40 bg-amber-500/15 text-amber-50";
+
   return (
     <header className="bg-gradient-to-r from-amber-500 via-orange-500 to-orange-600 shadow-lg">
       <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
               <span className="text-2xl">🏗️</span>
@@ -37,7 +47,19 @@ export default function Header({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm sm:self-auto ${syncBadgeClassName}`}
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full ${
+                  syncMode === "firebase" ? "bg-emerald-300" : "bg-amber-200"
+                }`}
+              />
+              {syncLabel}
+            </div>
+
+            <div className="flex items-center gap-2">
             {/* Notification Center */}
             <NotificationCenter
               notifications={notifications}
@@ -76,6 +98,7 @@ export default function Header({
               <span className="hidden sm:inline">Solicitar Empilhadeira</span>
               <span className="sm:hidden">Solicitar</span>
             </button>
+            </div>
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
 import type { Chamado } from "./types/chamado";
+import { hasFirebaseConfig } from "./config/firebase";
 
 type View = "geral" | "operador";
 
@@ -184,6 +185,7 @@ export default function App() {
         onMarkAsRead={markAsRead}
         onMarkAllAsRead={markAllAsRead}
         onClearAll={clearAll}
+        syncMode={hasFirebaseConfig ? "firebase" : "local"}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
