@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-in {
+  animation: animate-in 0.2s ease-out;
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Smooth scrollbar for notification panel */
+.max-h-80::-webkit-scrollbar,
+.max-h-96::-webkit-scrollbar {
+  width: 4px;
+}
+.max-h-80::-webkit-scrollbar-thumb,
+.max-h-96::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
+}
+.max-h-80::-webkit-scrollbar-track,
+.max-h-96::-webkit-scrollbar-track {
+  background: transparent;
+}
