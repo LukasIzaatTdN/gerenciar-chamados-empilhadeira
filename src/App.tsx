@@ -6,18 +6,24 @@ import ChamadoList from "./components/ChamadoList";
 import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
 import OperadorLogin, { type PerfilAcesso } from "./components/OperadorLogin";
 import NotificationToast from "./components/NotificationToast";
+import ProfileSettings from "./components/ProfileSettings";
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
 import type { Chamado } from "./types/chamado";
 import { hasFirebaseConfig } from "./config/firebase";
 
-type View = "geral" | "operador";
+type View = "geral" | "operador" | "perfil";
 type LoginTarget = "general" | "operator";
+type ThemeMode = "light" | "dark";
 
 const OPERADOR_KEY = "operador_empilhadeira_nome";
 const PERFIL_KEY = "operador_empilhadeira_perfil";
 const OPERADOR_STATUS_KEY = "operador_empilhadeira_status";
+const SETOR_KEY = "operador_empilhadeira_setor_principal";
+const NOTIFICACOES_KEY = "operador_empilhadeira_notificacoes";
+const SOM_KEY = "operador_empilhadeira_som";
+const THEME_KEY = "operador_empilhadeira_tema";
 
 export default function App() {
   const [showForm, setShowForm] = useState(false);
@@ -33,6 +39,21 @@ export default function App() {
     const savedStatus = localStorage.getItem(OPERADOR_STATUS_KEY);
     return savedStatus === "Pausa" ? "Pausa" : "Disponível";
   });
+  const [setorPrincipal, setSetorPrincipal] = useState<string>(() => {
+    return localStorage.getItem(SETOR_KEY) || "Estoque";
+  });
+  const [notificacoesAtivas, setNotificacoesAtivas] = useState(() => {
+    const saved = localStorage.getItem(NOTIFICACOES_KEY);
+    return saved === null ? true : saved === "true";
+  });
+  const [somAtivo, setSomAtivo] = useState(() => {
+    const saved = localStorage.getItem(SOM_KEY);
+    return saved === null ? true : saved === "true";
+  });
+  const [tema, setTema] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem(THEME_KEY);
+    return saved === "dark" ? "dark" : "light";
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginTarget, setLoginTarget] = useState<LoginTarget>("general");
 
@@ -46,7 +67,10 @@ export default function App() {
     markAllAsRead,
     dismissToast,
     clearAll,
-  } = useNotifications();
+  } = useNotifications({
+    enabled: notificacoesAtivas,
+    soundEnabled: somAtivo,
+  });
 
   // Notification callbacks for chamado state changes
   const chamadoCallbacks = useMemo(
@@ -126,6 +150,24 @@ export default function App() {
     localStorage.setItem(OPERADOR_STATUS_KEY, operadorStatus);
   }, [operadorStatus]);
 
+  useEffect(() => {
+    localStorage.setItem(SETOR_KEY, setorPrincipal);
+  }, [setorPrincipal]);
+
+  useEffect(() => {
+    localStorage.setItem(NOTIFICACOES_KEY, String(notificacoesAtivas));
+  }, [notificacoesAtivas]);
+
+  useEffect(() => {
+    localStorage.setItem(SOM_KEY, String(somAtivo));
+  }, [somAtivo]);
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, tema);
+    document.documentElement.dataset.theme = tema;
+    document.documentElement.classList.toggle("dark", tema === "dark");
+  }, [tema]);
+
   const canCreateChamado =
     perfilAcesso === "Promotor" ||
     perfilAcesso === "Funcionário" ||
@@ -174,6 +216,15 @@ export default function App() {
     setOperadorNome(null);
     setPerfilAcesso(null);
     setView("geral");
+  }
+
+  function handleAccessProfile() {
+    if (isAuthenticated) {
+      setView("perfil");
+      return;
+    }
+
+    openLoginModal("general");
   }
 
   // Simulate "operator nearby" notification
@@ -231,13 +282,35 @@ export default function App() {
     );
   }
 
+  if (view === "perfil" && operadorNome && perfilAcesso) {
+    return (
+      <>
+        <ProfileSettings
+          nome={operadorNome}
+          perfil={perfilAcesso}
+          setorPrincipal={setorPrincipal}
+          notificacoesAtivas={notificacoesAtivas}
+          somAtivo={somAtivo}
+          tema={tema}
+          onSetorPrincipalChange={setSetorPrincipal}
+          onNotificacoesChange={setNotificacoesAtivas}
+          onSomChange={setSomAtivo}
+          onTemaChange={setTema}
+          onVoltar={() => setView("geral")}
+          onLogout={handleLogout}
+        />
+        <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+      </>
+    );
+  }
+
   // General panel view (promoter)
   return (
     <div className="min-h-screen bg-transparent">
       <Header
         onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
-        onAccessProfile={() => openLoginModal("general")}
+        onAccessProfile={handleAccessProfile}
         notifications={notifications}
         unreadCount={unreadCount}
         onMarkAsRead={markAsRead}
@@ -294,6 +367,15 @@ export default function App() {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/90 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(15,23,42,0.1)] backdrop-blur-xl sm:hidden">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
+          {isAuthenticated && (
+            <button
+              onClick={handleAccessProfile}
+              className="touch-target flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+              aria-label="Abrir perfil e configurações"
+            >
+              ⚙️
+            </button>
+          )}
           <button
             onClick={canAccessOperatorPanel ? handleOperadorAccess : () => openLoginModal("operator")}
             className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"

@@ -22,7 +22,13 @@ function saveNotifications(notifs: AppNotification[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(notifs.slice(0, MAX_NOTIFICATIONS)));
 }
 
-export function useNotifications() {
+export function useNotifications({
+  enabled = true,
+  soundEnabled = true,
+}: {
+  enabled?: boolean;
+  soundEnabled?: boolean;
+} = {}) {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotifications());
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const { play } = useNotificationSound();
@@ -51,6 +57,10 @@ export function useNotifications() {
       chamadoId?: string,
       meta?: Record<string, string>
     ) => {
+      if (!enabled) {
+        return;
+      }
+
       const config = NOTIFICATION_CONFIG[type];
 
       const notif: AppNotification = {
@@ -71,7 +81,9 @@ export function useNotifications() {
       setToasts((prev) => [...prev, notif]);
 
       // Play sound
-      play(config.sound);
+      if (soundEnabled) {
+        play(config.sound);
+      }
 
       // Auto-dismiss toast after 5 seconds
       setTimeout(() => {
@@ -83,7 +95,7 @@ export function useNotifications() {
       // Dispatch to WhatsApp service (future integration)
       dispatchWhatsApp(notif);
     },
-    [play]
+    [enabled, play, soundEnabled]
   );
 
   const markAsRead = useCallback((id: string) => {

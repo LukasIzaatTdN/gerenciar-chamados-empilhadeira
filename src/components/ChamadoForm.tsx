@@ -47,8 +47,8 @@ export default function ChamadoForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="w-full max-w-lg animate-in rounded-t-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] shadow-2xl sm:rounded-[30px]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/38 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="w-full max-w-lg animate-in rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:rounded-[30px]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
@@ -57,14 +57,14 @@ export default function ChamadoForm({
         </div>
         <div className="flex items-center justify-between px-5 pb-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl text-white shadow-[0_10px_22px_rgba(249,115,22,0.28)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0f3d75] to-slate-900 text-xl text-white shadow-[0_10px_22px_rgba(15,23,42,0.22)]">
             <span className="text-xl">🏗️</span>
             </div>
             <div>
-            <h2 className="text-lg font-bold text-gray-800">
+            <h2 className="text-lg font-bold text-slate-900">
               Nova Solicitação de Empilhadeira
             </h2>
-              <p className="text-sm text-slate-500">Preencha rapido e envie para a fila</p>
+              <p className="text-sm text-slate-500">Preencha rápido e envie para a fila</p>
             </div>
           </div>
           <button
@@ -123,7 +123,7 @@ export default function ChamadoForm({
               placeholder="Ex: Doca 3, patio externo, corredor ao lado da expedicao"
               className={`touch-target w-full rounded-2xl border ${
                 errors.setor ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-              } px-4 py-3.5 text-base text-gray-800 transition-colors focus:border-orange-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-orange-100`}
+              } px-4 py-3.5 text-base text-gray-800 transition-colors focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
             />
             {errors.setor && (
               <p className="mt-1 text-xs text-red-500">{errors.setor}</p>
@@ -150,7 +150,7 @@ export default function ChamadoForm({
                     onClick={() => setTipoServico(tipo)}
                     className={`touch-target flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-medium transition-all ${
                       tipoServico === tipo
-                        ? "border-orange-400 bg-orange-50 text-orange-700 ring-4 ring-orange-100"
+                        ? "border-[#0f3d75] bg-blue-50 text-[#0f3d75] ring-4 ring-blue-100"
                         : "border-slate-200 bg-slate-50 text-gray-600 hover:border-slate-300 hover:bg-slate-100"
                     }`}
                   >
@@ -177,7 +177,7 @@ export default function ChamadoForm({
                     prioridade === p
                       ? p === "Urgente"
                         ? "border-red-400 bg-red-50 text-red-700 ring-4 ring-red-100"
-                        : "border-orange-400 bg-orange-50 text-orange-700 ring-4 ring-orange-100"
+                        : "border-amber-400 bg-amber-50 text-amber-700 ring-4 ring-amber-100"
                       : "border-slate-200 bg-slate-50 text-gray-600 hover:border-slate-300 hover:bg-slate-100"
                   }`}
                 >
@@ -199,7 +199,7 @@ export default function ChamadoForm({
             </button>
             <button
               type="submit"
-              className="touch-target rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(249,115,22,0.28)] transition-all hover:from-orange-500 hover:to-orange-700 hover:shadow-xl active:scale-[0.98]"
+              className="touch-target rounded-2xl bg-gradient-to-r from-[#0f3d75] to-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(15,23,42,0.24)] transition-all hover:brightness-110 hover:shadow-xl active:scale-[0.98]"
             >
               🏗️ Solicitar Empilhadeira
             </button>

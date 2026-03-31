@@ -54,18 +54,18 @@ export default function ChamadoCard({
 
   const statusConfig = {
     Aguardando: {
-      bg: "bg-amber-100/80",
+      bg: "bg-amber-100",
       text: "text-amber-900",
       dot: "bg-amber-500",
       label: "Aguardando",
       ring: "from-amber-400/90 via-amber-300/80 to-transparent",
     },
     "Em atendimento": {
-      bg: "bg-blue-100/80",
-      text: "text-blue-900",
-      dot: "bg-blue-500",
+      bg: "bg-emerald-100",
+      text: "text-emerald-900",
+      dot: "bg-emerald-500",
       label: "Em atendimento",
-      ring: "from-blue-500/90 via-cyan-400/80 to-transparent",
+      ring: "from-emerald-500/90 via-emerald-300/80 to-transparent",
     },
     Finalizado: {
       bg: "bg-emerald-100/80",
@@ -130,10 +130,10 @@ export default function ChamadoCard({
     <div
       className={`group fade-up relative overflow-hidden rounded-[28px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_36px_rgba(15,23,42,0.09)] ${
         isFinalizado
-          ? "border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.92))] opacity-85"
+          ? "border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(255,255,255,0.96))] opacity-90"
           : isUrgente
-          ? "border-red-200 bg-[linear-gradient(145deg,rgba(254,242,242,0.92),rgba(255,255,255,0.96))] shadow-[0_16px_30px_rgba(239,68,68,0.08)]"
-          : "border-white/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(248,250,252,0.94))] shadow-[0_16px_30px_rgba(15,23,42,0.06)]"
+          ? "border-red-200 bg-[linear-gradient(145deg,rgba(254,242,242,0.96),rgba(255,255,255,0.98))] shadow-[0_16px_30px_rgba(239,68,68,0.08)]"
+          : "border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_16px_30px_rgba(15,23,42,0.08)]"
       }`}
     >
       <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${status.ring}`} />
@@ -169,7 +169,7 @@ export default function ChamadoCard({
         <div className="flex flex-col gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-lg shadow-[0_8px_16px_rgba(15,23,42,0.08)]">
                 {tipoIcons[chamado.tipo_servico]}
               </span>
               <h3 className={`text-base font-black tracking-tight ${isFinalizado ? "text-slate-500" : "text-slate-900"}`}>
@@ -177,7 +177,7 @@ export default function ChamadoCard({
               </h3>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
                 {chamado.setor}
               </span>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-500">
@@ -198,7 +198,7 @@ export default function ChamadoCard({
             )}
           </div>
 
-          <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/85 p-4">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <span className="text-sm">📡</span>
               <h4 className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">

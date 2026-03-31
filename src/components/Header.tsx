@@ -48,7 +48,7 @@ export default function Header({
       : "border-amber-200/40 bg-amber-500/15 text-amber-50";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/60 bg-[linear-gradient(135deg,rgba(251,191,36,0.94),rgba(249,115,22,0.94))] shadow-[0_14px_34px_rgba(249,115,22,0.18)] backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_38px_rgba(15,23,42,0.18)] backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -59,8 +59,8 @@ export default function Header({
               <h1 className="text-xl font-black tracking-tight text-white sm:text-2xl">
                 Painel Empilhadeira
               </h1>
-              <p className="text-xs text-orange-50/90 sm:text-sm">
-                Operacao agil para patio, docas e estoque
+              <p className="text-xs text-slate-200/90 sm:text-sm">
+                Operação ágil para pátio, docas e estoque
               </p>
             </div>
           </div>
@@ -84,50 +84,59 @@ export default function Header({
             )}
 
             <div className="hidden items-center gap-2 sm:flex">
-            {/* Notification Center */}
-            <NotificationCenter
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkAsRead={onMarkAsRead}
-              onMarkAllAsRead={onMarkAllAsRead}
-              onClearAll={onClearAll}
-              variant="light"
-            />
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={onMarkAsRead}
+                onMarkAllAsRead={onMarkAllAsRead}
+                onClearAll={onClearAll}
+                variant="light"
+              />
 
-            <button
-              onClick={canAccessOperatorPanel ? onOperadorPanel : onAccessProfile}
-              className="flex items-center gap-2 rounded-xl border-2 border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:border-white/50 active:scale-95 sm:px-4"
-            >
-              <span>👷</span>
-              <span className="hidden sm:inline">{accessButtonLabel}</span>
-              <span className="sm:hidden">{canAccessOperatorPanel ? "Operador" : "Entrar"}</span>
-            </button>
-            <button
-              onClick={onNovoChamado}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-lg transition-all active:scale-95 sm:px-6 sm:text-base ${
-                canCreateChamado
-                  ? "bg-white text-orange-600 hover:bg-orange-50 hover:shadow-xl"
-                  : "bg-slate-900/15 text-white hover:bg-slate-900/20 hover:shadow-xl"
-              }`}
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
+              {perfilAcesso && usuarioNome && (
+                <button
+                  onClick={onAccessProfile}
+                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                >
+                  <span>⚙️</span>
+                  <span>Perfil</span>
+                </button>
+              )}
+
+              <button
+                onClick={canAccessOperatorPanel ? onOperadorPanel : onAccessProfile}
+                className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-              <span className="hidden sm:inline">
-                {canCreateChamado ? "Solicitar Empilhadeira" : "Acesso para Solicitar"}
-              </span>
-              <span className="sm:hidden">{canCreateChamado ? "Solicitar" : "Entrar"}</span>
-            </button>
+                <span>👷</span>
+                <span className="hidden sm:inline">{accessButtonLabel}</span>
+                <span className="sm:hidden">{canAccessOperatorPanel ? "Operador" : "Entrar"}</span>
+              </button>
+              <button
+                onClick={onNovoChamado}
+                className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold shadow-lg transition-all active:scale-95 sm:px-6 sm:text-base ${
+                  canCreateChamado
+                    ? "bg-amber-500 text-slate-950 hover:bg-amber-400 hover:shadow-xl"
+                    : "bg-white/10 text-white hover:bg-white/16 hover:shadow-xl"
+                }`}
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+                <span className="hidden sm:inline">
+                  {canCreateChamado ? "Solicitar Empilhadeira" : "Acesso para Solicitar"}
+                </span>
+                <span className="sm:hidden">{canCreateChamado ? "Solicitar" : "Entrar"}</span>
+              </button>
             </div>
           </div>
         </div>

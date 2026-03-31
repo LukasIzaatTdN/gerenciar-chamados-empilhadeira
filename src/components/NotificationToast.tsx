@@ -9,31 +9,31 @@ interface NotificationToastProps {
 
 const COLOR_MAP: Record<string, { bg: string; border: string; bar: string; icon: string }> = {
   blue: {
-    bg: "bg-blue-50",
+    bg: "bg-white",
     border: "border-blue-200",
-    bar: "bg-blue-500",
-    icon: "bg-blue-100 text-blue-600",
+    bar: "bg-blue-700",
+    icon: "bg-blue-100 text-blue-700",
   },
   indigo: {
-    bg: "bg-indigo-50",
+    bg: "bg-white",
     border: "border-indigo-200",
-    bar: "bg-indigo-500",
-    icon: "bg-indigo-100 text-indigo-600",
+    bar: "bg-blue-700",
+    icon: "bg-blue-100 text-blue-700",
   },
   emerald: {
-    bg: "bg-emerald-50",
+    bg: "bg-white",
     border: "border-emerald-200",
     bar: "bg-emerald-500",
     icon: "bg-emerald-100 text-emerald-600",
   },
   amber: {
-    bg: "bg-amber-50",
+    bg: "bg-white",
     border: "border-amber-200",
     bar: "bg-amber-500",
     icon: "bg-amber-100 text-amber-600",
   },
   green: {
-    bg: "bg-green-50",
+    bg: "bg-white",
     border: "border-green-200",
     bar: "bg-green-500",
     icon: "bg-green-100 text-green-600",
@@ -68,7 +68,7 @@ function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: ()
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border shadow-lg transition-all duration-300 ${colors.bg} ${colors.border} ${
+      className={`relative overflow-hidden rounded-2xl border shadow-[0_18px_36px_rgba(15,23,42,0.14)] transition-all duration-300 ${colors.bg} ${colors.border} ${
         visible && !exiting
           ? "translate-x-0 opacity-100"
           : "translate-x-full opacity-0"
@@ -107,7 +107,7 @@ function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: ()
         {/* Dismiss */}
         <button
           onClick={handleDismiss}
-          className="shrink-0 rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-200/50 hover:text-gray-600"
+          className="shrink-0 rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

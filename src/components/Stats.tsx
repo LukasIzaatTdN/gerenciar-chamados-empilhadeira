@@ -18,7 +18,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Aguardando",
       value: String(stats.aguardando),
       icon: "⏳",
-      bg: "bg-[linear-gradient(145deg,rgba(255,251,235,0.96),rgba(255,255,255,0.92))] border-amber-200/70",
+      bg: "bg-[linear-gradient(145deg,rgba(255,251,235,0.98),rgba(255,255,255,0.98))] border-amber-200",
       text: "text-amber-700",
       valueColor: "text-amber-600",
     },
@@ -26,9 +26,9 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Em Atendimento",
       value: String(stats.emAtendimento),
       icon: "🔧",
-      bg: "bg-[linear-gradient(145deg,rgba(239,246,255,0.96),rgba(255,255,255,0.92))] border-blue-200/70",
-      text: "text-blue-700",
-      valueColor: "text-blue-600",
+      bg: "bg-[linear-gradient(145deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))] border-emerald-200",
+      text: "text-emerald-700",
+      valueColor: "text-emerald-600",
     },
     {
       label: "Finalizados",
@@ -50,9 +50,9 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       label: "Tempo Médio",
       value: mediaMin !== null ? formatEstimateMinutes(mediaMin) : "—",
       icon: "⏱️",
-      bg: "bg-[linear-gradient(145deg,rgba(238,242,255,0.96),rgba(255,255,255,0.92))] border-indigo-200/70",
-      text: "text-indigo-700",
-      valueColor: "text-indigo-600",
+      bg: "bg-[linear-gradient(145deg,rgba(239,246,255,0.98),rgba(255,255,255,0.98))] border-blue-200",
+      text: "text-blue-800",
+      valueColor: "text-blue-700",
       subtitle:
         totalFinalizadosComTempo > 0
           ? `baseado em ${totalFinalizadosComTempo} atendimento${totalFinalizadosComTempo !== 1 ? "s" : ""}`
@@ -65,13 +65,13 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`fade-up rounded-[26px] border ${card.bg} p-3.5 shadow-[0_16px_32px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,23,42,0.1)] sm:p-4 ${
+          className={`fade-up rounded-[28px] border ${card.bg} p-4 shadow-[0_14px_30px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)] sm:p-5 ${
             card.label === "Tempo Médio" ? "col-span-2 sm:col-span-1" : ""
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/85 text-lg shadow-sm sm:text-xl">{card.icon}</span>
-            <span className={`text-xs font-medium ${card.text} sm:text-sm`}>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-lg shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:text-xl">{card.icon}</span>
+            <span className={`text-xs font-semibold ${card.text} sm:text-sm`}>
               {card.label}
             </span>
           </div>

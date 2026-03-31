@@ -25,7 +25,7 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/90 p-4 backdrop-blur-md">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(30,41,59,0.14),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_28%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,61,117,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_28%)]" />
 
       <div className="relative w-full max-w-md animate-in rounded-[32px] border border-slate-200/80 bg-white shadow-[0_30px_70px_rgba(15,23,42,0.16)]">
         <div className="flex items-center justify-end px-5 pt-5">
@@ -41,7 +41,7 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
         </div>
 
         <div className="px-6 pb-2 text-center sm:px-8">
-          <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-[28px] bg-[linear-gradient(135deg,#0f172a,#1d4ed8)] text-3xl text-white shadow-[0_20px_40px_rgba(29,78,216,0.25)]">
+            <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-[28px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-3xl text-white shadow-[0_20px_40px_rgba(15,23,42,0.22)]">
             🏗️
           </div>
           <h1 className="mt-5 text-2xl font-black tracking-tight text-slate-900">
@@ -87,7 +87,7 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
                   onClick={() => setPerfil(item)}
                   className={`touch-target rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
                     perfil === item
-                      ? "border-blue-900 bg-blue-950 text-white shadow-[0_12px_24px_rgba(15,23,42,0.18)]"
+                      ? "border-[#0f3d75] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white shadow-[0_12px_24px_rgba(15,23,42,0.18)]"
                       : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100"
                   }`}
                 >
@@ -99,7 +99,7 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
 
           <button
             type="submit"
-            className="touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f172a,#1d4ed8)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] transition-all hover:brightness-105 active:scale-[0.99]"
+            className="touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] transition-all hover:brightness-105 active:scale-[0.99]"
           >
             Entrar
           </button>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Chamado, TipoServico } from "../types/chamado";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
+import { cn } from "../utils/cn";
 
 interface DashboardProdutividadeProps {
   chamados: Chamado[];
@@ -11,13 +12,7 @@ type ChartDatum = {
   value: number;
 };
 
-const SERVICE_LABELS: TipoServico[] = [
-  "Descarga",
-  "Reposição",
-  "Retirada",
-  "Movimentação",
-];
-
+const SERVICE_LABELS: TipoServico[] = ["Descarga", "Reposição", "Retirada", "Movimentação"];
 type PeriodoFiltro = "Hoje" | "7 dias" | "30 dias";
 
 function sameDay(iso: string, reference: Date) {
@@ -56,10 +51,7 @@ function getTopSetor(chamados: Chamado[]) {
 function buildHourlySeries(chamados: Chamado[]) {
   const buckets = Array.from({ length: 8 }, (_, index) => {
     const hour = index * 3;
-    return {
-      label: `${String(hour).padStart(2, "0")}h`,
-      value: 0,
-    };
+    return { label: `${String(hour).padStart(2, "0")}h`, value: 0 };
   });
 
   chamados.forEach((chamado) => {
@@ -74,7 +66,6 @@ function buildHourlySeries(chamados: Chamado[]) {
 
 function buildSectorData(chamados: Chamado[]): ChartDatum[] {
   const counts = new Map<string, number>();
-
   chamados.forEach((chamado) => {
     counts.set(chamado.setor, (counts.get(chamado.setor) ?? 0) + 1);
   });
@@ -101,6 +92,26 @@ function formatDateTime(iso: string) {
   });
 }
 
+function CardShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div className="mb-4">
+        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function BarChart({
   title,
   subtitle,
@@ -113,25 +124,21 @@ function BarChart({
   tone?: "blue" | "amber";
 }) {
   const max = Math.max(...data.map((item) => item.value), 1);
-  const barColor = tone === "amber" ? "from-amber-400 to-orange-500" : "from-cyan-400 to-blue-500";
+  const barColor = tone === "amber" ? "from-amber-400 to-orange-500" : "from-[#0f3d75] to-blue-500";
 
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-      <div className="mb-4">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white/60">{title}</h3>
-        <p className="mt-1 text-sm text-white/45">{subtitle}</p>
-      </div>
+    <CardShell title={title} subtitle={subtitle}>
       <div className="space-y-3">
         {data.length === 0 ? (
-          <p className="text-sm text-white/35">Sem dados para exibir hoje.</p>
+          <p className="text-sm text-slate-400">Sem dados para exibir.</p>
         ) : (
           data.map((item) => (
             <div key={item.label} className="space-y-1">
               <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="truncate font-medium text-white/80">{item.label}</span>
-                <span className="font-semibold text-white/45">{item.value}</span>
+                <span className="truncate font-medium text-slate-700">{item.label}</span>
+                <span className="font-semibold text-slate-500">{item.value}</span>
               </div>
-              <div className="h-2 rounded-full bg-white/8">
+              <div className="h-2 rounded-full bg-slate-100">
                 <div
                   className={`h-2 rounded-full bg-gradient-to-r ${barColor}`}
                   style={{ width: `${(item.value / max) * 100}%` }}
@@ -141,7 +148,7 @@ function BarChart({
           ))
         )}
       </div>
-    </div>
+    </CardShell>
   );
 }
 
@@ -158,27 +165,15 @@ function LineChart({ data }: { data: ChartDatum[] }) {
     .join(" ");
 
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-      <div className="mb-4">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white/60">Atendimentos ao longo do dia</h3>
-        <p className="mt-1 text-sm text-white/45">Distribuição das movimentações em blocos de 3 horas.</p>
-      </div>
-
-      <div className="rounded-[22px] border border-white/8 bg-slate-950/20 p-4">
+    <CardShell
+      title="Atendimentos ao longo do dia"
+      subtitle="Distribuição das movimentações em blocos de 3 horas."
+    >
+      <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full overflow-visible">
           {[0, 1, 2, 3].map((line) => {
             const y = 6 + (line * (height - 10)) / 3;
-            return (
-              <line
-                key={line}
-                x1="0"
-                y1={y}
-                x2={width}
-                y2={y}
-                stroke="rgba(255,255,255,0.08)"
-                strokeDasharray="2 2"
-              />
-            );
+            return <line key={line} x1="0" y1={y} x2={width} y2={y} stroke="#cbd5e1" strokeDasharray="2 2" />;
           })}
           <polyline
             fill="none"
@@ -193,8 +188,8 @@ function LineChart({ data }: { data: ChartDatum[] }) {
             const y = height - (item.value / max) * (height - 6) - 3;
             return (
               <g key={item.label}>
-                <circle cx={x} cy={y} r="2.5" fill="#38bdf8" />
-                <text x={x} y={height + 4} textAnchor="middle" fontSize="4" fill="rgba(255,255,255,0.5)">
+                <circle cx={x} cy={y} r="2.5" fill="#0f3d75" />
+                <text x={x} y={height + 4} textAnchor="middle" fontSize="4" fill="#64748b">
                   {item.label}
                 </text>
               </g>
@@ -202,22 +197,19 @@ function LineChart({ data }: { data: ChartDatum[] }) {
           })}
           <defs>
             <linearGradient id="lineGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="0%" stopColor="#0f3d75" />
               <stop offset="100%" stopColor="#3b82f6" />
             </linearGradient>
           </defs>
         </svg>
       </div>
-    </div>
+    </CardShell>
   );
 }
 
 function DonutChart({ data }: { data: ChartDatum[] }) {
-  const total = Math.max(
-    data.reduce((sum, item) => sum + item.value, 0),
-    1
-  );
-  const colors = ["#22c55e", "#38bdf8", "#f59e0b", "#a855f7"];
+  const total = Math.max(data.reduce((sum, item) => sum + item.value, 0), 1);
+  const colors = ["#10b981", "#0f3d75", "#f59e0b", "#ef4444"];
   let currentAngle = -90;
 
   const segments = data.map((item, index) => {
@@ -229,37 +221,17 @@ function DonutChart({ data }: { data: ChartDatum[] }) {
     const start = polarToCartesian(50, 50, 36, endAngle);
     const end = polarToCartesian(50, 50, 36, startAngle);
     const largeArcFlag = angle > 180 ? 1 : 0;
-    const path = [
-      "M",
-      start.x,
-      start.y,
-      "A",
-      36,
-      36,
-      0,
-      largeArcFlag,
-      0,
-      end.x,
-      end.y,
-    ].join(" ");
+    const path = ["M", start.x, start.y, "A", 36, 36, 0, largeArcFlag, 0, end.x, end.y].join(" ");
 
-    return {
-      ...item,
-      color: colors[index % colors.length],
-      path,
-    };
+    return { ...item, color: colors[index % colors.length], path };
   });
 
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-      <div className="mb-4">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white/60">Tipos de serviço</h3>
-        <p className="mt-1 text-sm text-white/45">Participação de cada tipo de chamado no período de hoje.</p>
-      </div>
+    <CardShell title="Tipos de serviço" subtitle="Participação de cada tipo de chamado no período.">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-        <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-full bg-slate-950/20">
+        <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-full bg-slate-50">
           <svg viewBox="0 0 100 100" className="h-40 w-40">
-            <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
+            <circle cx="50" cy="50" r="36" fill="none" stroke="#e2e8f0" strokeWidth="12" />
             {segments.map((segment) => (
               <path
                 key={segment.label}
@@ -270,10 +242,10 @@ function DonutChart({ data }: { data: ChartDatum[] }) {
                 strokeLinecap="round"
               />
             ))}
-            <text x="50" y="48" textAnchor="middle" fontSize="8" fill="white" fontWeight="700">
+            <text x="50" y="48" textAnchor="middle" fontSize="8" fill="#0f172a" fontWeight="700">
               {data.reduce((sum, item) => sum + item.value, 0)}
             </text>
-            <text x="50" y="57" textAnchor="middle" fontSize="4" fill="rgba(255,255,255,0.5)">
+            <text x="50" y="57" textAnchor="middle" fontSize="4" fill="#64748b">
               chamados
             </text>
           </svg>
@@ -282,18 +254,18 @@ function DonutChart({ data }: { data: ChartDatum[] }) {
           {segments.map((segment) => (
             <div
               key={segment.label}
-              className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/5 px-4 py-3"
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
             >
               <div className="flex items-center gap-3">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: segment.color }} />
-                <span className="text-sm font-medium text-white/80">{segment.label}</span>
+                <span className="text-sm font-medium text-slate-700">{segment.label}</span>
               </div>
-              <span className="text-sm font-semibold text-white/55">{segment.value}</span>
+              <span className="text-sm font-semibold text-slate-500">{segment.value}</span>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </CardShell>
   );
 }
 
@@ -305,9 +277,7 @@ function polarToCartesian(centerX: number, centerY: number, radius: number, angl
   };
 }
 
-export default function DashboardProdutividade({
-  chamados,
-}: DashboardProdutividadeProps) {
+export default function DashboardProdutividade({ chamados }: DashboardProdutividadeProps) {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("Hoje");
 
   const {
@@ -365,8 +335,7 @@ export default function DashboardProdutividade({
               finalizadosNoPeriodo.reduce(
                 (sum, chamado) =>
                   sum +
-                  (new Date(chamado.finalizado_em!).getTime() -
-                    new Date(chamado.iniciado_em!).getTime()),
+                  (new Date(chamado.finalizado_em!).getTime() - new Date(chamado.iniciado_em!).getTime()),
                 0
               ) /
                 finalizadosNoPeriodo.length /
@@ -392,38 +361,36 @@ export default function DashboardProdutividade({
     {
       label: "Chamados no período",
       value: String(chamadosFiltrados.length),
-      tone: "from-cyan-400/20 to-blue-500/15 border-cyan-400/15",
+      tone: "border-blue-200 bg-[linear-gradient(145deg,rgba(239,246,255,0.98),rgba(255,255,255,0.98))]",
     },
     {
       label: "Tempo médio",
       value: mediaMinPeriodo !== null ? formatEstimateMinutes(mediaMinPeriodo) : "—",
-      tone: "from-emerald-400/20 to-green-500/15 border-emerald-400/15",
+      tone: "border-emerald-200 bg-[linear-gradient(145deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))]",
     },
     {
       label: "Setor mais acionado",
       value: setorMaisAcionado.total > 0 ? setorMaisAcionado.setor : "Sem dados",
-      tone: "from-indigo-400/20 to-violet-500/15 border-indigo-400/15",
-      secondary: setorMaisAcionado.total > 0 ? `${setorMaisAcionado.total} chamados` : "nenhuma solicitação hoje",
+      tone: "border-slate-200 bg-[linear-gradient(145deg,rgba(248,250,252,0.98),rgba(255,255,255,0.98))]",
+      secondary: setorMaisAcionado.total > 0 ? `${setorMaisAcionado.total} chamados` : "nenhuma solicitação",
     },
     {
       label: "Urgentes",
       value: String(urgentesFiltrados.length),
-      tone: "from-amber-300/20 to-orange-500/15 border-amber-400/15",
+      tone: "border-red-200 bg-[linear-gradient(145deg,rgba(254,242,242,0.98),rgba(255,255,255,0.98))]",
     },
   ];
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(30,41,59,0.78))] p-5 shadow-[0_22px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+      <div className="rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] p-5 shadow-[0_22px_40px_rgba(15,23,42,0.12)]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300/80">
-              Dashboard de produtividade
-            </p>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Dashboard de produtividade</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
               Indicadores da operação logística
             </h2>
-            <p className="mt-2 max-w-3xl text-sm text-white/55">
+            <p className="mt-2 max-w-3xl text-sm text-slate-500">
               Acompanhe desempenho, setores com maior demanda e a distribuição dos atendimentos ao longo do dia.
             </p>
           </div>
@@ -433,11 +400,12 @@ export default function DashboardProdutividade({
                 key={item}
                 type="button"
                 onClick={() => setPeriodo(item)}
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                className={cn(
+                  "rounded-2xl px-4 py-3 text-sm font-semibold transition-all",
                   periodo === item
-                    ? "bg-cyan-400 text-slate-950 shadow-[0_14px_28px_rgba(34,211,238,0.25)]"
-                    : "border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                }`}
+                    ? "bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white shadow-[0_14px_28px_rgba(15,23,42,0.2)]"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                )}
               >
                 {item}
               </button>
@@ -450,13 +418,14 @@ export default function DashboardProdutividade({
         {cards.map((card) => (
           <div
             key={card.label}
-            className={`rounded-[28px] border bg-gradient-to-br ${card.tone} p-5 shadow-[0_18px_34px_rgba(15,23,42,0.12)] backdrop-blur-sm`}
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/50">{card.label}</p>
-            <p className="mt-3 text-2xl font-black tracking-tight text-white">{card.value}</p>
-            {card.secondary && (
-              <p className="mt-2 text-sm text-white/50">{card.secondary}</p>
+            className={cn(
+              "rounded-[28px] border p-5 shadow-[0_18px_34px_rgba(15,23,42,0.08)]",
+              card.tone
             )}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{card.label}</p>
+            <p className="mt-3 text-2xl font-black tracking-tight text-slate-900">{card.value}</p>
+            {card.secondary && <p className="mt-2 text-sm text-slate-500">{card.secondary}</p>}
           </div>
         ))}
       </div>
@@ -464,7 +433,7 @@ export default function DashboardProdutividade({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
         <BarChart
           title="Chamados por setor"
-          subtitle="Top setores com mais solicitações no dia."
+          subtitle="Top setores com mais solicitações no período."
           data={setorData}
         />
         <LineChart data={lineData} />
@@ -473,71 +442,69 @@ export default function DashboardProdutividade({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.1fr]">
         <DonutChart data={serviceData} />
 
-        <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white/60">Setores que mais solicitaram</h3>
-            <p className="mt-1 text-sm text-white/45">Ranking rápido dos pontos com maior volume de chamados.</p>
-          </div>
+        <CardShell
+          title="Setores que mais solicitaram"
+          subtitle="Ranking rápido dos pontos com maior volume de chamados."
+        >
           <div className="space-y-3">
             {setoresMaisSolicitados.length === 0 ? (
-              <p className="text-sm text-white/35">Sem solicitações registradas hoje.</p>
+              <p className="text-sm text-slate-400">Sem solicitações registradas.</p>
             ) : (
               setoresMaisSolicitados.map((item, index) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/5 px-4 py-3"
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white/70">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white text-xs font-bold text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.06)]">
                       {index + 1}
                     </span>
-                    <span className="text-sm font-medium text-white/80">{item.label}</span>
+                    <span className="text-sm font-medium text-slate-700">{item.label}</span>
                   </div>
-                  <span className="text-sm font-semibold text-white/45">{item.value} chamados</span>
+                  <span className="text-sm font-semibold text-slate-500">{item.value} chamados</span>
                 </div>
               ))
             )}
           </div>
-        </div>
+        </CardShell>
       </div>
 
-      <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-        <div className="mb-4">
-          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white/60">Últimos atendimentos realizados</h3>
-          <p className="mt-1 text-sm text-white/45">Histórico recente dos atendimentos concluídos pela equipe.</p>
-        </div>
+      <CardShell
+        title="Últimos atendimentos realizados"
+        subtitle="Histórico recente dos atendimentos concluídos pela equipe."
+      >
         <div className="space-y-3">
           {ultimosAtendimentos.length === 0 ? (
-            <p className="text-sm text-white/35">Nenhum atendimento finalizado ainda.</p>
+            <p className="text-sm text-slate-400">Nenhum atendimento finalizado ainda.</p>
           ) : (
             ultimosAtendimentos.map((chamado) => (
               <div
                 key={chamado.id}
-                className="grid gap-3 rounded-[24px] border border-white/8 bg-white/5 px-4 py-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto]"
+                className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto]"
               >
                 <div>
-                  <p className="text-sm font-semibold text-white">{chamado.tipo_servico}</p>
-                  <p className="mt-1 text-sm text-white/55">{chamado.setor}</p>
+                  <p className="text-sm font-semibold text-slate-900">{chamado.tipo_servico}</p>
+                  <p className="mt-1 text-sm text-slate-500">{chamado.setor}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/35">Solicitante</p>
-                  <p className="mt-1 text-sm text-white/75">{chamado.solicitante_nome}</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Solicitante</p>
+                  <p className="mt-1 text-sm text-slate-700">{chamado.solicitante_nome}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/35">Tempo</p>
-                  <p className="mt-1 text-sm text-white/75">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Tempo</p>
+                  <p className="mt-1 text-sm text-slate-700">
                     {getDurationMinutes(chamado.iniciado_em!, chamado.finalizado_em!)} min
                   </p>
                 </div>
                 <div className="md:text-right">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/35">Concluído</p>
-                  <p className="mt-1 text-sm text-white/75">{formatDateTime(chamado.finalizado_em!)}</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Concluído</p>
+                  <p className="mt-1 text-sm text-slate-700">{formatDateTime(chamado.finalizado_em!)}</p>
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
+      </CardShell>
     </section>
   );
 }
