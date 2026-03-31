@@ -1,29 +1,46 @@
 import type { AppNotification } from "../types/notification";
 import NotificationCenter from "./NotificationCenter";
+import type { PerfilAcesso } from "./OperadorLogin";
 
 interface HeaderProps {
   onNovoChamado: () => void;
   onOperadorPanel: () => void;
+  onAccessProfile: () => void;
   notifications: AppNotification[];
   unreadCount: number;
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   syncMode: "firebase" | "local";
+  perfilAcesso: PerfilAcesso | null;
+  usuarioNome: string | null;
+  canCreateChamado: boolean;
+  canAccessOperatorPanel: boolean;
 }
 
 export default function Header({
   onNovoChamado,
   onOperadorPanel,
+  onAccessProfile,
   notifications,
   unreadCount,
   onMarkAsRead,
   onMarkAllAsRead,
   onClearAll,
   syncMode,
+  perfilAcesso,
+  usuarioNome,
+  canCreateChamado,
+  canAccessOperatorPanel,
 }: HeaderProps) {
   const syncLabel =
     syncMode === "firebase" ? "Firebase ativo" : "Modo local";
+
+  const accessButtonLabel = canAccessOperatorPanel
+    ? "Painel Operador"
+    : perfilAcesso
+    ? "Trocar Perfil"
+    : "Entrar";
 
   const syncBadgeClassName =
     syncMode === "firebase"
@@ -59,6 +76,13 @@ export default function Header({
               {syncLabel}
             </div>
 
+            {perfilAcesso && usuarioNome && (
+              <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] sm:self-auto">
+                <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
+                {usuarioNome} · {perfilAcesso}
+              </div>
+            )}
+
             <div className="hidden items-center gap-2 sm:flex">
             {/* Notification Center */}
             <NotificationCenter
@@ -71,16 +95,20 @@ export default function Header({
             />
 
             <button
-              onClick={onOperadorPanel}
+              onClick={canAccessOperatorPanel ? onOperadorPanel : onAccessProfile}
               className="flex items-center gap-2 rounded-xl border-2 border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:border-white/50 active:scale-95 sm:px-4"
             >
               <span>👷</span>
-              <span className="hidden sm:inline">Painel Operador</span>
-              <span className="sm:hidden">Operador</span>
+              <span className="hidden sm:inline">{accessButtonLabel}</span>
+              <span className="sm:hidden">{canAccessOperatorPanel ? "Operador" : "Entrar"}</span>
             </button>
             <button
               onClick={onNovoChamado}
-              className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-orange-600 shadow-lg transition-all hover:bg-orange-50 hover:shadow-xl active:scale-95 sm:px-6 sm:text-base"
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-lg transition-all active:scale-95 sm:px-6 sm:text-base ${
+                canCreateChamado
+                  ? "bg-white text-orange-600 hover:bg-orange-50 hover:shadow-xl"
+                  : "bg-slate-900/15 text-white hover:bg-slate-900/20 hover:shadow-xl"
+              }`}
             >
               <svg
                 className="h-5 w-5"
@@ -95,8 +123,10 @@ export default function Header({
                   d="M12 4.5v15m7.5-7.5h-15"
                 />
               </svg>
-              <span className="hidden sm:inline">Solicitar Empilhadeira</span>
-              <span className="sm:hidden">Solicitar</span>
+              <span className="hidden sm:inline">
+                {canCreateChamado ? "Solicitar Empilhadeira" : "Acesso para Solicitar"}
+              </span>
+              <span className="sm:hidden">{canCreateChamado ? "Solicitar" : "Entrar"}</span>
             </button>
             </div>
           </div>

@@ -5,10 +5,15 @@ import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 import NotificationCenter from "./NotificationCenter";
+import DashboardProdutividade from "./DashboardProdutividade";
+
+export type OperadorStatus = "Disponível" | "Pausa";
 
 interface OperadorPanelProps {
   chamados: Chamado[];
   operadorNome: string;
+  operadorStatus: OperadorStatus;
+  onStatusChange: (status: OperadorStatus) => void;
   onAssumir: (id: string, operadorNome: string) => void;
   onIniciar: (id: string) => void;
   onFinalizar: (id: string) => void;
@@ -50,11 +55,13 @@ function getDuration(start: string, end: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
-type FilterTab = "pendentes" | "meus" | "finalizados";
+type FilterTab = "dashboard" | "pendentes" | "meus" | "finalizados";
 
 export default function OperadorPanel({
   chamados,
   operadorNome,
+  operadorStatus,
+  onStatusChange,
   onAssumir,
   onIniciar,
   onFinalizar,
@@ -69,7 +76,8 @@ export default function OperadorPanel({
   onSimulateProximo,
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
-  const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
+  const [activeTab, setActiveTab] = useState<FilterTab>("dashboard");
+  const isDisponivel = operadorStatus === "Disponível";
 
   const setoresDisponiveis = useMemo(
     () =>
@@ -140,7 +148,9 @@ export default function OperadorPanel({
       ? applySetorFilter(pendentes)
       : activeTab === "meus"
       ? applySetorFilter(meusChamados)
-      : applySetorFilter(finalizados);
+      : activeTab === "finalizados"
+      ? applySetorFilter(finalizados)
+      : [];
 
   const tipoIcons: Record<string, string> = {
     Descarga: "📦",
@@ -150,6 +160,7 @@ export default function OperadorPanel({
   };
 
   const tabs: { key: FilterTab; label: string; count: number; icon: string }[] = [
+    { key: "dashboard", label: "Dashboard", count: chamados.length, icon: "📈" },
     { key: "pendentes", label: "Pendentes", count: pendentes.length, icon: "📋" },
     { key: "meus", label: "Meus Chamados", count: meusChamados.length, icon: "👷" },
     { key: "finalizados", label: "Finalizados", count: finalizados.length, icon: "✅" },
@@ -180,6 +191,16 @@ export default function OperadorPanel({
                 <p className="text-xs text-indigo-300 sm:text-sm">
                   Olá, <span className="font-semibold text-indigo-200">{operadorNome}</span>
                 </p>
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">
+                  <span
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${
+                      isDisponivel
+                        ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.45)]"
+                        : "bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.45)]"
+                    }`}
+                  />
+                  Status: {operadorStatus}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -227,6 +248,45 @@ export default function OperadorPanel({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-white/55">
+                Status do operador
+              </h2>
+              <p className="mt-1 text-sm text-white/70">
+                Defina rapidamente se voce esta disponível para assumir novos chamados.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              {(["Disponível", "Pausa"] as OperadorStatus[]).map((status) => {
+                const active = operadorStatus === status;
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => onStatusChange(status)}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
+                      active
+                        ? status === "Disponível"
+                          ? "bg-emerald-500 text-white shadow-[0_14px_28px_rgba(16,185,129,0.28)]"
+                          : "bg-amber-400 text-slate-950 shadow-[0_14px_28px_rgba(245,158,11,0.28)]"
+                        : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {!isDisponivel && (
+            <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              Em pausa: voce continua vendo os chamados, mas nao pode assumir novos atendimentos.
+            </div>
+          )}
+        </div>
+
         {/* Operator Quick Stats */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 sm:p-4">
@@ -312,38 +372,43 @@ export default function OperadorPanel({
           ))}
         </div>
 
-        {/* Sector Filter */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <span className="shrink-0 text-xs font-medium text-white/40">Filtrar setor:</span>
-            <button
-              onClick={() => setFilterSetor("Todos")}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                filterSetor === "Todos"
-                  ? "bg-white/20 text-white"
-                  : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
-              }`}
-            >
-              Todos
-            </button>
-            {setoresDisponiveis.map((setor) => (
+        {activeTab !== "dashboard" && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="shrink-0 text-xs font-medium text-white/40">Filtrar setor:</span>
               <button
-                key={setor}
-                onClick={() => setFilterSetor(setor)}
+                onClick={() => setFilterSetor("Todos")}
                 className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  filterSetor === setor
+                  filterSetor === "Todos"
                     ? "bg-white/20 text-white"
                     : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
                 }`}
               >
-                {setor}
+                Todos
               </button>
-            ))}
+              {setoresDisponiveis.map((setor) => (
+                <button
+                  key={setor}
+                  onClick={() => setFilterSetor(setor)}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                    filterSetor === setor
+                      ? "bg-white/20 text-white"
+                      : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+                  }`}
+                >
+                  {setor}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Chamado List */}
-        {currentList.length === 0 ? (
+        {/* Dashboard */}
+        {activeTab === "dashboard" ? (
+          <DashboardProdutividade
+            chamados={chamados}
+          />
+        ) : currentList.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 py-16">
             <span className="text-5xl">
               {activeTab === "pendentes" ? "✨" : activeTab === "meus" ? "👷" : "📊"}
@@ -514,9 +579,14 @@ export default function OperadorPanel({
                         {isAguardando && !chamado.operador_nome && (
                           <button
                             onClick={() => onAssumir(chamado.id, operadorNome)}
-                            className="rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-400 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95 sm:text-sm"
+                            disabled={!isDisponivel}
+                            className={`rounded-xl px-4 py-2.5 text-xs font-bold transition-all active:scale-95 sm:text-sm ${
+                              isDisponivel
+                                ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400 hover:shadow-xl hover:shadow-indigo-500/40"
+                                : "cursor-not-allowed bg-white/10 text-white/35"
+                            }`}
                           >
-                            🤚 Assumir
+                            {isDisponivel ? "🤚 Assumir" : "⏸ Em pausa"}
                           </button>
                         )}
 

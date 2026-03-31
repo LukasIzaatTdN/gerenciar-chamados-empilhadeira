@@ -3,8 +3,8 @@ import Header from "./components/Header";
 import Stats from "./components/Stats";
 import ChamadoForm from "./components/ChamadoForm";
 import ChamadoList from "./components/ChamadoList";
-import OperadorPanel from "./components/OperadorPanel";
-import OperadorLogin from "./components/OperadorLogin";
+import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
+import OperadorLogin, { type PerfilAcesso } from "./components/OperadorLogin";
 import NotificationToast from "./components/NotificationToast";
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
@@ -13,8 +13,11 @@ import type { Chamado } from "./types/chamado";
 import { hasFirebaseConfig } from "./config/firebase";
 
 type View = "geral" | "operador";
+type LoginTarget = "general" | "operator";
 
 const OPERADOR_KEY = "operador_empilhadeira_nome";
+const PERFIL_KEY = "operador_empilhadeira_perfil";
+const OPERADOR_STATUS_KEY = "operador_empilhadeira_status";
 
 export default function App() {
   const [showForm, setShowForm] = useState(false);
@@ -22,7 +25,16 @@ export default function App() {
   const [operadorNome, setOperadorNome] = useState<string | null>(() => {
     return localStorage.getItem(OPERADOR_KEY);
   });
+  const [perfilAcesso, setPerfilAcesso] = useState<PerfilAcesso | null>(() => {
+    const perfil = localStorage.getItem(PERFIL_KEY);
+    return perfil as PerfilAcesso | null;
+  });
+  const [operadorStatus, setOperadorStatus] = useState<OperadorStatus>(() => {
+    const savedStatus = localStorage.getItem(OPERADOR_STATUS_KEY);
+    return savedStatus === "Pausa" ? "Pausa" : "Disponível";
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginTarget, setLoginTarget] = useState<LoginTarget>("general");
 
   // Notification system
   const {
@@ -102,22 +114,65 @@ export default function App() {
     }
   }, [operadorNome]);
 
+  useEffect(() => {
+    if (perfilAcesso) {
+      localStorage.setItem(PERFIL_KEY, perfilAcesso);
+    } else {
+      localStorage.removeItem(PERFIL_KEY);
+    }
+  }, [perfilAcesso]);
+
+  useEffect(() => {
+    localStorage.setItem(OPERADOR_STATUS_KEY, operadorStatus);
+  }, [operadorStatus]);
+
+  const canCreateChamado =
+    perfilAcesso === "Promotor" ||
+    perfilAcesso === "Funcionário" ||
+    perfilAcesso === "Supervisor";
+
+  const canAccessOperatorPanel =
+    perfilAcesso === "Operador" || perfilAcesso === "Supervisor";
+
+  const isAuthenticated = Boolean(operadorNome && perfilAcesso);
+
+  function openLoginModal(target: LoginTarget) {
+    setLoginTarget(target);
+    setShowLoginModal(true);
+  }
+
   function handleOperadorAccess() {
-    if (operadorNome) {
+    if (isAuthenticated && canAccessOperatorPanel) {
       setView("operador");
     } else {
-      setShowLoginModal(true);
+      openLoginModal("operator");
     }
   }
 
-  function handleOperadorLogin(nome: string) {
+  function handleNovoChamadoAccess() {
+    if (isAuthenticated && canCreateChamado) {
+      setShowForm(true);
+    } else {
+      openLoginModal("general");
+    }
+  }
+
+  function handleOperadorLogin(nome: string, perfil: PerfilAcesso) {
     setOperadorNome(nome);
+    setPerfilAcesso(perfil);
     setShowLoginModal(false);
-    setView("operador");
+
+    if (loginTarget === "operator" && (perfil === "Operador" || perfil === "Supervisor")) {
+      setView("operador");
+      return;
+    }
+
+    setView("geral");
   }
 
   function handleLogout() {
     setOperadorNome(null);
+    setPerfilAcesso(null);
     setView("geral");
   }
 
@@ -150,12 +205,14 @@ export default function App() {
   }, [allChamados, operadorNome, notify]);
 
   // Operator panel view
-  if (view === "operador" && operadorNome) {
+  if (view === "operador" && operadorNome && canAccessOperatorPanel) {
     return (
       <>
         <OperadorPanel
           chamados={allChamados}
           operadorNome={operadorNome}
+          operadorStatus={operadorStatus}
+          onStatusChange={setOperadorStatus}
           onAssumir={assumirChamado}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
@@ -178,14 +235,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-transparent">
       <Header
-        onNovoChamado={() => setShowForm(true)}
+        onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
+        onAccessProfile={() => openLoginModal("general")}
         notifications={notifications}
         unreadCount={unreadCount}
         onMarkAsRead={markAsRead}
         onMarkAllAsRead={markAllAsRead}
         onClearAll={clearAll}
         syncMode={hasFirebaseConfig ? "firebase" : "local"}
+        perfilAcesso={perfilAcesso}
+        usuarioNome={operadorNome}
+        canCreateChamado={canCreateChamado}
+        canAccessOperatorPanel={canAccessOperatorPanel}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
@@ -221,9 +283,6 @@ export default function App() {
           chamados={chamados}
           filterStatus={filterStatus}
           onFilterChange={setFilterStatus}
-          onIniciar={iniciarAtendimento}
-          onFinalizar={finalizarChamado}
-          onExcluir={excluirChamado}
           timeEstimates={timeEstimates}
         />
       </main>
@@ -236,18 +295,18 @@ export default function App() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/90 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(15,23,42,0.1)] backdrop-blur-xl sm:hidden">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <button
-            onClick={handleOperadorAccess}
+            onClick={canAccessOperatorPanel ? handleOperadorAccess : () => openLoginModal("operator")}
             className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
           >
             <span>👷</span>
-            Operador
+            {canAccessOperatorPanel ? "Operador" : "Entrar"}
           </button>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleNovoChamadoAccess}
             className="touch-target flex flex-[1.35] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(249,115,22,0.32)]"
           >
             <span className="text-base">＋</span>
-            Novo Chamado
+            {canCreateChamado ? "Novo Chamado" : "Acesso para Solicitar"}
           </button>
         </div>
       </div>
@@ -255,6 +314,8 @@ export default function App() {
       {/* New Chamado Modal */}
       {showForm && (
         <ChamadoForm
+          solicitanteNome={operadorNome ?? ""}
+          solicitantePerfil={perfilAcesso}
           onSubmit={(data) => {
             criarChamado(data);
             setShowForm(false);

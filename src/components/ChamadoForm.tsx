@@ -4,12 +4,18 @@ import { TIPOS_SERVICO, PRIORIDADES } from "../types/chamado";
 import type { NovoChamadoInput } from "../hooks/useChamados";
 
 interface ChamadoFormProps {
+  solicitanteNome: string;
+  solicitantePerfil?: string | null;
   onSubmit: (data: NovoChamadoInput) => void;
   onCancel: () => void;
 }
 
-export default function ChamadoForm({ onSubmit, onCancel }: ChamadoFormProps) {
-  const [nome, setNome] = useState("");
+export default function ChamadoForm({
+  solicitanteNome,
+  solicitantePerfil,
+  onSubmit,
+  onCancel,
+}: ChamadoFormProps) {
   const [setor, setSetor] = useState<Setor>("");
   const [tipoServico, setTipoServico] = useState<TipoServico>("Descarga");
   const [prioridade, setPrioridade] = useState<Prioridade>("Normal");
@@ -19,8 +25,8 @@ export default function ChamadoForm({ onSubmit, onCancel }: ChamadoFormProps) {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
-    if (!nome.trim()) {
-      newErrors.nome = "Informe o nome do solicitante";
+    if (!solicitanteNome.trim()) {
+      newErrors.nome = "Faça login para identificar o solicitante";
     }
 
     if (!setor.trim()) {
@@ -33,7 +39,7 @@ export default function ChamadoForm({ onSubmit, onCancel }: ChamadoFormProps) {
     }
 
     onSubmit({
-      solicitante_nome: nome.trim(),
+      solicitante_nome: solicitanteNome.trim(),
       setor: setor.trim(),
       tipo_servico: tipoServico,
       prioridade,
@@ -73,24 +79,30 @@ export default function ChamadoForm({ onSubmit, onCancel }: ChamadoFormProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5 px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
-          {/* Nome do Solicitante */}
+          {/* Solicitante */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Nome do Solicitante *
+              Solicitante identificado
             </label>
-            <input
-              type="text"
-              value={nome}
-              onChange={(e) => {
-                setNome(e.target.value);
-                setErrors((prev) => ({ ...prev, nome: "" }));
-              }}
-              placeholder="Ex: João Silva"
-              className={`touch-target w-full rounded-2xl border ${
+            <div
+              className={`touch-target flex items-center justify-between rounded-2xl border ${
                 errors.nome ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-              } px-4 py-3.5 text-base text-gray-800 transition-colors focus:border-orange-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-orange-100`}
-              autoFocus
-            />
+              } px-4 py-3.5`}
+            >
+              <div>
+                <p className="text-base font-semibold text-slate-900">
+                  {solicitanteNome || "Usuário não identificado"}
+                </p>
+                {solicitantePerfil && (
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Perfil: {solicitantePerfil}
+                  </p>
+                )}
+              </div>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                Login ativo
+              </span>
+            </div>
             {errors.nome && (
               <p className="mt-1 text-xs text-red-500">{errors.nome}</p>
             )}

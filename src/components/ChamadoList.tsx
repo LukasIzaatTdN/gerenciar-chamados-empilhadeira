@@ -7,9 +7,6 @@ interface ChamadoListProps {
   chamados: Chamado[];
   filterStatus: FilterStatus;
   onFilterChange: (status: FilterStatus) => void;
-  onIniciar: (id: string) => void;
-  onFinalizar: (id: string) => void;
-  onExcluir: (id: string) => void;
   timeEstimates: TimeEstimatesResult;
 }
 
@@ -24,9 +21,6 @@ export default function ChamadoList({
   chamados,
   filterStatus,
   onFilterChange,
-  onIniciar,
-  onFinalizar,
-  onExcluir,
   timeEstimates,
 }: ChamadoListProps) {
   return (
@@ -69,9 +63,6 @@ export default function ChamadoList({
             <ChamadoCard
               key={chamado.id}
               chamado={chamado}
-              onIniciar={onIniciar}
-              onFinalizar={onFinalizar}
-              onExcluir={onExcluir}
               estimate={timeEstimates.estimates[chamado.id]}
               remainingMin={timeEstimates.tempoRestanteEmAtendimento[chamado.id]}
             />
