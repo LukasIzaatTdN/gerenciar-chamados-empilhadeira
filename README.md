@@ -100,7 +100,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
 - Usuários ativos da mesma unidade podem assumir chamados e acessar o painel operacional.
-- Etapas operacionais do atendimento exigem perfil operacional da unidade.
+- Etapas operacionais do atendimento exigem apenas unidade correta e usuário ativo.
 - Supervisor visualiza dashboard/fila/relatórios da unidade dele e pode atuar operacionalmente na mesma unidade.
 - Administrador geral pode visualizar todas as unidades.
 

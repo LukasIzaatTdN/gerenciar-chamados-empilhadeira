@@ -191,10 +191,7 @@ async function ensureFirebaseSessionForChamado(chamado: Chamado) {
     throw new Error("Seu acesso está inativo no sistema.");
   }
 
-  if (
-    perfilResolved !== "Administrador Geral" &&
-    supermercadoResolved !== chamado.supermercado_id
-  ) {
+  if (supermercadoResolved !== chamado.supermercado_id) {
     throw new Error(
       `Unidade divergente no Firebase. Usuário: ${supermercadoResolved ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
     );
