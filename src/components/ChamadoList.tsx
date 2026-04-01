@@ -1,6 +1,7 @@
 import type { Chamado } from "../types/chamado";
 import type { FilterStatus } from "../hooks/useChamados";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
+import type { Supermercado } from "../types/supermercado";
 import ChamadoCard from "./ChamadoCard";
 
 interface ChamadoListProps {
@@ -9,6 +10,7 @@ interface ChamadoListProps {
   onFilterChange: (status: FilterStatus) => void;
   timeEstimates: TimeEstimatesResult;
   showSupermercado: boolean;
+  supermercados?: Supermercado[];
 }
 
 const FILTERS: { label: string; value: FilterStatus }[] = [
@@ -24,6 +26,7 @@ export default function ChamadoList({
   onFilterChange,
   timeEstimates,
   showSupermercado,
+  supermercados = [],
 }: ChamadoListProps) {
   return (
     <div className="space-y-4">
@@ -68,6 +71,7 @@ export default function ChamadoList({
               estimate={timeEstimates.estimates[chamado.id]}
               remainingMin={timeEstimates.tempoRestanteEmAtendimento[chamado.id]}
               showSupermercado={showSupermercado}
+              supermercados={supermercados}
             />
           ))}
         </div>

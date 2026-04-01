@@ -1,5 +1,6 @@
 import type { Chamado } from "../types/chamado";
 import { getSupermercadoById } from "../data/supermercados";
+import type { Supermercado } from "../types/supermercado";
 import type { TimeEstimate } from "../hooks/useTimeEstimates";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 
@@ -8,6 +9,7 @@ interface ChamadoCardProps {
   estimate?: TimeEstimate;
   remainingMin?: number | null;
   showSupermercado?: boolean;
+  supermercados?: Supermercado[];
 }
 
 function formatDateTime(iso: string) {
@@ -49,6 +51,7 @@ export default function ChamadoCard({
   estimate,
   remainingMin,
   showSupermercado = false,
+  supermercados = [],
 }: ChamadoCardProps) {
   const isUrgente = chamado.prioridade === "Urgente";
   const isEmAtendimento = chamado.status === "Em atendimento";
@@ -86,7 +89,10 @@ export default function ChamadoCard({
   };
 
   const status = statusConfig[chamado.status];
-  const supermercado = getSupermercadoById(chamado.supermercado_id);
+  const supermercado = getSupermercadoById(
+    chamado.supermercado_id,
+    supermercados.length > 0 ? supermercados : undefined
+  );
 
   const atualizacoes = [
     {

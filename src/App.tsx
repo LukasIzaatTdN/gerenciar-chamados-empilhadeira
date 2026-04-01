@@ -775,6 +775,7 @@ export default function App() {
           onFilterChange={setFilterStatus}
           timeEstimates={timeEstimates}
           showSupermercado={canViewAllUnits && adminSupermercadoFiltro === "todos"}
+          supermercados={supermercados}
         />
           </>
         )}
