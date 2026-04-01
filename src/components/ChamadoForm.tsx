@@ -65,11 +65,14 @@ export default function ChamadoForm({
         tipo_servico: tipoServico,
         prioridade,
       });
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Não foi possível abrir o chamado agora. Verifique suas permissões e tente novamente.";
       setErrors((prev) => ({
         ...prev,
-        submit:
-          "Não foi possível abrir o chamado agora. Verifique suas permissões e tente novamente.",
+        submit: message,
       }));
     } finally {
       setIsSubmitting(false);

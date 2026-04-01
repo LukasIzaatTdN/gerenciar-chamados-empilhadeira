@@ -205,7 +205,14 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       };
 
       if (db) {
-        await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
+        try {
+          await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Não foi possível abrir o chamado agora. Tente novamente."
+          );
+        }
       } else {
         setChamados((prev) => [...prev, novo]);
       }
@@ -221,9 +228,16 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
 
       if (db) {
-        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
-          operador_nome: operadorNome,
-        });
+        try {
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            operador_nome: operadorNome,
+          });
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Não foi possível assumir o chamado."
+          );
+        }
         callbacks?.onAssumido?.(
           { ...chamadoAtual, operador_nome: operadorNome },
           operadorNome
@@ -253,10 +267,17 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       const iniciado_em = new Date().toISOString();
 
       if (db) {
-        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
-          status: "Em atendimento" as Status,
-          iniciado_em,
-        });
+        try {
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            status: "Em atendimento" as Status,
+            iniciado_em,
+          });
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Não foi possível iniciar o atendimento."
+          );
+        }
         callbacks?.onIniciado?.({
           ...chamadoAtual,
           status: "Em atendimento",
@@ -289,10 +310,17 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       const finalizado_em = new Date().toISOString();
 
       if (db) {
-        await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
-          status: "Finalizado" as Status,
-          finalizado_em,
-        });
+        try {
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            status: "Finalizado" as Status,
+            finalizado_em,
+          });
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Não foi possível finalizar o chamado."
+          );
+        }
         callbacks?.onFinalizado?.({
           ...chamadoAtual,
           status: "Finalizado",
@@ -363,3 +391,18 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     excluirChamado,
   };
 }
+  function mapFirestoreWriteError(error: unknown, fallback: string): Error {
+    const firestoreError = error as FirestoreError | undefined;
+    if (firestoreError?.code === "permission-denied") {
+      return new Error(
+        "Permissão negada para salvar chamado. Verifique se seu perfil e unidade estão corretos."
+      );
+    }
+    if (firestoreError?.code === "unauthenticated") {
+      return new Error("Sessão expirada. Faça login novamente.");
+    }
+    if (firestoreError?.code === "unavailable") {
+      return new Error("Firebase indisponível no momento. Tente novamente em instantes.");
+    }
+    return new Error(fallback);
+  }
