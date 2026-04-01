@@ -12,6 +12,16 @@ import type { Supermercado } from "../types/supermercado";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
+function normalizeIdFromCodigo(codigo: string) {
+  return `sm-${codigo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")}`;
+}
+
 function normalizeSupermercado(
   data: Partial<Supermercado>,
   fallbackId: string
@@ -59,10 +69,11 @@ export function useSupermercados() {
 
   const createSupermercado = useCallback(
     async (input: { nome: string; codigo: string; endereco: string }) => {
+      const codigoNormalizado = input.codigo.trim().toUpperCase();
       const novo: Supermercado = {
-        id: `sm-${Date.now()}`,
+        id: normalizeIdFromCodigo(codigoNormalizado),
         nome: input.nome.trim(),
-        codigo: input.codigo.trim().toUpperCase(),
+        codigo: codigoNormalizado,
         endereco: input.endereco.trim(),
         status: "Ativo",
         criado_em: new Date().toISOString(),
