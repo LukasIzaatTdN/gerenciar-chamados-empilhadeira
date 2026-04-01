@@ -210,7 +210,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Não foi possível abrir o chamado agora. Tente novamente."
+            "Permissão negada ao abrir chamado. Verifique perfil e unidade."
           );
         }
       } else {
@@ -240,7 +240,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Não foi possível assumir o chamado."
+            "Permissão negada ao assumir chamado. Verifique perfil e unidade."
           );
         }
         callbacks?.onAssumido?.(
@@ -287,7 +287,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Não foi possível iniciar o atendimento."
+            "Permissão negada ao iniciar atendimento. Verifique perfil e unidade."
           );
         }
         callbacks?.onIniciado?.({
@@ -338,7 +338,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Não foi possível finalizar o chamado."
+            "Permissão negada ao finalizar chamado. Verifique perfil e unidade."
           );
         }
         callbacks?.onFinalizado?.({
@@ -415,15 +415,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   function mapFirestoreWriteError(error: unknown, fallback: string): Error {
     const firestoreError = error as FirestoreError | undefined;
     if (firestoreError?.code === "permission-denied") {
-      return new Error(
-        "Permissão negada para salvar chamado. Verifique se seu perfil e unidade estão corretos."
-      );
+      return new Error(`${fallback} (permission-denied)`);
     }
     if (firestoreError?.code === "unauthenticated") {
-      return new Error("Sessão expirada. Faça login novamente.");
+      return new Error(`${fallback} (sessão expirada)`);
     }
     if (firestoreError?.code === "unavailable") {
-      return new Error("Firebase indisponível no momento. Tente novamente em instantes.");
+      return new Error(`${fallback} (Firebase indisponível)`);
     }
     return new Error(fallback);
   }
