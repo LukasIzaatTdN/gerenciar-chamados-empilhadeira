@@ -41,8 +41,16 @@ export default function Header({
   showOperatorAction,
   showDashboardAction,
 }: HeaderProps) {
+  const firebaseProjectId =
+    typeof import.meta.env.VITE_FIREBASE_PROJECT_ID === "string"
+      ? import.meta.env.VITE_FIREBASE_PROJECT_ID
+      : "";
   const syncLabel =
-    syncMode === "firebase" ? "Firebase ativo" : "Modo local";
+    syncMode === "firebase"
+      ? firebaseProjectId
+        ? `Firebase ativo · ${firebaseProjectId}`
+        : "Firebase ativo"
+      : "Modo local";
 
   const syncBadgeClassName =
     syncMode === "firebase"
