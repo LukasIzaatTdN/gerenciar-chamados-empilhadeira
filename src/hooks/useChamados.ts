@@ -6,13 +6,14 @@ import {
   deleteDoc,
   doc,
   type FirestoreError,
+  getDoc,
   onSnapshot,
   query,
   setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -134,6 +135,45 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   if (scope.canViewAll) return chamados;
   if (!scope.supermercadoId) return [];
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
+}
+
+async function ensureFirebaseSessionForChamado(chamado: Chamado) {
+  if (!db) return;
+
+  const currentUser = auth?.currentUser;
+  if (!currentUser) {
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
+
+  await currentUser.getIdToken(true);
+
+  const userSnap = await getDoc(doc(db, "usuarios", currentUser.uid));
+  if (!userSnap.exists()) {
+    throw new Error("Cadastro do usuário não encontrado no Firebase.");
+  }
+
+  const userData = userSnap.data() as {
+    perfil?: string;
+    supermercado_id?: string | null;
+    status?: string;
+  };
+
+  if (userData.status === "Inativo") {
+    throw new Error("Seu acesso está inativo no sistema.");
+  }
+
+  if (userData.perfil !== "Operador" && userData.perfil !== "Supervisor" && userData.perfil !== "Administrador Geral") {
+    throw new Error("Seu perfil atual não pode operar chamados.");
+  }
+
+  if (
+    userData.perfil !== "Administrador Geral" &&
+    userData.supermercado_id !== chamado.supermercado_id
+  ) {
+    throw new Error(
+      `Unidade divergente no Firebase. Usuário: ${userData.supermercado_id ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
+    );
+  }
 }
 
 export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
@@ -265,6 +305,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
@@ -312,6 +353,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
@@ -365,6 +407,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
