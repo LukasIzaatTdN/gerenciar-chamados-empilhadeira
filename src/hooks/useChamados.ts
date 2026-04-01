@@ -225,7 +225,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const assumirChamado = useCallback(
     async (id: string, operadorNome: string) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
-      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
 
       if (db) {
         try {
@@ -262,7 +267,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const iniciarAtendimento = useCallback(
     async (id: string, operadorNome: string) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
-      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
 
       const iniciado_em = new Date().toISOString();
       const operador_nome = chamadoAtual.operador_nome ?? operadorNome;
@@ -308,7 +318,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const finalizarChamado = useCallback(
     async (id: string, operadorNome: string) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
-      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
 
       const finalizado_em = new Date().toISOString();
       const operador_nome = chamadoAtual.operador_nome ?? operadorNome;

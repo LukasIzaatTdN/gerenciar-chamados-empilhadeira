@@ -547,6 +547,7 @@ export default function App() {
           onMarkAllAsRead={markAllAsRead}
           onClearAll={clearAll}
           onSimulateProximo={handleSimulateProximo}
+          syncError={syncError}
         />
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
       </>

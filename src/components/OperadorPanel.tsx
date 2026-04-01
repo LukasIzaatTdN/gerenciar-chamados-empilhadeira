@@ -27,6 +27,7 @@ interface OperadorPanelProps {
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   onSimulateProximo: () => void;
+  syncError?: string | null;
 }
 
 function formatDateTime(iso: string) {
@@ -76,6 +77,7 @@ export default function OperadorPanel({
   onMarkAllAsRead,
   onClearAll,
   onSimulateProximo,
+  syncError = null,
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
@@ -252,6 +254,12 @@ export default function OperadorPanel({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        {syncError && (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {syncError}
+          </div>
+        )}
+
         <div className="mb-4 rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
