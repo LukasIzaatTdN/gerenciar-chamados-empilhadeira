@@ -11,7 +11,10 @@ service cloud.firestore {
         ? (request.auth.token.perfil != null
             ? request.auth.token.perfil
             : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                && (
+                  !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
+                  || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                )
                 ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
                 : null))
         : null;
@@ -22,7 +25,10 @@ service cloud.firestore {
         ? (request.auth.token.supermercado_id != null
             ? request.auth.token.supermercado_id
             : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                && (
+                  !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
+                  || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                )
                 ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
                 : null))
         : null;
@@ -30,6 +36,28 @@ service cloud.firestore {
 
     function isAdminGeral() {
       return perfil() == "Administrador Geral";
+    }
+
+    function isPerfilValido(perfilInput) {
+      return perfilInput == "Promotor"
+        || perfilInput == "Funcionário"
+        || perfilInput == "Operador"
+        || perfilInput == "Supervisor"
+        || perfilInput == "Administrador Geral";
+    }
+
+    function isSupermercadoVinculoValido(perfilInput, supermercadoId) {
+      return (
+        perfilInput == "Administrador Geral"
+        && (
+          supermercadoId == null
+          || (supermercadoId is string && supermercadoId.size() > 0)
+        )
+      ) || (
+        perfilInput != "Administrador Geral"
+        && supermercadoId is string
+        && supermercadoId.size() > 0
+      );
     }
 
     function isSupervisor() {
@@ -82,7 +110,12 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == id
         && request.resource.data.id == request.auth.uid
-        && request.resource.data.status == "Ativo";
+        && request.resource.data.status == "Ativo"
+        && isPerfilValido(request.resource.data.perfil)
+        && isSupermercadoVinculoValido(
+          request.resource.data.perfil,
+          request.resource.data.supermercado_id
+        );
 
       allow update: if isAdminGeral()
         || (

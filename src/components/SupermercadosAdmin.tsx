@@ -3,9 +3,12 @@ import type { Supermercado } from "../types/supermercado";
 
 interface SupermercadosAdminProps {
   supermercados: Supermercado[];
-  onCreate: (input: { nome: string; codigo: string; endereco: string }) => void;
-  onUpdate: (id: string, input: { nome: string; codigo: string; endereco: string }) => void;
-  onToggleStatus: (id: string) => void;
+  onCreate: (input: { nome: string; codigo: string; endereco: string }) => Promise<void>;
+  onUpdate: (
+    id: string,
+    input: { nome: string; codigo: string; endereco: string }
+  ) => Promise<void>;
+  onToggleStatus: (id: string) => Promise<void>;
   onVoltar: () => void;
 }
 
@@ -39,6 +42,8 @@ export default function SupermercadosAdmin({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
 
   const isEditing = editingId !== null;
   const tituloForm = isEditing ? "Editar supermercado" : "Novo supermercado";
@@ -64,7 +69,7 @@ export default function SupermercadosAdmin({
     return null;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const validation = validateForm();
     if (validation) {
@@ -78,13 +83,23 @@ export default function SupermercadosAdmin({
       endereco: form.endereco.trim(),
     };
 
-    if (editingId) {
-      onUpdate(editingId, payload);
-    } else {
-      onCreate(payload);
+    try {
+      setIsSubmitting(true);
+      if (editingId) {
+        await onUpdate(editingId, payload);
+      } else {
+        await onCreate(payload);
+      }
+      resetForm();
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : "Não foi possível salvar a unidade. Tente novamente.";
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForm();
   }
 
   function beginEdit(supermercado: Supermercado) {
@@ -95,6 +110,22 @@ export default function SupermercadosAdmin({
       endereco: supermercado.endereco,
     });
     setError(null);
+  }
+
+  async function handleToggleStatus(id: string) {
+    try {
+      setPendingStatusId(id);
+      setError(null);
+      await onToggleStatus(id);
+    } catch (toggleError) {
+      const message =
+        toggleError instanceof Error
+          ? toggleError.message
+          : "Não foi possível atualizar o status da unidade.";
+      setError(message);
+    } finally {
+      setPendingStatusId(null);
+    }
   }
 
   return (
@@ -158,9 +189,10 @@ export default function SupermercadosAdmin({
             <div className="flex flex-wrap items-center gap-2 md:col-span-3">
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="touch-target rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.2)]"
               >
-                {isEditing ? "Salvar alteração" : "Cadastrar unidade"}
+                {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteração" : "Cadastrar unidade"}
               </button>
               {isEditing && (
                 <button
@@ -231,14 +263,21 @@ export default function SupermercadosAdmin({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onToggleStatus(supermercado.id)}
+                      onClick={() => {
+                        void handleToggleStatus(supermercado.id);
+                      }}
+                      disabled={pendingStatusId === supermercado.id}
                       className={`rounded-xl px-3 py-2 text-xs font-semibold ${
                         supermercado.status === "Ativo"
                           ? "bg-amber-100 text-amber-700"
                           : "bg-emerald-100 text-emerald-700"
                       }`}
                     >
-                      {supermercado.status === "Ativo" ? "Inativar" : "Ativar"}
+                      {pendingStatusId === supermercado.id
+                        ? "Atualizando..."
+                        : supermercado.status === "Ativo"
+                          ? "Inativar"
+                          : "Ativar"}
                     </button>
                   </div>
                 </div>

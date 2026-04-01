@@ -453,31 +453,31 @@ export default function App() {
     setView("geral");
   }
 
-  function handleCreateSupermercado(input: {
+  async function handleCreateSupermercado(input: {
     nome: string;
     codigo: string;
     endereco: string;
   }) {
-    void createSupermercado({
+    await createSupermercado({
       nome: input.nome.trim(),
       codigo: input.codigo.trim().toUpperCase(),
       endereco: input.endereco.trim(),
     });
   }
 
-  function handleUpdateSupermercado(
+  async function handleUpdateSupermercado(
     id: string,
     input: { nome: string; codigo: string; endereco: string }
   ) {
-    void updateSupermercado(id, {
+    await updateSupermercado(id, {
       nome: input.nome.trim(),
       codigo: input.codigo.trim().toUpperCase(),
       endereco: input.endereco.trim(),
     });
   }
 
-  function handleToggleSupermercadoStatus(id: string) {
-    void toggleSupermercadoStatus(id);
+  async function handleToggleSupermercadoStatus(id: string) {
+    await toggleSupermercadoStatus(id);
   }
 
   function handleOpenSupermercadosAdmin() {

@@ -37,27 +37,24 @@ export function useSupermercados() {
       return;
     }
 
-    return onSnapshot(collection(firestore, SUPERMERCADOS_COLLECTION), async (snapshot) => {
-      if (snapshot.empty) {
-        await Promise.all(
-          SUPERMERCADOS.map((item) =>
-            setDoc(doc(firestore, SUPERMERCADOS_COLLECTION, item.id), item)
+    return onSnapshot(
+      collection(firestore, SUPERMERCADOS_COLLECTION),
+      (snapshot) => {
+        const remote = snapshot.docs
+          .map((snapshotDoc) =>
+            normalizeSupermercado(
+              snapshotDoc.data() as Partial<Supermercado>,
+              snapshotDoc.id
+            )
           )
-        );
-        return;
+          .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+
+        setSupermercados(remote.length > 0 ? remote : SUPERMERCADOS);
+      },
+      () => {
+        setSupermercados(SUPERMERCADOS);
       }
-
-      const remote = snapshot.docs
-        .map((snapshotDoc) =>
-          normalizeSupermercado(
-            snapshotDoc.data() as Partial<Supermercado>,
-            snapshotDoc.id
-          )
-        )
-        .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
-
-      setSupermercados(remote);
-    });
+    );
   }, []);
 
   const createSupermercado = useCallback(
@@ -71,9 +68,13 @@ export function useSupermercados() {
         criado_em: new Date().toISOString(),
       };
 
-      if (db) {
-        await setDoc(doc(db, SUPERMERCADOS_COLLECTION, novo.id), novo);
-        return;
+      try {
+        if (db) {
+          await setDoc(doc(db, SUPERMERCADOS_COLLECTION, novo.id), novo);
+          return;
+        }
+      } catch {
+        throw new Error("Sem permissão para cadastrar supermercado. Verifique o perfil do usuário.");
       }
 
       setSupermercados((prev) => [novo, ...prev]);
@@ -86,13 +87,17 @@ export function useSupermercados() {
       id: string,
       input: { nome: string; codigo: string; endereco: string }
     ) => {
-      if (db) {
-        await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
-          nome: input.nome.trim(),
-          codigo: input.codigo.trim().toUpperCase(),
-          endereco: input.endereco.trim(),
-        });
-        return;
+      try {
+        if (db) {
+          await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
+            nome: input.nome.trim(),
+            codigo: input.codigo.trim().toUpperCase(),
+            endereco: input.endereco.trim(),
+          });
+          return;
+        }
+      } catch {
+        throw new Error("Sem permissão para editar supermercado.");
       }
 
       setSupermercados((prev) =>
@@ -117,11 +122,15 @@ export function useSupermercados() {
 
     const nextStatus = supermercadoAtual.status === "Ativo" ? "Inativo" : "Ativo";
 
-    if (db) {
-      await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
-        status: nextStatus,
-      });
-      return;
+    try {
+      if (db) {
+        await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
+          status: nextStatus,
+        });
+        return;
+      }
+    } catch {
+      throw new Error("Sem permissão para alterar status do supermercado.");
     }
 
     setSupermercados((prev) =>
