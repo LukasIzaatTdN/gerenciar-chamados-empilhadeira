@@ -236,8 +236,40 @@ export default function App() {
         const supermercadoClaim = tokenResult.claims.supermercado_id;
         const nomeClaim = tokenResult.claims.nome;
 
-        if (isPerfilAcesso(perfilClaim)) {
-          const usuarioClaims: UsuarioSistema = {
+        let usuarioResolved: UsuarioSistema | null = null;
+
+        // Prioriza o documento de usuário no Firestore para manter alinhamento com as rules.
+        if (db) {
+          const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
+            if (userData.status === "Inativo") {
+              setUsuarioAtual(null);
+              await signOut(firebaseAuth);
+              setShowLoginModal(true);
+              return;
+            }
+
+            if (isPerfilAcesso(userData.perfil)) {
+              usuarioResolved = {
+                id: firebaseUser.uid,
+                nome:
+                  typeof userData.nome === "string" && userData.nome.trim()
+                    ? userData.nome.trim()
+                    : firebaseUser.email?.trim() || "Usuário",
+                perfil: userData.perfil,
+                supermercado_id:
+                  typeof userData.supermercado_id === "string"
+                    ? userData.supermercado_id
+                    : null,
+              };
+            }
+          }
+        }
+
+        // Fallback para claims quando não houver doc válido.
+        if (!usuarioResolved && isPerfilAcesso(perfilClaim)) {
+          usuarioResolved = {
             id: firebaseUser.uid,
             nome:
               typeof nomeClaim === "string" && nomeClaim.trim()
@@ -251,56 +283,17 @@ export default function App() {
                 ? supermercadoClaim.trim()
                 : null,
           };
-
-          setUsuarioAtual(usuarioClaims);
-          setView((prev) => {
-            if (prev === "perfil" || prev === "supermercados") return prev;
-            return getViewByPerfil(usuarioClaims.perfil);
-          });
-          return;
         }
 
-        if (!db) {
+        if (!usuarioResolved) {
           setUsuarioAtual(null);
           return;
         }
 
-        const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-        if (!userDoc.exists()) {
-          setUsuarioAtual(null);
-          return;
-        }
-
-        const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
-        if (userData.status === "Inativo") {
-          setUsuarioAtual(null);
-          await signOut(firebaseAuth);
-          setShowLoginModal(true);
-          return;
-        }
-
-        if (!isPerfilAcesso(userData.perfil)) {
-          setUsuarioAtual(null);
-          return;
-        }
-
-        const usuarioFromDoc: UsuarioSistema = {
-          id: firebaseUser.uid,
-          nome:
-            typeof userData.nome === "string" && userData.nome.trim()
-              ? userData.nome.trim()
-              : firebaseUser.email?.trim() || "Usuário",
-          perfil: userData.perfil,
-          supermercado_id:
-            typeof userData.supermercado_id === "string"
-              ? userData.supermercado_id
-              : null,
-        };
-
-        setUsuarioAtual(usuarioFromDoc);
+        setUsuarioAtual(usuarioResolved);
         setView((prev) => {
           if (prev === "perfil" || prev === "supermercados") return prev;
-          return getViewByPerfil(usuarioFromDoc.perfil);
+          return getViewByPerfil(usuarioResolved.perfil);
         });
       } catch {
         setUsuarioAtual(null);
