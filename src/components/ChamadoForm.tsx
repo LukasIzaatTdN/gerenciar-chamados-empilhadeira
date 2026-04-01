@@ -14,7 +14,7 @@ interface ChamadoFormProps {
   supermercados?: Supermercado[];
   supermercadoSelecionadoId?: string;
   onSupermercadoSelecionadoChange?: (id: string) => void;
-  onSubmit: (data: NovoChamadoFormInput) => void;
+  onSubmit: (data: NovoChamadoFormInput) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -33,8 +33,9 @@ export default function ChamadoForm({
   const [tipoServico, setTipoServico] = useState<TipoServico>("Descarga");
   const [prioridade, setPrioridade] = useState<Prioridade>("Normal");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
@@ -55,12 +56,24 @@ export default function ChamadoForm({
       return;
     }
 
-    onSubmit({
-      solicitante_nome: solicitanteNome.trim(),
-      setor: setor.trim(),
-      tipo_servico: tipoServico,
-      prioridade,
-    });
+    try {
+      setIsSubmitting(true);
+      setErrors({});
+      await onSubmit({
+        solicitante_nome: solicitanteNome.trim(),
+        setor: setor.trim(),
+        tipo_servico: tipoServico,
+        prioridade,
+      });
+    } catch {
+      setErrors((prev) => ({
+        ...prev,
+        submit:
+          "Não foi possível abrir o chamado agora. Verifique suas permissões e tente novamente.",
+      }));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -251,17 +264,22 @@ export default function ChamadoForm({
             <button
               type="button"
               onClick={onCancel}
+              disabled={isSubmitting}
               className="touch-target rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-200"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               className="touch-target rounded-2xl bg-gradient-to-r from-[#0f3d75] to-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(15,23,42,0.24)] transition-all hover:brightness-110 hover:shadow-xl active:scale-[0.98]"
             >
-              🏗️ Solicitar Empilhadeira
+              {isSubmitting ? "Enviando..." : "🏗️ Solicitar Empilhadeira"}
             </button>
           </div>
+          {errors.submit && (
+            <p className="text-sm font-medium text-red-600">{errors.submit}</p>
+          )}
         </form>
       </div>
     </div>

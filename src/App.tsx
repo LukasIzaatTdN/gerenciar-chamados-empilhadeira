@@ -859,16 +859,16 @@ export default function App() {
           supermercados={supermercados}
           supermercadoSelecionadoId={adminChamadoSupermercadoId}
           onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
-          onSubmit={(data) => {
+          onSubmit={async (data) => {
             const supermercadoChamadoId = permissions.canViewAllUnits
               ? adminChamadoSupermercadoId
               : supermercadoId;
 
             if (!supermercadoChamadoId) {
-              return;
+              throw new Error("Supermercado não definido");
             }
 
-            criarChamado({
+            await criarChamado({
               ...data,
               supermercado_id: supermercadoChamadoId,
             });

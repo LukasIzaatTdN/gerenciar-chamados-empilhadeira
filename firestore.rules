@@ -76,13 +76,98 @@ service cloud.firestore {
       return supermercadoClaim() != null && unidadeId == supermercadoClaim();
     }
 
+    function isTextoNaoVazio(valor) {
+      return valor is string && valor.size() > 0;
+    }
+
+    function isStatusChamadoValido(status) {
+      return status == "Aguardando"
+        || status == "Em atendimento"
+        || status == "Finalizado";
+    }
+
+    function isPrioridadeValida(prioridade) {
+      return prioridade == "Normal" || prioridade == "Urgente";
+    }
+
+    function isTipoServicoValido(tipo) {
+      return tipo == "Descarga"
+        || tipo == "Reposição"
+        || tipo == "Retirada"
+        || tipo == "Movimentação";
+    }
+
+    function isChamadoBaseValido(data) {
+      return isTextoNaoVazio(data.id)
+        && isTextoNaoVazio(data.supermercado_id)
+        && isTextoNaoVazio(data.solicitante_nome)
+        && isTextoNaoVazio(data.setor)
+        && isTipoServicoValido(data.tipo_servico)
+        && isPrioridadeValida(data.prioridade)
+        && isStatusChamadoValido(data.status)
+        && isTextoNaoVazio(data.criado_em)
+        && (data.operador_nome == null || isTextoNaoVazio(data.operador_nome))
+        && (data.iniciado_em == null || isTextoNaoVazio(data.iniciado_em))
+        && (data.finalizado_em == null || isTextoNaoVazio(data.finalizado_em));
+    }
+
+    function isCriacaoChamadoValida() {
+      return isChamadoBaseValido(request.resource.data)
+        && request.resource.data.status == "Aguardando"
+        && request.resource.data.operador_nome == null
+        && request.resource.data.iniciado_em == null
+        && request.resource.data.finalizado_em == null;
+    }
+
+    function isAtualizacaoOperacionalPermitida() {
+      return isChamadoBaseValido(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.solicitante_nome == resource.data.solicitante_nome
+        && request.resource.data.setor == resource.data.setor
+        && request.resource.data.tipo_servico == resource.data.tipo_servico
+        && request.resource.data.prioridade == resource.data.prioridade
+        && request.resource.data.criado_em == resource.data.criado_em;
+    }
+
+    function isTransicaoStatusPermitida() {
+      return (
+        resource.data.status == "Aguardando"
+        && (
+          request.resource.data.status == "Aguardando"
+          || (
+            request.resource.data.status == "Em atendimento"
+            && request.resource.data.iniciado_em != null
+            && request.resource.data.finalizado_em == null
+          )
+        )
+      ) || (
+        resource.data.status == "Em atendimento"
+        && (
+          request.resource.data.status == "Em atendimento"
+          || (
+            request.resource.data.status == "Finalizado"
+            && request.resource.data.iniciado_em != null
+            && request.resource.data.finalizado_em != null
+          )
+        )
+      ) || (
+        resource.data.status == "Finalizado"
+        && request.resource.data.status == "Finalizado"
+      );
+    }
+
     match /chamados/{id} {
       allow read: if isAdminGeral() || isMesmaUnidade(resource.data.supermercado_id);
 
       allow create: if (
-        isAdminGeral()
+        (isAdminGeral()
+          && request.resource.data.id == id
+          && isCriacaoChamadoValida())
         || (
-          (isPromotorOuFuncionario() || isOperador() || isSupervisor())
+          isPromotorOuFuncionario()
+          && request.resource.data.id == id
+          && isCriacaoChamadoValida()
           && isMesmaUnidade(request.resource.data.supermercado_id)
         )
       );
@@ -91,6 +176,8 @@ service cloud.firestore {
         isAdminGeral()
         || (
           (isOperador() || isSupervisor())
+          && isAtualizacaoOperacionalPermitida()
+          && isTransicaoStatusPermitida()
           && isMesmaUnidade(resource.data.supermercado_id)
           && isMesmaUnidade(request.resource.data.supermercado_id)
         )
