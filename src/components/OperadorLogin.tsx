@@ -15,8 +15,6 @@ interface OperadorLoginProps {
   onCancel: () => void;
   supermercados: Supermercado[];
   authMode?: "local" | "firebase";
-  noticeMessage?: string | null;
-  onDismissNotice?: () => void;
 }
 
 const PERFIS_LOGIN: PerfilAcesso[] = [
@@ -33,8 +31,6 @@ export default function OperadorLogin({
   onCancel,
   supermercados,
   authMode = "local",
-  noticeMessage,
-  onDismissNotice,
 }: OperadorLoginProps) {
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [perfilSelecionado, setPerfilSelecionado] = useState<PerfilAcesso | "">("");
@@ -174,12 +170,6 @@ export default function OperadorLogin({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pb-8">
-          {noticeMessage && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-              {noticeMessage}
-            </div>
-          )}
-
           {authMode === "firebase" ? (
             <>
               <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
@@ -188,7 +178,6 @@ export default function OperadorLogin({
                   onClick={() => {
                     setAuthTab("login");
                     setError("");
-                    onDismissNotice?.();
                   }}
                   className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
                     authTab === "login"
@@ -203,7 +192,6 @@ export default function OperadorLogin({
                   onClick={() => {
                     setAuthTab("register");
                     setError("");
-                    onDismissNotice?.();
                   }}
                   className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
                     authTab === "register"
@@ -225,7 +213,6 @@ export default function OperadorLogin({
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setError("");
-                    onDismissNotice?.();
                   }}
                   placeholder="seuemail@empresa.com"
                   required
@@ -246,7 +233,6 @@ export default function OperadorLogin({
                   onChange={(e) => {
                     setPassword(e.target.value);
                     setError("");
-                    onDismissNotice?.();
                   }}
                   placeholder="••••••••"
                   required
@@ -268,7 +254,6 @@ export default function OperadorLogin({
                       onChange={(e) => {
                         setNomeColaborador(e.target.value);
                         setError("");
-                        onDismissNotice?.();
                       }}
                       placeholder="Ex.: João Silva"
                       required
@@ -285,7 +270,6 @@ export default function OperadorLogin({
                       onChange={(e) => {
                         setPerfilSelecionado(e.target.value as PerfilAcesso | "");
                         setError("");
-                        onDismissNotice?.();
                       }}
                       className={`w-full rounded-xl border ${
                         error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
@@ -309,7 +293,6 @@ export default function OperadorLogin({
                       onChange={(e) => {
                         setSupermercadoId(e.target.value);
                         setError("");
-                        onDismissNotice?.();
                       }}
                       className={`w-full rounded-xl border ${
                         error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
@@ -341,7 +324,6 @@ export default function OperadorLogin({
                   onChange={(e) => {
                     setPerfilSelecionado(e.target.value as PerfilAcesso | "");
                     setError("");
-                    onDismissNotice?.();
                   }}
                   className={`w-full rounded-xl border ${
                     error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
@@ -370,7 +352,6 @@ export default function OperadorLogin({
                   onChange={(e) => {
                     setNomeColaborador(e.target.value);
                     setError("");
-                    onDismissNotice?.();
                   }}
                   placeholder="Ex.: João Silva"
                   required
@@ -388,7 +369,6 @@ export default function OperadorLogin({
                     onChange={(e) => {
                       setSupermercadoId(e.target.value);
                       setError("");
-                      onDismissNotice?.();
                     }}
                     className={`w-full rounded-xl border ${
                       error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"

@@ -51,18 +51,22 @@ service cloud.firestore {
     match /chamados/{id} {
       allow read: if isAdminGeral() || isMesmaUnidade(resource.data.supermercado_id);
 
-      allow create: if isAdminGeral()
+      allow create: if (
+        isAdminGeral()
         || (
           (isPromotorOuFuncionario() || isOperador() || isSupervisor())
           && isMesmaUnidade(request.resource.data.supermercado_id)
-        );
+        )
+      );
 
-      allow update: if isAdminGeral()
+      allow update: if (
+        isAdminGeral()
         || (
           (isOperador() || isSupervisor())
           && isMesmaUnidade(resource.data.supermercado_id)
           && isMesmaUnidade(request.resource.data.supermercado_id)
-        );
+        )
+      );
 
       allow delete: if isAdminGeral();
     }
@@ -78,7 +82,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == id
         && request.resource.data.id == request.auth.uid
-        && request.resource.data.status == "Pendente";
+        && request.resource.data.status == "Ativo";
 
       allow update: if isAdminGeral()
         || (

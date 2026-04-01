@@ -19,7 +19,7 @@ function requireArg(name) {
 
 const uid = requireArg("uid");
 const perfil = requireArg("perfil");
-const supermercadoId = readArg("supermercado-id");
+const supermercadoId = requireArg("supermercado-id");
 const nome = readArg("nome");
 const serviceAccountPath = readArg("service-account");
 
@@ -37,15 +37,9 @@ admin.initializeApp({
 
 const claims = {
   perfil,
-  supermercado_id: perfil === "Administrador Geral" ? null : supermercadoId,
+  supermercado_id: supermercadoId,
   nome: nome ?? undefined,
 };
-
-if (perfil !== "Administrador Geral" && !supermercadoId) {
-  throw new Error(
-    "Para perfis não administradores, informe --supermercado-id"
-  );
-}
 
 await admin.auth().setCustomUserClaims(uid, claims);
 

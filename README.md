@@ -31,7 +31,6 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Fluxo de autenticação:
   - sem Firebase: login local por perfil + nome + unidade
   - com Firebase: entrar por e-mail/senha e criar conta (nome, perfil e unidade)
-- Cadastro Firebase com status inicial `Pendente` (aprovação administrativa)
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
@@ -42,14 +41,12 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
-- Script de aprovação administrativa com aplicação de claims:
-  - `npm run auth:approve-user`
+- Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
 
 ### Em andamento / faltando
 
 - Aplicar e validar regras em produção:
   - `firebase deploy --only firestore:rules`
-- Configurar custom claims de forma obrigatória no backend (`perfil`, `supermercado_id`)
 - Criar fluxo administrativo completo de gestão de usuários:
   - alteração de perfil/unidade
   - bloqueio/inativação
@@ -132,10 +129,14 @@ npm run build
 ```bash
 npm run auth:set-claims
 npm run auth:create-token
-npm run auth:approve-user
 ```
 
 Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
+
+Observação importante:
+
+- `--supermercado-id` é obrigatório em todos os scripts de claims/token
+- para Administrador Geral, use `--supermercado-id all`
 
 ## Deploy de regras do Firestore
 

@@ -88,7 +88,6 @@ export default function App() {
     return saved === "dark" ? "dark" : "light";
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
   const {
@@ -251,7 +250,6 @@ export default function App() {
                 : null,
           };
 
-          setAuthNotice(null);
           setUsuarioAtual(usuarioClaims);
           setView((prev) => {
             if (prev === "perfil" || prev === "supermercados") return prev;
@@ -268,27 +266,12 @@ export default function App() {
         const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
         if (!userDoc.exists()) {
           setUsuarioAtual(null);
-          setAuthNotice("Conta sem cadastro interno. Solicite liberação ao administrador.");
-          await signOut(firebaseAuth);
-          setShowLoginModal(true);
           return;
         }
 
-        const userData = userDoc.data() as Partial<UsuarioSistema> & {
-          status?: string;
-        };
-
-        if (userData.status === "Pendente") {
-          setUsuarioAtual(null);
-          setAuthNotice("Conta criada e aguardando aprovação do administrador.");
-          await signOut(firebaseAuth);
-          setShowLoginModal(true);
-          return;
-        }
-
+        const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
         if (userData.status === "Inativo") {
           setUsuarioAtual(null);
-          setAuthNotice("Conta inativa. Entre em contato com o administrador.");
           await signOut(firebaseAuth);
           setShowLoginModal(true);
           return;
@@ -296,9 +279,6 @@ export default function App() {
 
         if (!isPerfilAcesso(userData.perfil)) {
           setUsuarioAtual(null);
-          setAuthNotice("Perfil não configurado para esta conta.");
-          await signOut(firebaseAuth);
-          setShowLoginModal(true);
           return;
         }
 
@@ -315,7 +295,6 @@ export default function App() {
               : null,
         };
 
-        setAuthNotice(null);
         setUsuarioAtual(usuarioFromDoc);
         setView((prev) => {
           if (prev === "perfil" || prev === "supermercados") return prev;
@@ -370,7 +349,6 @@ export default function App() {
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
 
   function openLoginModal() {
-    setAuthNotice(null);
     setShowLoginModal(true);
   }
 
@@ -406,7 +384,6 @@ export default function App() {
   }
 
   async function handleOperadorLogin(usuario: UsuarioSistema) {
-    setAuthNotice(null);
     const usuarioPersistido = await upsertUsuarioFromLogin(usuario);
     setUsuarioAtual(usuarioPersistido);
     setShowLoginModal(false);
@@ -432,7 +409,6 @@ export default function App() {
     password: string;
   }) {
     if (!auth) throw new Error("Firebase Auth não inicializado");
-    setAuthNotice(null);
     await signInWithEmailAndPassword(auth, input.email, input.password);
     setShowLoginModal(false);
   }
@@ -459,16 +435,13 @@ export default function App() {
         nome: input.nome.trim(),
         perfil: input.perfil,
         supermercado_id: input.supermercado_id,
-        status: "Pendente",
+        status: "Ativo",
         email: input.email.trim().toLowerCase(),
         criado_em: new Date().toISOString(),
       },
       { merge: true }
     );
-
-    await signOut(auth);
-    setAuthNotice("Cadastro enviado. Aguarde aprovação do administrador para acessar.");
-    setShowLoginModal(true);
+    setShowLoginModal(false);
   }
 
   function handleLogout() {
@@ -911,8 +884,6 @@ export default function App() {
           onLogin={handleOperadorLogin}
           onFirebaseLogin={handleFirebaseEmailLogin}
           onFirebaseRegister={handleFirebaseRegister}
-          noticeMessage={authNotice}
-          onDismissNotice={() => setAuthNotice(null)}
           onCancel={() => setShowLoginModal(false)}
           supermercados={supermercados}
           authMode={hasFirebaseConfig ? "firebase" : "local"}

@@ -19,19 +19,13 @@ function requireArg(name) {
 
 const uid = requireArg("uid");
 const perfil = requireArg("perfil");
-const supermercadoId = readArg("supermercado-id");
+const supermercadoId = requireArg("supermercado-id");
 const nome = readArg("nome");
 const serviceAccountPath = readArg("service-account");
 
 if (!serviceAccountPath || !fs.existsSync(serviceAccountPath)) {
   throw new Error(
     "Informe um JSON de service account válido via --service-account /caminho/serviceAccount.json"
-  );
-}
-
-if (perfil !== "Administrador Geral" && !supermercadoId) {
-  throw new Error(
-    "Para perfis não administradores, informe --supermercado-id"
   );
 }
 
@@ -43,7 +37,7 @@ admin.initializeApp({
 
 const additionalClaims = {
   perfil,
-  supermercado_id: perfil === "Administrador Geral" ? null : supermercadoId,
+  supermercado_id: supermercadoId,
   nome: nome ?? undefined,
 };
 
