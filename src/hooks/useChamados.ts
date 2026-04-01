@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  type FirestoreError,
   onSnapshot,
   query,
   setDoc,
@@ -142,9 +143,10 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
           setChamados(sortChamados(remoteChamados));
         },
-        () => {
+        (error: FirestoreError) => {
+          const code = error.code ? ` (${error.code})` : "";
           setSyncError(
-            "Falha ao sincronizar chamados com o Firebase. Verifique login, perfil e regras do Firestore."
+            `Falha ao sincronizar chamados com o Firebase${code}. Verifique login, perfil e regras do Firestore.`
           );
         }
       );
