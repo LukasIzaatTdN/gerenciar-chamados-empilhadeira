@@ -18,8 +18,10 @@ import { useSupermercados } from "./hooks/useSupermercados";
 import { useUsuarios } from "./hooks/useUsuarios";
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   getIdTokenResult,
   onAuthStateChanged,
+  signInWithPopup,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
@@ -405,6 +407,42 @@ export default function App() {
   }) {
     if (!auth) throw new Error("Firebase Auth não inicializado");
     await signInWithEmailAndPassword(auth, input.email, input.password);
+    setShowLoginModal(false);
+  }
+
+  async function handleFirebaseGoogleLogin() {
+    if (!auth) throw new Error("Firebase Auth não inicializado");
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const credential = await signInWithPopup(auth, provider);
+
+    if (!db) {
+      setShowLoginModal(false);
+      return;
+    }
+
+    const userRef = doc(db, "usuarios", credential.user.uid);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists()) {
+      await signOut(auth);
+      throw new Error(
+        "Conta Google sem cadastro no sistema. Crie a conta por e-mail/senha ou peça liberação ao administrador."
+      );
+    }
+
+    const data = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
+    if (data.status === "Inativo") {
+      await signOut(auth);
+      throw new Error("Conta inativa. Solicite ativação ao administrador.");
+    }
+
+    if (!isPerfilAcesso(data.perfil)) {
+      await signOut(auth);
+      throw new Error("Perfil de acesso não configurado para esta conta.");
+    }
+
     setShowLoginModal(false);
   }
 
@@ -927,6 +965,7 @@ export default function App() {
         <OperadorLogin
           onLogin={handleOperadorLogin}
           onFirebaseLogin={handleFirebaseEmailLogin}
+          onFirebaseGoogleLogin={handleFirebaseGoogleLogin}
           onFirebaseRegister={handleFirebaseRegister}
           onCancel={() => setShowLoginModal(false)}
           supermercados={supermercados}

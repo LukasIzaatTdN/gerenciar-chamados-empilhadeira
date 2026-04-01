@@ -5,6 +5,7 @@ import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
 interface OperadorLoginProps {
   onLogin: (usuario: UsuarioSistema) => void | Promise<void>;
   onFirebaseLogin?: (input: { email: string; password: string }) => void | Promise<void>;
+  onFirebaseGoogleLogin?: () => void | Promise<void>;
   onFirebaseRegister?: (input: {
     nome: string;
     email: string;
@@ -27,6 +28,7 @@ const PERFIS_LOGIN: PerfilAcesso[] = [
 export default function OperadorLogin({
   onLogin,
   onFirebaseLogin,
+  onFirebaseGoogleLogin,
   onFirebaseRegister,
   onCancel,
   supermercados,
@@ -75,8 +77,12 @@ export default function OperadorLogin({
             email: normalizedEmail,
             password,
           });
-        } catch {
-          setError("Não foi possível entrar. Verifique e-mail e senha.");
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível entrar. Verifique e-mail e senha."
+          );
         }
         return;
       }
@@ -241,6 +247,33 @@ export default function OperadorLogin({
                   } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
                 />
               </div>
+
+              {authTab === "login" && onFirebaseGoogleLogin && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setError("");
+                    try {
+                      await onFirebaseGoogleLogin();
+                    } catch (err) {
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Não foi possível entrar com Google."
+                      );
+                    }
+                  }}
+                  className="touch-target flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                    <path
+                      fill="#EA4335"
+                      d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.4l2.6-2.5C16.7 3.3 14.5 2.4 12 2.4 6.8 2.4 2.6 6.6 2.6 11.8S6.8 21.2 12 21.2c6.9 0 9.2-4.8 9.2-7.3 0-.5-.1-.9-.1-1.3H12z"
+                    />
+                  </svg>
+                  Entrar com Google
+                </button>
+              )}
 
               {authTab === "register" && (
                 <>
