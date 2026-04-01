@@ -3,3 +3,6 @@ dist
 .env
 .env.local
 .env.*.local
+keys/
+*.pem
+serviceAccountKey.json
