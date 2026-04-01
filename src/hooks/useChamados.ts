@@ -266,7 +266,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            status: "Aguardando" as Status,
             operador_nome: operadorNome,
+            atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -314,6 +316,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: "Em atendimento" as Status,
             iniciado_em,
             operador_nome,
+            finalizado_em: null,
+            atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -365,6 +369,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: "Finalizado" as Status,
             finalizado_em,
             operador_nome,
+            atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
           throw mapFirestoreWriteError(

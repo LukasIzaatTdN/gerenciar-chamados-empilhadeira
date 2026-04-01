@@ -197,6 +197,21 @@ service cloud.firestore {
       ) || (
         resource.data.status == "Finalizado"
         && request.resource.data.status == "Finalizado"
+      ) || (
+        !isStatusChamadoValido(resource.data.status)
+        && (
+          request.resource.data.status == "Aguardando"
+          || (
+            request.resource.data.status == "Em atendimento"
+            && request.resource.data.iniciado_em != null
+            && isCampoVazio(request.resource.data.finalizado_em)
+          )
+          || (
+            request.resource.data.status == "Finalizado"
+            && request.resource.data.iniciado_em != null
+            && request.resource.data.finalizado_em != null
+          )
+        )
       );
     }
 
