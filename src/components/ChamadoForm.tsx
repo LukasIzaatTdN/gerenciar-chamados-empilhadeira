@@ -64,10 +64,10 @@ export default function ChamadoForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/38 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="w-full max-w-lg animate-in rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:rounded-[30px]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/38 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="w-full max-w-lg animate-in overflow-y-auto rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.18)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
           <div className="flex items-center gap-3">
             <span className="mx-auto block h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" />
           </div>
@@ -108,9 +108,9 @@ export default function ChamadoForm({
               Solicitante identificado
             </label>
             <div
-              className={`touch-target flex items-center justify-between rounded-2xl border ${
+              className={`touch-target flex flex-col items-start gap-2 rounded-2xl border ${
                 errors.nome ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-              } px-4 py-3.5`}
+              } px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between`}
             >
               <div>
                 <p className="text-base font-semibold text-slate-900">
@@ -193,7 +193,7 @@ export default function ChamadoForm({
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Tipo de Serviço
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {TIPOS_SERVICO.map((tipo) => {
                 const icons: Record<string, string> = {
                   Descarga: "📦",
@@ -225,7 +225,7 @@ export default function ChamadoForm({
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Prioridade
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PRIORIDADES.map((p) => (
                 <button
                   key={p}
@@ -247,7 +247,7 @@ export default function ChamadoForm({
           </div>
 
           {/* Buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={onCancel}
