@@ -100,6 +100,10 @@ service cloud.firestore {
       return valor is string && valor.size() > 0;
     }
 
+    function isCampoVazio(valor) {
+      return valor == null || (valor is string && valor.size() == 0);
+    }
+
     function isStatusChamadoValido(status) {
       return status == "Aguardando"
         || status == "Em atendimento"
@@ -126,9 +130,9 @@ service cloud.firestore {
         && isPrioridadeValida(data.prioridade)
         && isStatusChamadoValido(data.status)
         && isTextoNaoVazio(data.criado_em)
-        && (data.operador_nome == null || isTextoNaoVazio(data.operador_nome))
-        && (data.iniciado_em == null || isTextoNaoVazio(data.iniciado_em))
-        && (data.finalizado_em == null || isTextoNaoVazio(data.finalizado_em));
+        && (isCampoVazio(data.operador_nome) || isTextoNaoVazio(data.operador_nome))
+        && (isCampoVazio(data.iniciado_em) || isTextoNaoVazio(data.iniciado_em))
+        && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em));
     }
 
     function isCriacaoChamadoValida() {
@@ -161,9 +165,12 @@ service cloud.firestore {
           "atualizado_em"
         ])
         && isStatusChamadoValido(request.resource.data.status)
-        && (request.resource.data.operador_nome == null || isTextoNaoVazio(request.resource.data.operador_nome))
-        && (request.resource.data.iniciado_em == null || isTextoNaoVazio(request.resource.data.iniciado_em))
-        && (request.resource.data.finalizado_em == null || isTextoNaoVazio(request.resource.data.finalizado_em));
+        && (
+          isCampoVazio(request.resource.data.operador_nome)
+          || isTextoNaoVazio(request.resource.data.operador_nome)
+        )
+        && (request.resource.data.iniciado_em == null || request.resource.data.iniciado_em is string)
+        && (request.resource.data.finalizado_em == null || request.resource.data.finalizado_em is string);
     }
 
     function isTransicaoStatusPermitida() {
@@ -174,7 +181,7 @@ service cloud.firestore {
           || (
             request.resource.data.status == "Em atendimento"
             && request.resource.data.iniciado_em != null
-            && request.resource.data.finalizado_em == null
+            && isCampoVazio(request.resource.data.finalizado_em)
           )
         )
       ) || (
