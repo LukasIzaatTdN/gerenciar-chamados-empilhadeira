@@ -3,7 +3,9 @@ export type NotificationType =
   | "chamado_assumido"
   | "atendimento_iniciado"
   | "operador_proximo"
-  | "atendimento_finalizado";
+  | "atendimento_finalizado"
+  | "perfil_atualizado"
+  | "erro_perfil";
 
 export interface AppNotification {
   id: string;
@@ -45,5 +47,15 @@ export const NOTIFICATION_CONFIG: Record<
     icon: "✅",
     color: "green",
     sound: "success",
+  },
+  perfil_atualizado: {
+    icon: "🏪",
+    color: "blue",
+    sound: "info",
+  },
+  erro_perfil: {
+    icon: "⚠️",
+    color: "red",
+    sound: "alert",
   },
 };

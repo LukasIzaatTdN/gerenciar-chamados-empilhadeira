@@ -5,6 +5,7 @@ import AdminScopeSelector from "./components/AdminScopeSelector";
 import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
 import SupermercadosAdmin from "./components/SupermercadosAdmin";
+import UsuariosAdmin from "./components/UsuariosAdmin";
 import ChamadoForm from "./components/ChamadoForm";
 import ChamadoList from "./components/ChamadoList";
 import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
@@ -31,7 +32,7 @@ import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
 
-type View = "geral" | "operador" | "perfil" | "dashboard" | "supermercados";
+type View = "geral" | "operador" | "perfil" | "dashboard" | "supermercados" | "usuarios";
 type ThemeMode = "light" | "dark";
 
 const USER_SESSION_KEY = "operador_empilhadeira_usuario";
@@ -98,7 +99,12 @@ export default function App() {
     updateSupermercado,
     toggleSupermercadoStatus,
   } = useSupermercados();
-  const { upsertUsuarioFromLogin } = useUsuarios();
+  const {
+    usuarios,
+    upsertUsuarioFromLogin,
+    updateUsuarioAdmin,
+    toggleUsuarioStatus,
+  } = useUsuarios();
   const operadorNome = usuarioAtual?.nome ?? null;
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
@@ -294,7 +300,7 @@ export default function App() {
 
         setUsuarioAtual(usuarioResolved);
         setView((prev) => {
-          if (prev === "perfil" || prev === "supermercados") return prev;
+          if (prev === "perfil" || prev === "supermercados" || prev === "usuarios") return prev;
           return getViewByPerfil(usuarioResolved.perfil);
         });
       } catch {
@@ -519,6 +525,12 @@ export default function App() {
     }
   }
 
+  function handleOpenUsuariosAdmin() {
+    if (permissions.canViewAllUnits) {
+      setView("usuarios");
+    }
+  }
+
   function handleAccessProfile() {
     if (isAuthenticated) {
       setView("perfil");
@@ -560,6 +572,19 @@ export default function App() {
         "Verifique permissões do usuário operador e regras do Firestore."
       );
     }
+  }
+
+  async function handleUpdateUsuarioAdmin(
+    id: string,
+    input: { perfil: UsuarioSistema["perfil"]; supermercado_id: string | null }
+  ) {
+    await updateUsuarioAdmin(id, input);
+    notify("perfil_atualizado", "Usuário atualizado", "Perfil/unidade alterados com sucesso.");
+  }
+
+  async function handleToggleUsuarioStatus(id: string) {
+    await toggleUsuarioStatus(id);
+    notify("perfil_atualizado", "Status atualizado", "Status do usuário alterado com sucesso.");
   }
 
   // Simulate "operator nearby" notification
@@ -758,6 +783,40 @@ export default function App() {
     );
   }
 
+  if (view === "usuarios" && permissions.canViewAllUnits) {
+    return (
+      <>
+        <Header
+          onNovoChamado={handleNovoChamadoAccess}
+          onOperadorPanel={handleOperadorAccess}
+          onDashboard={handleDashboardAccess}
+          onAccessProfile={handleAccessProfile}
+          onOpenLogin={openLoginModal}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClearAll={clearAll}
+          syncMode={hasFirebaseConfig ? "firebase" : "local"}
+          perfilAcesso={perfilAcesso}
+          usuarioNome={operadorNome}
+          supermercadoNome={supermercadoNome}
+          showCreateAction={permissions.canCreateChamado}
+          showOperatorAction={permissions.canAccessOperatorPanel}
+          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+        />
+        <UsuariosAdmin
+          usuarios={usuarios}
+          supermercados={supermercados}
+          currentAdminId={usuarioAtual?.id ?? null}
+          onUpdate={handleUpdateUsuarioAdmin}
+          onToggleStatus={handleToggleUsuarioStatus}
+          onVoltar={() => setView("geral")}
+        />
+      </>
+    );
+  }
+
   // General panel view (promoter)
   return (
     <div className="min-h-screen bg-transparent">
@@ -792,14 +851,24 @@ export default function App() {
 
         {canViewAllUnits && (
           <div className="mb-5">
-            <button
-              type="button"
-              onClick={handleOpenSupermercadosAdmin}
-              className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-            >
-              <span>🏬</span>
-              <span>Gerenciar Supermercados</span>
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleOpenSupermercadosAdmin}
+                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+              >
+                <span>🏬</span>
+                <span>Gerenciar Supermercados</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenUsuariosAdmin}
+                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+              >
+                <span>👥</span>
+                <span>Gerenciar Usuários</span>
+              </button>
+            </div>
           </div>
         )}
 

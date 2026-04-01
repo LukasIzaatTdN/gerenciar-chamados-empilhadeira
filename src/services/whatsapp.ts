@@ -56,6 +56,12 @@ const MESSAGE_TEMPLATES: Record<NotificationType, (notif: AppNotification) => st
 
   atendimento_finalizado: (n) =>
     `✅ *Atendimento Finalizado*\n\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
+
+  perfil_atualizado: (n) =>
+    `🏪 *Perfil Atualizado*\n\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
+
+  erro_perfil: (n) =>
+    `⚠️ *Erro de Perfil*\n\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
 };
 
 // ─── Send Function ───────────────────────────────────────
@@ -157,6 +163,10 @@ function getRecipientsForType(
         ...(meta?.solicitantePhone ? [meta.solicitantePhone] : []),
         ...(meta?.operadorPhone ? [meta.operadorPhone] : []),
       ];
+
+    case "perfil_atualizado":
+    case "erro_perfil":
+      return config.defaultRecipients;
 
     default:
       return config.defaultRecipients;
