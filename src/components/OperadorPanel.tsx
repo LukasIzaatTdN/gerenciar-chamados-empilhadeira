@@ -16,8 +16,8 @@ interface OperadorPanelProps {
   operadorStatus: OperadorStatus;
   onStatusChange: (status: OperadorStatus) => void;
   onAssumir: (id: string, operadorNome: string) => void;
-  onIniciar: (id: string) => void;
-  onFinalizar: (id: string) => void;
+  onIniciar: (id: string, operadorNome: string) => void;
+  onFinalizar: (id: string, operadorNome: string) => void;
   onVoltar: () => void;
   onLogout: () => void;
   timeEstimates: TimeEstimatesResult;
@@ -644,7 +644,7 @@ export default function OperadorPanel({
 
                         {isAguardando && isAssumido && (
                           <button
-                            onClick={() => onIniciar(chamado.id)}
+                            onClick={() => onIniciar(chamado.id, operadorNome)}
                             className="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 active:scale-95 sm:w-auto sm:text-sm"
                           >
                             Iniciar
@@ -653,7 +653,7 @@ export default function OperadorPanel({
 
                         {isEmAtendimento && isAssumido && (
                           <button
-                            onClick={() => onFinalizar(chamado.id)}
+                            onClick={() => onFinalizar(chamado.id, operadorNome)}
                             className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:brightness-105 active:scale-95 sm:w-auto sm:text-sm"
                           >
                             Finalizar

@@ -6,30 +6,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasUsuarioAtivo() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && (
+          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
+          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+        );
+    }
+
+    function perfilDoc() {
+      return hasUsuarioAtivo()
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+        : null;
+    }
+
+    function supermercadoDoc() {
+      return hasUsuarioAtivo()
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+        : null;
+    }
+
     function perfil() {
       return isSignedIn()
-        ? (request.auth.token.perfil != null
-            ? request.auth.token.perfil
-            : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                && (
-                  !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-                  || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-                )
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+        ? (perfilDoc() != null
+            ? perfilDoc()
+            : (request.auth.token.perfil != null
+                ? request.auth.token.perfil
                 : null))
         : null;
     }
 
     function supermercadoClaim() {
       return isSignedIn()
-        ? (request.auth.token.supermercado_id != null
-            ? request.auth.token.supermercado_id
-            : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                && (
-                  !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-                  || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-                )
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+        ? (supermercadoDoc() != null
+            ? supermercadoDoc()
+            : (request.auth.token.supermercado_id != null
+                ? request.auth.token.supermercado_id
                 : null))
         : null;
     }
@@ -120,14 +133,23 @@ service cloud.firestore {
     }
 
     function isAtualizacaoOperacionalPermitida() {
-      return isChamadoBaseValido(request.resource.data)
-        && request.resource.data.id == resource.data.id
+      return isStatusChamadoValido(request.resource.data.status)
+        && (request.resource.data.operador_nome == null || isTextoNaoVazio(request.resource.data.operador_nome))
+        && (request.resource.data.iniciado_em == null || isTextoNaoVazio(request.resource.data.iniciado_em))
+        && (request.resource.data.finalizado_em == null || isTextoNaoVazio(request.resource.data.finalizado_em))
         && request.resource.data.supermercado_id == resource.data.supermercado_id
         && request.resource.data.solicitante_nome == resource.data.solicitante_nome
         && request.resource.data.setor == resource.data.setor
         && request.resource.data.tipo_servico == resource.data.tipo_servico
         && request.resource.data.prioridade == resource.data.prioridade
-        && request.resource.data.criado_em == resource.data.criado_em;
+        && request.resource.data.criado_em == resource.data.criado_em
+        && (
+          request.resource.data.id == resource.data.id
+          || (
+            !("id" in resource.data)
+            && !("id" in request.resource.data)
+          )
+        );
     }
 
     function isTransicaoStatusPermitida() {

@@ -260,17 +260,19 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   );
 
   const iniciarAtendimento = useCallback(
-    async (id: string) => {
+    async (id: string, operadorNome: string) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
       if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
 
       const iniciado_em = new Date().toISOString();
+      const operador_nome = chamadoAtual.operador_nome ?? operadorNome;
 
       if (db) {
         try {
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
+            operador_nome,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -282,6 +284,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           ...chamadoAtual,
           status: "Em atendimento",
           iniciado_em,
+          operador_nome,
         });
         return;
       }
@@ -289,7 +292,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Em atendimento" as Status, iniciado_em }
+            ? { ...c, status: "Em atendimento" as Status, iniciado_em, operador_nome }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
@@ -303,17 +306,19 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   );
 
   const finalizarChamado = useCallback(
-    async (id: string) => {
+    async (id: string, operadorNome: string) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
       if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
 
       const finalizado_em = new Date().toISOString();
+      const operador_nome = chamadoAtual.operador_nome ?? operadorNome;
 
       if (db) {
         try {
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
+            operador_nome,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -325,6 +330,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           ...chamadoAtual,
           status: "Finalizado",
           finalizado_em,
+          operador_nome,
         });
         return;
       }
@@ -332,7 +338,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Finalizado" as Status, finalizado_em }
+            ? { ...c, status: "Finalizado" as Status, finalizado_em, operador_nome }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
