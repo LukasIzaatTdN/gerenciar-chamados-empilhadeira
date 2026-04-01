@@ -23,7 +23,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import type { Chamado } from "./types/chamado";
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
@@ -490,6 +490,32 @@ export default function App() {
     openLoginModal();
   }
 
+  async function handleOperadorSupermercadoChange(nextSupermercadoId: string) {
+    if (!usuarioAtual || usuarioAtual.perfil !== "Operador") return;
+    if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
+
+    const unidadeAtiva = supermercados.find(
+      (item) => item.id === nextSupermercadoId && item.status === "Ativo"
+    );
+    if (!unidadeAtiva) return;
+
+    if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
+      await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
+        supermercado_id: nextSupermercadoId,
+        atualizado_em: new Date().toISOString(),
+      });
+    }
+
+    setUsuarioAtual((prev) =>
+      prev ? { ...prev, supermercado_id: nextSupermercadoId } : prev
+    );
+    notify(
+      "perfil_atualizado",
+      "Unidade atualizada",
+      `Operação alterada para ${unidadeAtiva.nome}`
+    );
+  }
+
   // Simulate "operator nearby" notification
   const handleSimulateProximo = useCallback(() => {
     // Find the first pending chamado that this operator has assumed or any pending
@@ -553,11 +579,14 @@ export default function App() {
         <ProfileSettings
           nome={operadorNome}
           perfil={perfilAcesso}
+          supermercadoId={supermercadoId}
           supermercadoNome={supermercadoNome}
+          supermercados={supermercados}
           setorPrincipal={setorPrincipal}
           notificacoesAtivas={notificacoesAtivas}
           somAtivo={somAtivo}
           tema={tema}
+          onSupermercadoChange={handleOperadorSupermercadoChange}
           onSetorPrincipalChange={setSetorPrincipal}
           onNotificacoesChange={setNotificacoesAtivas}
           onSomChange={setSomAtivo}
