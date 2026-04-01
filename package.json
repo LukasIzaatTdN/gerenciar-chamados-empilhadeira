@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "auth:set-claims": "node scripts/firebase/set-custom-claims.mjs",
+    "auth:create-token": "node scripts/firebase/create-custom-token.mjs",
+    "auth:approve-user": "node scripts/firebase/approve-user.mjs"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
@@ -24,6 +27,7 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
+    "firebase-admin": "^13.4.0",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.2.4",

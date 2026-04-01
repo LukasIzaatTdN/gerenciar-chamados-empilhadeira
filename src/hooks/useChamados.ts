@@ -9,21 +9,24 @@ import {
   query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
+const LEGACY_SUPERMERCADO_ID = "sem-unidade";
 
 function loadChamados(): Chamado[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return [];
     const parsed = JSON.parse(data) as Chamado[];
-    // Migrate old records that don't have operador_nome
+    // Migrate old records that don't have operador_nome or supermercado_id
     return parsed.map((c) => ({
       ...c,
       operador_nome: c.operador_nome ?? null,
+      supermercado_id: c.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
     }));
   } catch {
     return [];
@@ -55,6 +58,7 @@ function sortChamados(chamados: Chamado[]): Chamado[] {
 }
 
 export interface NovoChamadoInput {
+  supermercado_id: string;
   solicitante_nome: string;
   setor: Setor;
   tipo_servico: TipoServico;
@@ -71,7 +75,24 @@ export interface ChamadoCallbacks {
   onFinalizado?: (chamado: Chamado) => void;
 }
 
-export function useChamados(callbacks?: ChamadoCallbacks) {
+interface ChamadoScope {
+  supermercadoId: string | null;
+  canViewAll: boolean;
+}
+
+function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
+  if (scope.canViewAll) return true;
+  if (!scope.supermercadoId) return false;
+  return chamado.supermercado_id === scope.supermercadoId;
+}
+
+function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
+  if (scope.canViewAll) return chamados;
+  if (!scope.supermercadoId) return [];
+  return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
+}
+
+export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados());
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("Todos");
   const isRemoteSyncEnabled = db !== null;
@@ -84,12 +105,24 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
 
   useEffect(() => {
     if (isRemoteSyncEnabled && db) {
-      const chamadosQuery = query(collection(db, CHAMADOS_COLLECTION));
+      if (!scope.canViewAll && !scope.supermercadoId) {
+        setChamados([]);
+        return;
+      }
+
+      const chamadosQuery = scope.canViewAll
+        ? query(collection(db, CHAMADOS_COLLECTION))
+        : query(
+            collection(db, CHAMADOS_COLLECTION),
+            where("supermercado_id", "==", scope.supermercadoId)
+          );
+
       return onSnapshot(chamadosQuery, (snapshot) => {
         const remoteChamados = snapshot.docs.map((snapshotDoc) => {
           const data = snapshotDoc.data() as Partial<Chamado>;
           return {
             id: data.id ?? snapshotDoc.id,
+            supermercado_id: data.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
             solicitante_nome: data.solicitante_nome ?? "",
             setor: data.setor as Setor,
             tipo_servico: data.tipo_servico as TipoServico,
@@ -118,7 +151,7 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [isRemoteSyncEnabled]);
+  }, [isRemoteSyncEnabled, scope.canViewAll, scope.supermercadoId]);
 
   useEffect(() => {
     if (isRemoteSyncEnabled) return;
@@ -138,8 +171,14 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
 
   const criarChamado = useCallback(
     async (input: NovoChamadoInput) => {
+      if (!scope.canViewAll) {
+        if (!scope.supermercadoId) return;
+        if (input.supermercado_id !== scope.supermercadoId) return;
+      }
+
       const novo: Chamado = {
         id: uuidv4(),
+        supermercado_id: input.supermercado_id,
         solicitante_nome: input.solicitante_nome,
         setor: input.setor,
         tipo_servico: input.tipo_servico,
@@ -159,19 +198,22 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
 
       callbacks?.onCriado?.(novo);
     },
-    [callbacks]
+    [callbacks, scope.canViewAll, scope.supermercadoId]
   );
 
   const assumirChamado = useCallback(
     async (id: string, operadorNome: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+
       if (db) {
         await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
           operador_nome: operadorNome,
         });
-        const chamado = chamados.find((c) => c.id === id);
-        if (chamado) {
-          callbacks?.onAssumido?.({ ...chamado, operador_nome: operadorNome }, operadorNome);
-        }
+        callbacks?.onAssumido?.(
+          { ...chamadoAtual, operador_nome: operadorNome },
+          operadorNome
+        );
         return;
       }
 
@@ -186,11 +228,14 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return updated;
       });
     },
-    [callbacks, chamados]
+    [callbacks, chamados, scope]
   );
 
   const iniciarAtendimento = useCallback(
     async (id: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+
       const iniciado_em = new Date().toISOString();
 
       if (db) {
@@ -198,10 +243,11 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
           status: "Em atendimento" as Status,
           iniciado_em,
         });
-        const chamado = chamados.find((c) => c.id === id);
-        if (chamado) {
-          callbacks?.onIniciado?.({ ...chamado, status: "Em atendimento", iniciado_em });
-        }
+        callbacks?.onIniciado?.({
+          ...chamadoAtual,
+          status: "Em atendimento",
+          iniciado_em,
+        });
         return;
       }
 
@@ -218,11 +264,14 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return updated;
       });
     },
-    [callbacks, chamados]
+    [callbacks, chamados, scope]
   );
 
   const finalizarChamado = useCallback(
     async (id: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+
       const finalizado_em = new Date().toISOString();
 
       if (db) {
@@ -230,10 +279,11 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
           status: "Finalizado" as Status,
           finalizado_em,
         });
-        const chamado = chamados.find((c) => c.id === id);
-        if (chamado) {
-          callbacks?.onFinalizado?.({ ...chamado, status: "Finalizado", finalizado_em });
-        }
+        callbacks?.onFinalizado?.({
+          ...chamadoAtual,
+          status: "Finalizado",
+          finalizado_em,
+        });
         return;
       }
 
@@ -250,11 +300,14 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
         return updated;
       });
     },
-    [callbacks, chamados]
+    [callbacks, chamados, scope]
   );
 
   const excluirChamado = useCallback(
     async (id: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual || !canAccessChamado(chamadoAtual, scope)) return;
+
       if (db) {
         await deleteDoc(doc(db, CHAMADOS_COLLECTION, id));
         return;
@@ -262,26 +315,28 @@ export function useChamados(callbacks?: ChamadoCallbacks) {
 
       setChamados((prev) => prev.filter((c) => c.id !== id));
     },
-    []
+    [chamados, scope]
   );
+
+  const chamadosEscopo = applyScope(chamados, scope);
 
   const chamadosFiltrados = sortChamados(
     filterStatus === "Todos"
-      ? chamados
-      : chamados.filter((c) => c.status === filterStatus)
+      ? chamadosEscopo
+      : chamadosEscopo.filter((c) => c.status === filterStatus)
   );
 
   const stats = {
-    total: chamados.length,
-    aguardando: chamados.filter((c) => c.status === "Aguardando").length,
-    emAtendimento: chamados.filter((c) => c.status === "Em atendimento").length,
-    finalizado: chamados.filter((c) => c.status === "Finalizado").length,
-    urgentes: chamados.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
+    total: chamadosEscopo.length,
+    aguardando: chamadosEscopo.filter((c) => c.status === "Aguardando").length,
+    emAtendimento: chamadosEscopo.filter((c) => c.status === "Em atendimento").length,
+    finalizado: chamadosEscopo.filter((c) => c.status === "Finalizado").length,
+    urgentes: chamadosEscopo.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
   };
 
   return {
     chamados: chamadosFiltrados,
-    allChamados: chamados,
+    allChamados: chamadosEscopo,
     stats,
     filterStatus,
     setFilterStatus,

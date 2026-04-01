@@ -1,4 +1,5 @@
 import type { Chamado } from "../types/chamado";
+import { getSupermercadoById } from "../data/supermercados";
 import type { TimeEstimate } from "../hooks/useTimeEstimates";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 
@@ -6,6 +7,7 @@ interface ChamadoCardProps {
   chamado: Chamado;
   estimate?: TimeEstimate;
   remainingMin?: number | null;
+  showSupermercado?: boolean;
 }
 
 function formatDateTime(iso: string) {
@@ -36,10 +38,17 @@ function getDuration(start: string, end: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
+function getPrioridadeTone(prioridade: Chamado["prioridade"]) {
+  return prioridade === "Urgente"
+    ? "bg-red-100 text-red-700"
+    : "bg-amber-100 text-amber-700";
+}
+
 export default function ChamadoCard({
   chamado,
   estimate,
   remainingMin,
+  showSupermercado = false,
 }: ChamadoCardProps) {
   const isUrgente = chamado.prioridade === "Urgente";
   const isEmAtendimento = chamado.status === "Em atendimento";
@@ -77,6 +86,7 @@ export default function ChamadoCard({
   };
 
   const status = statusConfig[chamado.status];
+  const supermercado = getSupermercadoById(chamado.supermercado_id);
 
   const atualizacoes = [
     {
@@ -160,7 +170,7 @@ export default function ChamadoCard({
             </span>
           )}
 
-          <span className="ml-auto text-xs font-medium text-slate-400">
+          <span className="w-full text-xs font-medium text-slate-400 sm:ml-auto sm:w-auto">
             Ultima atualizacao: {ultimaAtualizacao.value}
           </span>
         </div>
@@ -178,10 +188,21 @@ export default function ChamadoCard({
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
-                {chamado.setor}
+                Setor: {chamado.setor}
+              </span>
+              <span className={`rounded-full px-2.5 py-1 font-semibold ${getPrioridadeTone(chamado.prioridade)}`}>
+                Prioridade: {chamado.prioridade}
+              </span>
+              {showSupermercado && (
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                  {supermercado?.nome ?? "Unidade não identificada"}
+                </span>
+              )}
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-500">
+                Abertura: {formatDateTime(chamado.criado_em)}
               </span>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-500">
-                {getTimeSince(chamado.criado_em)}
+                Espera: {getTimeSince(chamado.criado_em)}
               </span>
             </div>
             <p className={`mt-3 text-sm ${isFinalizado ? "text-slate-400" : "text-slate-500"}`}>

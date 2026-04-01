@@ -33,6 +33,7 @@ html {
     linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
 }
 
 html[data-theme="dark"] {
@@ -43,10 +44,12 @@ html[data-theme="dark"] {
 }
 
 body {
+  margin: 0;
   min-height: 100vh;
   background: transparent;
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
   font-family:
     "Segoe UI",
     "IBM Plex Sans",
@@ -55,6 +58,23 @@ body {
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 @keyframes animate-in {
@@ -146,5 +166,9 @@ body {
 @media (max-width: 640px) {
   body {
     padding-bottom: max(88px, env(safe-area-inset-bottom));
+  }
+
+  html {
+    font-size: 15px;
   }
 }

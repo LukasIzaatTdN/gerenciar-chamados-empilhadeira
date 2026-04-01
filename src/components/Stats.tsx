@@ -2,11 +2,11 @@ import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 
 interface StatsProps {
   stats: {
-    total: number;
     aguardando: number;
     emAtendimento: number;
-    finalizado: number;
+    finalizadosHoje: number;
     urgentes: number;
+    setorMaisAcionado: string;
   };
   mediaMin: number | null;
   totalFinalizadosComTempo: number;
@@ -31,8 +31,8 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       valueColor: "text-emerald-600",
     },
     {
-      label: "Finalizados",
-      value: String(stats.finalizado),
+      label: "Finalizados Hoje",
+      value: String(stats.finalizadosHoje),
       icon: "✅",
       bg: "bg-[linear-gradient(145deg,rgba(236,253,245,0.96),rgba(255,255,255,0.92))] border-emerald-200/70",
       text: "text-emerald-700",
@@ -45,6 +45,15 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       bg: "bg-[linear-gradient(145deg,rgba(254,242,242,0.96),rgba(255,255,255,0.92))] border-red-200/70",
       text: "text-red-700",
       valueColor: "text-red-600",
+    },
+    {
+      label: "Setor Mais Acionado",
+      value: stats.setorMaisAcionado,
+      icon: "📍",
+      bg: "bg-[linear-gradient(145deg,rgba(248,250,252,0.98),rgba(255,255,255,0.98))] border-slate-200",
+      text: "text-slate-700",
+      valueColor: "text-slate-800",
+      subtitle: stats.setorMaisAcionado === "Sem dados" ? "nenhuma solicitação ainda" : "maior demanda do período",
     },
     {
       label: "Tempo Médio",
@@ -61,12 +70,14 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6 sm:gap-4">
       {cards.map((card) => (
         <div
           key={card.label}
           className={`fade-up rounded-[28px] border ${card.bg} p-4 shadow-[0_14px_30px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)] sm:p-5 ${
-            card.label === "Tempo Médio" ? "col-span-2 sm:col-span-1" : ""
+            card.label === "Tempo Médio" || card.label === "Setor Mais Acionado"
+              ? "col-span-2 lg:col-span-1"
+              : ""
           }`}
         >
           <div className="flex items-center gap-2">

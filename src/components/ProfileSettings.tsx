@@ -1,11 +1,12 @@
 import { cn } from "../utils/cn";
-import type { PerfilAcesso } from "./OperadorLogin";
+import type { PerfilAcesso } from "../types/usuario";
 
 type ThemeMode = "light" | "dark";
 
 interface ProfileSettingsProps {
   nome: string;
   perfil: PerfilAcesso;
+  supermercadoNome: string | null;
   setorPrincipal: string;
   notificacoesAtivas: boolean;
   somAtivo: boolean;
@@ -74,6 +75,7 @@ function Toggle({
 export default function ProfileSettings({
   nome,
   perfil,
+  supermercadoNome,
   setorPrincipal,
   notificacoesAtivas,
   somAtivo,
@@ -172,6 +174,7 @@ export default function ProfileSettings({
                 {[
                   { label: "Nome", value: nome },
                   { label: "Perfil", value: perfil },
+                  { label: "Unidade", value: supermercadoNome ?? "Todas as unidades" },
                   { label: "Setor principal", value: setorPrincipal },
                 ].map((item) => (
                   <div

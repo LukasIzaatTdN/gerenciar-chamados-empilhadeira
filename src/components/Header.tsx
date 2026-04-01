@@ -1,11 +1,13 @@
 import type { AppNotification } from "../types/notification";
+import type { PerfilAcesso } from "../types/usuario";
 import NotificationCenter from "./NotificationCenter";
-import type { PerfilAcesso } from "./OperadorLogin";
 
 interface HeaderProps {
   onNovoChamado: () => void;
   onOperadorPanel: () => void;
+  onDashboard: () => void;
   onAccessProfile: () => void;
+  onOpenLogin: () => void;
   notifications: AppNotification[];
   unreadCount: number;
   onMarkAsRead: (id: string) => void;
@@ -14,14 +16,18 @@ interface HeaderProps {
   syncMode: "firebase" | "local";
   perfilAcesso: PerfilAcesso | null;
   usuarioNome: string | null;
-  canCreateChamado: boolean;
-  canAccessOperatorPanel: boolean;
+  supermercadoNome: string | null;
+  showCreateAction: boolean;
+  showOperatorAction: boolean;
+  showDashboardAction: boolean;
 }
 
 export default function Header({
   onNovoChamado,
   onOperadorPanel,
+  onDashboard,
   onAccessProfile,
+  onOpenLogin,
   notifications,
   unreadCount,
   onMarkAsRead,
@@ -30,17 +36,13 @@ export default function Header({
   syncMode,
   perfilAcesso,
   usuarioNome,
-  canCreateChamado,
-  canAccessOperatorPanel,
+  supermercadoNome,
+  showCreateAction,
+  showOperatorAction,
+  showDashboardAction,
 }: HeaderProps) {
   const syncLabel =
     syncMode === "firebase" ? "Firebase ativo" : "Modo local";
-
-  const accessButtonLabel = canAccessOperatorPanel
-    ? "Painel Operador"
-    : perfilAcesso
-    ? "Trocar Perfil"
-    : "Entrar";
 
   const syncBadgeClassName =
     syncMode === "firebase"
@@ -80,6 +82,7 @@ export default function Header({
               <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] sm:self-auto">
                 <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
                 {usuarioNome} · {perfilAcesso}
+                {supermercadoNome ? ` · ${supermercadoNome}` : " · Todas as unidades"}
               </div>
             )}
 
@@ -104,39 +107,52 @@ export default function Header({
               )}
 
               <button
-                onClick={canAccessOperatorPanel ? onOperadorPanel : onAccessProfile}
+                onClick={onOpenLogin}
                 className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
               >
-                <span>👷</span>
-                <span className="hidden sm:inline">{accessButtonLabel}</span>
-                <span className="sm:hidden">{canAccessOperatorPanel ? "Operador" : "Entrar"}</span>
+                <span>🔐</span>
+                <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>
               </button>
-              <button
-                onClick={onNovoChamado}
-                className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold shadow-lg transition-all active:scale-95 sm:px-6 sm:text-base ${
-                  canCreateChamado
-                    ? "bg-amber-500 text-slate-950 hover:bg-amber-400 hover:shadow-xl"
-                    : "bg-white/10 text-white hover:bg-white/16 hover:shadow-xl"
-                }`}
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
+
+              {showOperatorAction && (
+                <button
+                  onClick={onOperadorPanel}
+                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4.5v15m7.5-7.5h-15"
-                  />
-                </svg>
-                <span className="hidden sm:inline">
-                  {canCreateChamado ? "Solicitar Empilhadeira" : "Acesso para Solicitar"}
-                </span>
-                <span className="sm:hidden">{canCreateChamado ? "Solicitar" : "Entrar"}</span>
-              </button>
+                  <span>👷</span>
+                  <span>Painel Operador</span>
+                </button>
+              )}
+              {showDashboardAction && (
+                <button
+                  onClick={onDashboard}
+                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                >
+                  <span>📈</span>
+                  <span>Dashboard</span>
+                </button>
+              )}
+              {showCreateAction && (
+                <button
+                  onClick={onNovoChamado}
+                  className="flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all active:scale-95 hover:bg-amber-400 hover:shadow-xl sm:px-6 sm:text-base"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4.5v15m7.5-7.5h-15"
+                    />
+                  </svg>
+                  <span>Solicitar Empilhadeira</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

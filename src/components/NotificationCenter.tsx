@@ -101,11 +101,12 @@ export default function NotificationCenter({
       {/* Dropdown Panel */}
       {open && (
         <div
-          className={`absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border shadow-2xl sm:w-96 ${
+          className={`fixed inset-x-3 top-16 z-50 overflow-hidden rounded-2xl border shadow-2xl sm:absolute sm:right-0 sm:left-auto sm:top-12 sm:w-96 ${
             isDark
               ? "border-white/10 bg-slate-800 shadow-black/50"
               : "border-gray-200 bg-white shadow-gray-200/50"
           }`}
+          style={{ maxWidth: "min(24rem, calc(100vw - 1.5rem))" }}
         >
           {/* Header */}
           <div
@@ -124,7 +125,7 @@ export default function NotificationCenter({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center justify-end gap-1">
               {unreadCount > 0 && (
                 <button
                   onClick={onMarkAllAsRead}

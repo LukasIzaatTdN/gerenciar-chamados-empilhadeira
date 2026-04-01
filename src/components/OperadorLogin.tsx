@@ -1,34 +1,155 @@
-import { useState } from "react";
-
-export type PerfilAcesso = "Promotor" | "Funcionário" | "Operador" | "Supervisor";
+import { useEffect, useMemo, useState } from "react";
+import type { Supermercado } from "../types/supermercado";
+import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
 
 interface OperadorLoginProps {
-  onLogin: (nome: string, perfil: PerfilAcesso) => void;
+  onLogin: (usuario: UsuarioSistema) => void | Promise<void>;
+  onFirebaseLogin?: (input: { email: string; password: string }) => void | Promise<void>;
+  onFirebaseRegister?: (input: {
+    nome: string;
+    email: string;
+    password: string;
+    perfil: PerfilAcesso;
+    supermercado_id: string;
+  }) => void | Promise<void>;
   onCancel: () => void;
+  supermercados: Supermercado[];
+  authMode?: "local" | "firebase";
+  noticeMessage?: string | null;
+  onDismissNotice?: () => void;
 }
 
-const PERFIS: PerfilAcesso[] = ["Promotor", "Funcionário", "Operador", "Supervisor"];
+const PERFIS_LOGIN: PerfilAcesso[] = [
+  "Promotor",
+  "Funcionário",
+  "Operador",
+  "Administrador Geral",
+];
 
-export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps) {
-  const [nome, setNome] = useState("");
-  const [perfil, setPerfil] = useState<PerfilAcesso>("Operador");
+export default function OperadorLogin({
+  onLogin,
+  onFirebaseLogin,
+  onFirebaseRegister,
+  onCancel,
+  supermercados,
+  authMode = "local",
+  noticeMessage,
+  onDismissNotice,
+}: OperadorLoginProps) {
+  const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [perfilSelecionado, setPerfilSelecionado] = useState<PerfilAcesso | "">("");
+  const [nomeColaborador, setNomeColaborador] = useState("");
+  const [supermercadoId, setSupermercadoId] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const supermercadosAtivos = useMemo(
+    () => supermercados.filter((item) => item.status === "Ativo"),
+    [supermercados]
+  );
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (perfilSelecionado && !supermercadoId) {
+      setSupermercadoId(supermercadosAtivos[0]?.id ?? "");
+    }
+  }, [perfilSelecionado, supermercadoId, supermercadosAtivos]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome.trim()) {
-      setError("Informe seu nome para continuar");
+
+    if (authMode === "firebase") {
+      const normalizedEmail = email.trim();
+      if (!normalizedEmail) {
+        setError("Informe seu e-mail");
+        return;
+      }
+      if (!password.trim()) {
+        setError("Informe sua senha");
+        return;
+      }
+
+      if (authTab === "login") {
+        if (!onFirebaseLogin) {
+          setError("Fluxo de autenticação indisponível");
+          return;
+        }
+
+        try {
+          await onFirebaseLogin({
+            email: normalizedEmail,
+            password,
+          });
+        } catch {
+          setError("Não foi possível entrar. Verifique e-mail e senha.");
+        }
+        return;
+      }
+
+      const nomeFinal = nomeColaborador.trim();
+      if (!nomeFinal) {
+        setError("Informe o nome do colaborador para criar a conta");
+        return;
+      }
+      if (!perfilSelecionado) {
+        setError("Selecione um perfil para criar a conta");
+        return;
+      }
+      if (!supermercadoId) {
+        setError("Selecione a unidade para criar a conta");
+        return;
+      }
+      if (!onFirebaseRegister) {
+        setError("Fluxo de cadastro indisponível");
+        return;
+      }
+
+      try {
+        await onFirebaseRegister({
+          nome: nomeFinal,
+          email: normalizedEmail,
+          password,
+          perfil: perfilSelecionado,
+          supermercado_id: supermercadoId,
+        });
+      } catch {
+        setError("Não foi possível criar a conta. Tente novamente.");
+      }
       return;
     }
-    onLogin(nome.trim(), perfil);
+
+    const nomeFinal = nomeColaborador.trim();
+
+    if (!nomeFinal) {
+      setError("Informe o nome do colaborador para continuar");
+      return;
+    }
+
+    if (!perfilSelecionado) {
+      setError("Selecione um perfil para continuar");
+      return;
+    }
+
+    if (!supermercadoId) {
+      setError("Selecione uma unidade para continuar");
+      return;
+    }
+
+    const usuario: UsuarioSistema = {
+      id: `session-${perfilSelecionado.toLowerCase().replace(/\s+/g, "-")}-${supermercadoId || "all"}`,
+      nome: nomeFinal,
+      perfil: perfilSelecionado,
+      supermercado_id: supermercadoId,
+    };
+
+    await onLogin(usuario);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/90 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-100/90 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,61,117,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_28%)]" />
 
-      <div className="relative w-full max-w-md animate-in rounded-[32px] border border-slate-200/80 bg-white shadow-[0_30px_70px_rgba(15,23,42,0.16)]">
-        <div className="flex items-center justify-end px-5 pt-5">
+      <div className="relative my-auto w-full max-w-md animate-in overflow-y-auto rounded-[28px] border border-slate-200/80 bg-white shadow-[0_30px_70px_rgba(15,23,42,0.16)] sm:rounded-[32px] max-h-[calc(100dvh-2rem)]">
+        <div className="sticky top-0 z-10 flex items-center justify-end bg-white/95 px-5 pt-5 backdrop-blur-sm">
           <button
             onClick={onCancel}
             className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
@@ -52,56 +173,256 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-6 pt-4 sm:px-8 sm:pb-8">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Nome
-            </label>
-            <input
-              type="text"
-              value={nome}
-              onChange={(e) => {
-                setNome(e.target.value);
-                setError("");
-              }}
-              placeholder="Ex: Carlos Santos"
-              className={`w-full rounded-xl border ${
-                error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-              } touch-target px-4 py-3.5 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-              autoFocus
-            />
-            {error && (
-              <p className="mt-1.5 text-xs text-red-500">{error}</p>
-            )}
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pb-8">
+          {noticeMessage && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              {noticeMessage}
+            </div>
+          )}
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Perfil de acesso
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {PERFIS.map((item) => (
+          {authMode === "firebase" ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
                 <button
-                  key={item}
                   type="button"
-                  onClick={() => setPerfil(item)}
-                  className={`touch-target rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
-                    perfil === item
-                      ? "border-[#0f3d75] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white shadow-[0_12px_24px_rgba(15,23,42,0.18)]"
-                      : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100"
+                  onClick={() => {
+                    setAuthTab("login");
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    authTab === "login"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {item}
+                  Entrar
                 </button>
-              ))}
-            </div>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthTab("register");
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    authTab === "register"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Criar conta
+                </button>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  E-mail
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  placeholder="seuemail@empresa.com"
+                  required
+                  autoFocus
+                  className={`w-full rounded-xl border ${
+                    error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                  } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  placeholder="••••••••"
+                  required
+                  className={`w-full rounded-xl border ${
+                    error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                  } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                />
+              </div>
+
+              {authTab === "register" && (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Nome do colaborador
+                    </label>
+                    <input
+                      type="text"
+                      value={nomeColaborador}
+                      onChange={(e) => {
+                        setNomeColaborador(e.target.value);
+                        setError("");
+                        onDismissNotice?.();
+                      }}
+                      placeholder="Ex.: João Silva"
+                      required
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Perfil de acesso
+                    </label>
+                    <select
+                      value={perfilSelecionado}
+                      onChange={(e) => {
+                        setPerfilSelecionado(e.target.value as PerfilAcesso | "");
+                        setError("");
+                        onDismissNotice?.();
+                      }}
+                      className={`w-full rounded-xl border ${
+                        error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                      } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                    >
+                      <option value="">Selecione seu acesso</option>
+                      {PERFIS_LOGIN.map((perfil) => (
+                        <option key={perfil} value={perfil}>
+                          {perfil}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Supermercado / Unidade
+                    </label>
+                    <select
+                      value={supermercadoId}
+                      onChange={(e) => {
+                        setSupermercadoId(e.target.value);
+                        setError("");
+                        onDismissNotice?.();
+                      }}
+                      className={`w-full rounded-xl border ${
+                        error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                      } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                    >
+                      <option value="">Selecione a unidade</option>
+                      {supermercadosAtivos.map((supermercado) => (
+                        <option key={supermercado.id} value={supermercado.id}>
+                          {supermercado.nome} ({supermercado.codigo})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {error && (
+                <p className="text-xs text-red-500">{error}</p>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Perfil de acesso
+                </label>
+                <select
+                  value={perfilSelecionado}
+                  onChange={(e) => {
+                    setPerfilSelecionado(e.target.value as PerfilAcesso | "");
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  className={`w-full rounded-xl border ${
+                    error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                  } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                  autoFocus
+                >
+                  <option value="">Selecione seu acesso</option>
+                  {PERFIS_LOGIN.map((perfil) => (
+                    <option key={perfil} value={perfil}>
+                      {perfil}
+                    </option>
+                  ))}
+                </select>
+                {error && (
+                  <p className="mt-1.5 text-xs text-red-500">{error}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Nome do colaborador
+                </label>
+                <input
+                  type="text"
+                  value={nomeColaborador}
+                  onChange={(e) => {
+                    setNomeColaborador(e.target.value);
+                    setError("");
+                    onDismissNotice?.();
+                  }}
+                  placeholder="Ex.: João Silva"
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+
+              {perfilSelecionado && (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Unidade
+                  </label>
+                  <select
+                    value={supermercadoId}
+                    onChange={(e) => {
+                      setSupermercadoId(e.target.value);
+                      setError("");
+                      onDismissNotice?.();
+                    }}
+                    className={`w-full rounded-xl border ${
+                      error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                    } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                  >
+                    <option value="">Selecione a unidade</option>
+                    {supermercadosAtivos.map((supermercado) => (
+                      <option key={supermercado.id} value={supermercado.id}>
+                        {supermercado.nome} ({supermercado.codigo})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {perfilSelecionado && (
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-900">
+                    {nomeColaborador.trim() || "Nome não informado"}
+                  </p>
+                  <p className="mt-1">Perfil: {perfilSelecionado}</p>
+                  <p className="mt-1">
+                    Unidade: {supermercadosAtivos.find((item) => item.id === supermercadoId)?.nome ?? "Não definida"}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           <button
             type="submit"
             className="touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] transition-all hover:brightness-105 active:scale-[0.99]"
           >
-            Entrar
+            {authMode === "firebase" && authTab === "register" ? "Criar Conta" : "Entrar"}
           </button>
 
           <div className="flex items-center justify-center">
@@ -109,7 +430,9 @@ export default function OperadorLogin({ onLogin, onCancel }: OperadorLoginProps)
               type="button"
               className="text-sm font-medium text-slate-400 transition-colors hover:text-slate-600"
             >
-              Acesso interno rápido
+              {authMode === "firebase"
+                ? "Acesso via Firebase Auth (e-mail e senha)"
+                : "Acesso interno por perfil do sistema"}
             </button>
           </div>
         </form>

@@ -2,17 +2,30 @@ import { useState } from "react";
 import type { Setor, TipoServico, Prioridade } from "../types/chamado";
 import { TIPOS_SERVICO, PRIORIDADES } from "../types/chamado";
 import type { NovoChamadoInput } from "../hooks/useChamados";
+import type { Supermercado } from "../types/supermercado";
+
+type NovoChamadoFormInput = Omit<NovoChamadoInput, "supermercado_id">;
 
 interface ChamadoFormProps {
   solicitanteNome: string;
   solicitantePerfil?: string | null;
-  onSubmit: (data: NovoChamadoInput) => void;
+  supermercadoNome?: string | null;
+  isAdminGeral?: boolean;
+  supermercados?: Supermercado[];
+  supermercadoSelecionadoId?: string;
+  onSupermercadoSelecionadoChange?: (id: string) => void;
+  onSubmit: (data: NovoChamadoFormInput) => void;
   onCancel: () => void;
 }
 
 export default function ChamadoForm({
   solicitanteNome,
   solicitantePerfil,
+  supermercadoNome,
+  isAdminGeral = false,
+  supermercados = [],
+  supermercadoSelecionadoId = "",
+  onSupermercadoSelecionadoChange,
   onSubmit,
   onCancel,
 }: ChamadoFormProps) {
@@ -31,6 +44,10 @@ export default function ChamadoForm({
 
     if (!setor.trim()) {
       newErrors.setor = "Informe onde o trabalho sera realizado";
+    }
+
+    if (isAdminGeral && !supermercadoSelecionadoId) {
+      newErrors.supermercado = "Selecione o supermercado para abrir o chamado";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -65,6 +82,12 @@ export default function ChamadoForm({
               Nova Solicitação de Empilhadeira
             </h2>
               <p className="text-sm text-slate-500">Preencha rápido e envie para a fila</p>
+              {supermercadoNome && (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-300" />
+                  Unidade atual: {supermercadoNome}
+                </div>
+              )}
             </div>
           </div>
           <button
@@ -98,6 +121,11 @@ export default function ChamadoForm({
                     Perfil: {solicitantePerfil}
                   </p>
                 )}
+                {supermercadoNome && (
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Unidade: {supermercadoNome}
+                  </p>
+                )}
               </div>
               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                 Login ativo
@@ -107,6 +135,36 @@ export default function ChamadoForm({
               <p className="mt-1 text-xs text-red-500">{errors.nome}</p>
             )}
           </div>
+
+          {isAdminGeral && (
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-gray-700">
+                Supermercado da solicitação *
+              </label>
+              <select
+                value={supermercadoSelecionadoId}
+                onChange={(e) => {
+                  onSupermercadoSelecionadoChange?.(e.target.value);
+                  setErrors((prev) => ({ ...prev, supermercado: "" }));
+                }}
+                className={`touch-target w-full rounded-2xl border ${
+                  errors.supermercado ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+              >
+                <option value="">Selecione a unidade</option>
+                {supermercados
+                  .filter((item) => item.status === "Ativo")
+                  .map((supermercado) => (
+                    <option key={supermercado.id} value={supermercado.id}>
+                      {supermercado.nome} · {supermercado.codigo}
+                    </option>
+                  ))}
+              </select>
+              {errors.supermercado && (
+                <p className="mt-1 text-xs text-red-500">{errors.supermercado}</p>
+              )}
+            </div>
+          )}
 
           {/* Local do trabalho */}
           <div>

@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function perfil() {
+      return isSignedIn()
+        ? (request.auth.token.perfil != null
+            ? request.auth.token.perfil
+            : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+                : null))
+        : null;
+    }
+
+    function supermercadoClaim() {
+      return isSignedIn()
+        ? (request.auth.token.supermercado_id != null
+            ? request.auth.token.supermercado_id
+            : (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+                : null))
+        : null;
+    }
+
+    function isAdminGeral() {
+      return perfil() == "Administrador Geral";
+    }
+
+    function isSupervisor() {
+      return perfil() == "Supervisor";
+    }
+
+    function isOperador() {
+      return perfil() == "Operador";
+    }
+
+    function isPromotorOuFuncionario() {
+      return perfil() == "Promotor" || perfil() == "Funcionário";
+    }
+
+    function isMesmaUnidade(unidadeId) {
+      return supermercadoClaim() != null && unidadeId == supermercadoClaim();
+    }
+
+    match /chamados/{id} {
+      allow read: if isAdminGeral() || isMesmaUnidade(resource.data.supermercado_id);
+
+      allow create: if isAdminGeral()
+        || (
+          (isPromotorOuFuncionario() || isOperador() || isSupervisor())
+          && isMesmaUnidade(request.resource.data.supermercado_id)
+        );
+
+      allow update: if isAdminGeral()
+        || (
+          (isOperador() || isSupervisor())
+          && isMesmaUnidade(resource.data.supermercado_id)
+          && isMesmaUnidade(request.resource.data.supermercado_id)
+        );
+
+      allow delete: if isAdminGeral();
+    }
+
+    match /supermercados/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdminGeral();
+    }
+
+    match /usuarios/{id} {
+      allow read: if isAdminGeral() || (isSignedIn() && request.auth.uid == id);
+
+      allow create: if isSignedIn()
+        && request.auth.uid == id
+        && request.resource.data.id == request.auth.uid
+        && request.resource.data.status == "Pendente";
+
+      allow update: if isAdminGeral()
+        || (
+          isSignedIn()
+          && request.auth.uid == id
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.supermercado_id == resource.data.supermercado_id
+          && request.resource.data.status == resource.data.status
+        );
+
+      allow delete: if isAdminGeral();
+    }
+  }
+}

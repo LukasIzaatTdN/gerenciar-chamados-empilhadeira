@@ -8,6 +8,7 @@ export type Status = "Aguardando" | "Em atendimento" | "Finalizado";
 
 export interface Chamado {
   id: string;
+  supermercado_id: string;
   solicitante_nome: string;
   setor: Setor;
   tipo_servico: TipoServico;
