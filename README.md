@@ -30,7 +30,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Login responsivo (desktop/mobile) com modal otimizado para telas menores
 - Fluxo de autenticação:
   - sem Firebase: login local por perfil + nome + unidade
-  - com Firebase: entrar por e-mail/senha e criar conta (nome, perfil e unidade)
+  - com Firebase: entrar por e-mail/senha, entrar com Google e criar conta (nome, perfil e unidade)
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
@@ -38,6 +38,10 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - `chamados`
   - `supermercados`
   - `usuarios`
+- Gestão administrativa de usuários (Administrador Geral):
+  - listar usuários
+  - alterar perfil/unidade
+  - bloquear/inativar e reativar usuário
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
@@ -47,9 +51,6 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 - Aplicar e validar regras em produção:
   - `firebase deploy --only firestore:rules`
-- Criar fluxo administrativo completo de gestão de usuários:
-  - alteração de perfil/unidade
-  - bloqueio/inativação
 - Endurecer regras para impedir autoelevação de perfil no cadastro público
 - Adicionar testes automatizados (principalmente mobile e permissões)
 
@@ -84,6 +85,7 @@ Arquivos-chave:
 - `src/components/OperadorLogin.tsx`
 - `src/components/OperadorPanel.tsx`
 - `src/components/SupermercadosAdmin.tsx`
+- `src/components/UsuariosAdmin.tsx`
 - `src/hooks/useChamados.ts`
 - `src/hooks/useSupermercados.ts`
 - `src/hooks/useUsuarios.ts`
@@ -129,6 +131,7 @@ npm run build
 ```bash
 npm run auth:set-claims
 npm run auth:create-token
+npm run auth:approve-user
 ```
 
 Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
