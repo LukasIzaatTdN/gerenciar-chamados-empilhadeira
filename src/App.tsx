@@ -499,21 +499,29 @@ export default function App() {
     );
     if (!unidadeAtiva) return;
 
-    if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
-      await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
-        supermercado_id: nextSupermercadoId,
-        atualizado_em: new Date().toISOString(),
-      });
-    }
+    try {
+      if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
+        await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
+          supermercado_id: nextSupermercadoId,
+          atualizado_em: new Date().toISOString(),
+        });
+      }
 
-    setUsuarioAtual((prev) =>
-      prev ? { ...prev, supermercado_id: nextSupermercadoId } : prev
-    );
-    notify(
-      "perfil_atualizado",
-      "Unidade atualizada",
-      `Operação alterada para ${unidadeAtiva.nome}`
-    );
+      setUsuarioAtual((prev) =>
+        prev ? { ...prev, supermercado_id: nextSupermercadoId } : prev
+      );
+      notify(
+        "perfil_atualizado",
+        "Unidade atualizada",
+        `Operação alterada para ${unidadeAtiva.nome}`
+      );
+    } catch {
+      notify(
+        "erro_perfil",
+        "Não foi possível trocar unidade",
+        "Verifique permissões do usuário operador e regras do Firestore."
+      );
+    }
   }
 
   // Simulate "operator nearby" notification

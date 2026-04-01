@@ -85,6 +85,13 @@ service cloud.firestore {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
 
+    function isSupermercadoAtivo(supermercadoId) {
+      return supermercadoId is string
+        && supermercadoId.size() > 0
+        && exists(/databases/$(database)/documents/supermercados/$(supermercadoId))
+        && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo";
+    }
+
     function isMesmaUnidade(unidadeId) {
       return supermercadoClaim() != null && unidadeId == supermercadoClaim();
     }
@@ -231,8 +238,14 @@ service cloud.firestore {
           isSignedIn()
           && request.auth.uid == id
           && request.resource.data.perfil == resource.data.perfil
-          && request.resource.data.supermercado_id == resource.data.supermercado_id
           && request.resource.data.status == resource.data.status
+          && (
+            request.resource.data.supermercado_id == resource.data.supermercado_id
+            || (
+              resource.data.perfil == "Operador"
+              && isSupermercadoAtivo(request.resource.data.supermercado_id)
+            )
+          )
         );
 
       allow delete: if isAdminGeral();
