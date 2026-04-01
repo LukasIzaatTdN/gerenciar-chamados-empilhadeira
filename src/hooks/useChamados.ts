@@ -95,6 +95,7 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
 export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados());
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("Todos");
+  const [syncError, setSyncError] = useState<string | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
   useEffect(() => {
     if (isRemoteSyncEnabled && db) {
+      setSyncError(null);
       if (!scope.canViewAll && !scope.supermercadoId) {
         setChamados([]);
         return;
@@ -117,28 +119,38 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             where("supermercado_id", "==", scope.supermercadoId)
           );
 
-      return onSnapshot(chamadosQuery, (snapshot) => {
-        const remoteChamados = snapshot.docs.map((snapshotDoc) => {
-          const data = snapshotDoc.data() as Partial<Chamado>;
-          return {
-            id: data.id ?? snapshotDoc.id,
-            supermercado_id: data.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
-            solicitante_nome: data.solicitante_nome ?? "",
-            setor: data.setor as Setor,
-            tipo_servico: data.tipo_servico as TipoServico,
-            prioridade: data.prioridade as Prioridade,
-            status: (data.status as Status) ?? "Aguardando",
-            operador_nome: data.operador_nome ?? null,
-            criado_em: data.criado_em ?? new Date().toISOString(),
-            iniciado_em: data.iniciado_em ?? null,
-            finalizado_em: data.finalizado_em ?? null,
-          };
-        });
+      return onSnapshot(
+        chamadosQuery,
+        (snapshot) => {
+          setSyncError(null);
+          const remoteChamados = snapshot.docs.map((snapshotDoc) => {
+            const data = snapshotDoc.data() as Partial<Chamado>;
+            return {
+              id: data.id ?? snapshotDoc.id,
+              supermercado_id: data.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
+              solicitante_nome: data.solicitante_nome ?? "",
+              setor: data.setor as Setor,
+              tipo_servico: data.tipo_servico as TipoServico,
+              prioridade: data.prioridade as Prioridade,
+              status: (data.status as Status) ?? "Aguardando",
+              operador_nome: data.operador_nome ?? null,
+              criado_em: data.criado_em ?? new Date().toISOString(),
+              iniciado_em: data.iniciado_em ?? null,
+              finalizado_em: data.finalizado_em ?? null,
+            };
+          });
 
-        setChamados(sortChamados(remoteChamados));
-      });
+          setChamados(sortChamados(remoteChamados));
+        },
+        () => {
+          setSyncError(
+            "Falha ao sincronizar chamados com o Firebase. Verifique login, perfil e regras do Firestore."
+          );
+        }
+      );
     }
 
+    setSyncError(null);
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
@@ -338,6 +350,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     chamados: chamadosFiltrados,
     allChamados: chamadosEscopo,
     stats,
+    syncError,
+    isRemoteSyncEnabled,
     filterStatus,
     setFilterStatus,
     criarChamado,

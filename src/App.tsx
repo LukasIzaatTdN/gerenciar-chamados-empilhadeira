@@ -172,6 +172,8 @@ export default function App() {
     chamados,
     allChamados,
     stats,
+    syncError,
+    isRemoteSyncEnabled: chamadosRemoteSyncEnabled,
     filterStatus,
     setFilterStatus,
     criarChamado,
@@ -740,6 +742,16 @@ export default function App() {
 
         {(permissions.canTrackOwnChamados || permissions.canViewUnitQueue || permissions.canViewAllUnits) && (
           <>
+        {syncError && (
+          <div className="mb-4 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 shadow-[0_10px_24px_rgba(239,68,68,0.08)]">
+            {syncError}
+          </div>
+        )}
+        {!syncError && !chamadosRemoteSyncEnabled && (
+          <div className="mb-4 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 shadow-[0_10px_24px_rgba(245,158,11,0.08)]">
+            Você está em modo local. Para sincronizar entre dispositivos, configure Firebase neste dispositivo.
+          </div>
+        )}
         <div className="mb-4 flex flex-col gap-3 rounded-[28px] border border-white/70 bg-white/60 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
