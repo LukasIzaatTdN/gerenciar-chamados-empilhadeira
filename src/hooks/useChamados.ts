@@ -17,18 +17,61 @@ import { db } from "../config/firebase";
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
 const LEGACY_SUPERMERCADO_ID = "sem-unidade";
+const TIPOS_SERVICO_VALIDOS: TipoServico[] = [
+  "Descarga",
+  "Reposição",
+  "Retirada",
+  "Movimentação",
+];
+const PRIORIDADES_VALIDAS: Prioridade[] = ["Normal", "Urgente"];
+const STATUS_VALIDOS: Status[] = ["Aguardando", "Em atendimento", "Finalizado"];
+
+function sanitizeDateString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return value.trim() ? value : null;
+}
+
+function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
+  const tipoServico = TIPOS_SERVICO_VALIDOS.includes(data.tipo_servico as TipoServico)
+    ? (data.tipo_servico as TipoServico)
+    : "Descarga";
+  const prioridade = PRIORIDADES_VALIDAS.includes(data.prioridade as Prioridade)
+    ? (data.prioridade as Prioridade)
+    : "Normal";
+  const status = STATUS_VALIDOS.includes(data.status as Status)
+    ? (data.status as Status)
+    : "Aguardando";
+
+  return {
+    id: typeof data.id === "string" && data.id.trim() ? data.id : fallbackId,
+    supermercado_id:
+      typeof data.supermercado_id === "string" && data.supermercado_id.trim()
+        ? data.supermercado_id
+        : LEGACY_SUPERMERCADO_ID,
+    solicitante_nome:
+      typeof data.solicitante_nome === "string" && data.solicitante_nome.trim()
+        ? data.solicitante_nome
+        : "Solicitante",
+    setor: typeof data.setor === "string" && data.setor.trim() ? data.setor : "Setor não informado",
+    tipo_servico: tipoServico,
+    prioridade,
+    status,
+    operador_nome:
+      typeof data.operador_nome === "string" && data.operador_nome.trim()
+        ? data.operador_nome
+        : null,
+    criado_em: sanitizeDateString(data.criado_em) ?? new Date().toISOString(),
+    iniciado_em: sanitizeDateString(data.iniciado_em),
+    finalizado_em: sanitizeDateString(data.finalizado_em),
+  };
+}
 
 function loadChamados(): Chamado[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return [];
-    const parsed = JSON.parse(data) as Chamado[];
-    // Migrate old records that don't have operador_nome or supermercado_id
-    return parsed.map((c) => ({
-      ...c,
-      operador_nome: c.operador_nome ?? null,
-      supermercado_id: c.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
-    }));
+    const parsed = JSON.parse(data) as Partial<Chamado>[];
+    return parsed.map((c, index) => normalizeChamado(c, `local-${index}`));
   } catch {
     return [];
   }
@@ -124,22 +167,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         chamadosQuery,
         (snapshot) => {
           setSyncError(null);
-          const remoteChamados = snapshot.docs.map((snapshotDoc) => {
-            const data = snapshotDoc.data() as Partial<Chamado>;
-            return {
-              id: data.id ?? snapshotDoc.id,
-              supermercado_id: data.supermercado_id ?? LEGACY_SUPERMERCADO_ID,
-              solicitante_nome: data.solicitante_nome ?? "",
-              setor: data.setor as Setor,
-              tipo_servico: data.tipo_servico as TipoServico,
-              prioridade: data.prioridade as Prioridade,
-              status: (data.status as Status) ?? "Aguardando",
-              operador_nome: data.operador_nome ?? null,
-              criado_em: data.criado_em ?? new Date().toISOString(),
-              iniciado_em: data.iniciado_em ?? null,
-              finalizado_em: data.finalizado_em ?? null,
-            };
-          });
+          const remoteChamados = snapshot.docs.map((snapshotDoc) =>
+            normalizeChamado(snapshotDoc.data() as Partial<Chamado>, snapshotDoc.id)
+          );
 
           setChamados(sortChamados(remoteChamados));
         },
@@ -156,7 +186,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setChamados(JSON.parse(e.newValue));
+          const parsed = JSON.parse(e.newValue) as Partial<Chamado>[];
+          setChamados(parsed.map((item, index) => normalizeChamado(item, `local-${index}`)));
         } catch {
           // ignore
         }

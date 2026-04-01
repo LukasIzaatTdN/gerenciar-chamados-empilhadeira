@@ -106,7 +106,7 @@ export default function OperadorPanel({
       Array.from(
         new Set(
           chamados
-            .map((c) => c.setor.trim())
+            .map((c) => (typeof c.setor === "string" ? c.setor.trim() : ""))
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b, "pt-BR"))
         )
