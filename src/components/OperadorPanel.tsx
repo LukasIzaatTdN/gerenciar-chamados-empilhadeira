@@ -15,9 +15,9 @@ interface OperadorPanelProps {
   supermercadoNome: string | null;
   operadorStatus: OperadorStatus;
   onStatusChange: (status: OperadorStatus) => void;
-  onAssumir: (id: string, operadorNome: string) => void;
-  onIniciar: (id: string, operadorNome: string) => void;
-  onFinalizar: (id: string, operadorNome: string) => void;
+  onAssumir: (id: string, operadorNome: string) => void | Promise<void>;
+  onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
+  onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
   onVoltar: () => void;
   onLogout: () => void;
   timeEstimates: TimeEstimatesResult;
@@ -79,7 +79,25 @@ export default function OperadorPanel({
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
   const isDisponivel = operadorStatus === "Disponível";
+
+  async function runAction(actionId: string, action: () => void | Promise<void>) {
+    try {
+      setActionError(null);
+      setLoadingActionId(actionId);
+      await action();
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Não foi possível concluir esta ação agora.";
+      setActionError(message);
+    } finally {
+      setLoadingActionId(null);
+    }
+  }
 
   const setoresDisponiveis = useMemo(
     () =>
@@ -270,6 +288,12 @@ export default function OperadorPanel({
             </div>
           </div>
         </div>
+
+        {actionError && (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {actionError}
+          </div>
+        )}
 
         <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -629,8 +653,12 @@ export default function OperadorPanel({
                       <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
                         {isAguardando && !chamado.operador_nome && (
                           <button
-                            onClick={() => onAssumir(chamado.id, operadorNome)}
-                            disabled={!isDisponivel}
+                            onClick={() => {
+                              void runAction(`assumir-${chamado.id}`, () =>
+                                onAssumir(chamado.id, operadorNome)
+                              );
+                            }}
+                            disabled={!isDisponivel || loadingActionId === `assumir-${chamado.id}`}
                             className={cn(
                               "w-full rounded-xl px-4 py-2.5 text-xs font-bold transition-all active:scale-95 sm:w-auto sm:text-sm",
                               isDisponivel
@@ -638,25 +666,39 @@ export default function OperadorPanel({
                                 : "cursor-not-allowed bg-slate-100 text-slate-400"
                             )}
                           >
-                            {isDisponivel ? "Assumir" : "Em pausa"}
+                            {loadingActionId === `assumir-${chamado.id}`
+                              ? "Assumindo..."
+                              : isDisponivel
+                                ? "Assumir"
+                                : "Em pausa"}
                           </button>
                         )}
 
                         {isAguardando && isAssumido && (
                           <button
-                            onClick={() => onIniciar(chamado.id, operadorNome)}
+                            onClick={() => {
+                              void runAction(`iniciar-${chamado.id}`, () =>
+                                onIniciar(chamado.id, operadorNome)
+                              );
+                            }}
+                            disabled={loadingActionId === `iniciar-${chamado.id}`}
                             className="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 active:scale-95 sm:w-auto sm:text-sm"
                           >
-                            Iniciar
+                            {loadingActionId === `iniciar-${chamado.id}` ? "Iniciando..." : "Iniciar"}
                           </button>
                         )}
 
                         {isEmAtendimento && isAssumido && (
                           <button
-                            onClick={() => onFinalizar(chamado.id, operadorNome)}
+                            onClick={() => {
+                              void runAction(`finalizar-${chamado.id}`, () =>
+                                onFinalizar(chamado.id, operadorNome)
+                              );
+                            }}
+                            disabled={loadingActionId === `finalizar-${chamado.id}`}
                             className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:brightness-105 active:scale-95 sm:w-auto sm:text-sm"
                           >
-                            Finalizar
+                            {loadingActionId === `finalizar-${chamado.id}` ? "Finalizando..." : "Finalizar"}
                           </button>
                         )}
 
