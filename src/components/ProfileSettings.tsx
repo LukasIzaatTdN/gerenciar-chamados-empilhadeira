@@ -97,7 +97,6 @@ export default function ProfileSettings({
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
-  const podeSelecionarUnidadeOperacao = perfil === "Operador";
   const supermercadosAtivos = supermercados.filter((item) => item.status === "Ativo");
 
   return (
@@ -207,39 +206,37 @@ export default function ProfileSettings({
                 ))}
               </div>
 
-              {podeSelecionarUnidadeOperacao && (
-                <div className="mt-4 rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Loja em operação
-                  </p>
-                  <p className={cn("mt-1 text-sm", isDark ? "text-slate-400" : "text-slate-500")}>
-                    Troque a unidade quando iniciar operação em outra loja.
-                  </p>
-                  <select
-                    value={supermercadoId ?? ""}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        void onSupermercadoChange(e.target.value);
-                      }
-                    }}
-                    className={cn(
-                      "mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus:ring-4",
-                      isDark
-                        ? "border-slate-700 bg-slate-900 text-slate-100 focus:border-amber-400/40 focus:ring-amber-500/15"
-                        : "border-slate-200 bg-white text-slate-900 focus:border-amber-300 focus:ring-amber-100"
-                    )}
-                  >
-                    <option value="" disabled>
-                      Selecione a unidade
+              <div className="mt-4 rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Loja em operação
+                </p>
+                <p className={cn("mt-1 text-sm", isDark ? "text-slate-400" : "text-slate-500")}>
+                  Troque a unidade vinculada quando iniciar operação em outra loja.
+                </p>
+                <select
+                  value={supermercadoId ?? ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      void onSupermercadoChange(e.target.value);
+                    }
+                  }}
+                  className={cn(
+                    "mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus:ring-4",
+                    isDark
+                      ? "border-slate-700 bg-slate-900 text-slate-100 focus:border-amber-400/40 focus:ring-amber-500/15"
+                      : "border-slate-200 bg-white text-slate-900 focus:border-amber-300 focus:ring-amber-100"
+                  )}
+                >
+                  <option value="" disabled>
+                    Selecione a unidade
+                  </option>
+                  {supermercadosAtivos.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome} ({item.codigo})
                     </option>
-                    {supermercadosAtivos.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.nome} ({item.codigo})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div

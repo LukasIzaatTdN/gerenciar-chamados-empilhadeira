@@ -279,9 +279,10 @@ service cloud.firestore {
           && (
             request.resource.data.supermercado_id == resource.data.supermercado_id
             || (
-              resource.data.perfil == "Operador"
-              && isSupermercadoAtivo(request.resource.data.supermercado_id)
+              resource.data.perfil == "Administrador Geral"
+              && request.resource.data.supermercado_id == null
             )
+            || isSupermercadoAtivo(request.resource.data.supermercado_id)
           )
         );
 

@@ -607,7 +607,7 @@ export default function App() {
   }
 
   async function handleOperadorSupermercadoChange(nextSupermercadoId: string) {
-    if (!usuarioAtual || usuarioAtual.perfil !== "Operador") return;
+    if (!usuarioAtual) return;
     if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
 
     const unidadeAtiva = supermercados.find(
@@ -635,7 +635,7 @@ export default function App() {
       notify(
         "erro_perfil",
         "Não foi possível trocar unidade",
-        "Verifique permissões do usuário operador e regras do Firestore."
+        "Verifique login do usuário e regras do Firestore."
       );
     }
   }

@@ -53,6 +53,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
+- Troca de unidade disponível no perfil para qualquer usuário ativo, respeitando unidades ativas no cadastro
 - Navegação com retorno para a tela anterior:
   - perfil/configurações
   - painel do operador
