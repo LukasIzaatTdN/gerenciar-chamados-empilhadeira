@@ -77,10 +77,6 @@ service cloud.firestore {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
 
-    function isOperador() {
-      return perfil() == "Operador";
-    }
-
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
@@ -250,15 +246,6 @@ service cloud.firestore {
           && isTransicaoStatusPermitida()
           && isMesmaUnidade(resource.data.supermercado_id)
           && isMesmaUnidade(request.resource.data.supermercado_id)
-          && (
-            isOperador()
-            || (
-              resource.data.status == "Aguardando"
-              && request.resource.data.status == "Aguardando"
-              && isCampoVazio(resource.data.operador_nome)
-              && isTextoNaoVazio(request.resource.data.operador_nome)
-            )
-          )
         )
       );
 

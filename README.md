@@ -75,9 +75,9 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - mapeamento em `firebase.json`
 - Regras operacionais atuais:
   - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
-  - usuários ativos da mesma unidade podem assumir chamados
-  - `Operador` inicia e finaliza chamados somente da unidade vinculada
-  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, sem executar atendimento
+  - usuários ativos da mesma unidade podem acessar o painel operacional
+  - usuários ativos da mesma unidade podem assumir, registrar deslocamento, chegada, iniciar e finalizar chamados
+  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, e também pode atuar na operação quando necessário
   - `Administrador Geral` mantém visão total das unidades e autonomia administrativa
 - Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
 - Tratamento defensivo de runtime:
@@ -96,9 +96,8 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
-- Usuários ativos da mesma unidade podem assumir chamados.
-- Somente operadores iniciam e finalizam atendimentos da própria unidade.
-- Supervisor visualiza dashboard/fila/relatórios da unidade dele.
+- Usuários ativos da mesma unidade podem operar os chamados e acessar o painel operacional.
+- Supervisor visualiza dashboard/fila/relatórios da unidade dele e pode atuar operacionalmente na mesma unidade.
 - Administrador geral pode visualizar todas as unidades.
 
 ## Estrutura relevante

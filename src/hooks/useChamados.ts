@@ -141,10 +141,7 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
 }
 
-async function ensureFirebaseSessionForChamado(
-  chamado: Chamado,
-  options?: { requireOperationalProfile?: boolean }
-) {
+async function ensureFirebaseSessionForChamado(chamado: Chamado) {
   if (!db) return;
 
   const currentUser = auth?.currentUser;
@@ -167,14 +164,6 @@ async function ensureFirebaseSessionForChamado(
 
   if (userData.status === "Inativo") {
     throw new Error("Seu acesso está inativo no sistema.");
-  }
-
-  if (
-    options?.requireOperationalProfile !== false &&
-    userData.perfil !== "Operador" &&
-    userData.perfil !== "Administrador Geral"
-  ) {
-    throw new Error("Somente operadores podem assumir, iniciar ou finalizar chamados.");
   }
 
   if (
@@ -320,9 +309,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual, {
-            requireOperationalProfile: false,
-          });
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
