@@ -98,6 +98,10 @@ export default function OperadorPanel({
       setActionError(null);
       setLoadingActionId(actionId);
       await action();
+      if (actionId.startsWith("assumir-")) {
+        setFilterSetor("Todos");
+        setActiveTab("meus");
+      }
     } catch (error) {
       const message =
         error instanceof Error && error.message
