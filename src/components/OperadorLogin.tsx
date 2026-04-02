@@ -161,7 +161,11 @@ export default function OperadorLogin({
     await onLogin(usuario);
   }
 
-  const shouldDisableSubmit = !hasUnidadesAtivas && authMode === "firebase" && authTab === "register";
+  const shouldDisableSubmit =
+    authMode === "firebase" &&
+    authTab === "register" &&
+    !isAdminGeral &&
+    !hasUnidadesAtivas;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-100/90 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
@@ -294,9 +298,15 @@ export default function OperadorLogin({
 
               {authTab === "register" && (
                 <>
-                  {!hasUnidadesAtivas && (
+                  {!hasUnidadesAtivas && !isAdminGeral && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       Nenhuma unidade ativa encontrada no Firestore. Para recomeçar o projeto, rode o bootstrap e faça login novamente.
+                    </div>
+                  )}
+
+                  {!hasUnidadesAtivas && isAdminGeral && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                      Nenhuma unidade ativa foi encontrada agora, mas o Administrador Geral pode criar a conta sem vincular supermercado.
                     </div>
                   )}
 
