@@ -180,15 +180,8 @@ async function ensureFirebaseSessionForChamado(chamado: Chamado) {
   const supermercadoResolved =
     normalizeSupermercadoId(userData?.supermercado_id) ??
     normalizeSupermercadoId(tokenResult.claims.supermercado_id);
-  const statusResolved =
-    typeof userData?.status === "string" ? userData.status : "Ativo";
-
   if (!userSnap.exists() && !perfilResolved) {
     throw new Error("Cadastro do usuário não encontrado no Firebase.");
-  }
-
-  if (statusResolved === "Inativo") {
-    throw new Error("Seu acesso está inativo no sistema.");
   }
 
   if (supermercadoResolved !== chamado.supermercado_id) {

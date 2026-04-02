@@ -25,7 +25,7 @@ service cloud.firestore {
     }
 
     function hasAccessIdentity() {
-      return hasUsuarioAtivo() || hasClaimsAtivas();
+      return isSignedIn();
     }
 
     function perfilDoc() {
@@ -102,7 +102,7 @@ service cloud.firestore {
     }
 
     function canAccessChamadoUnidade(unidadeId) {
-      return hasAccessIdentity() && (
+      return isSignedIn() && (
         isAdminGeral()
         || isMesmaUnidade(unidadeId)
       );
