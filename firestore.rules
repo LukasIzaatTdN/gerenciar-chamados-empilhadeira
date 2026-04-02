@@ -246,11 +246,19 @@ service cloud.firestore {
         isAdminGeral()
         || (
           hasUsuarioAtivo()
-          && isOperador()
           && isAtualizacaoOperacionalPermitida()
           && isTransicaoStatusPermitida()
           && isMesmaUnidade(resource.data.supermercado_id)
           && isMesmaUnidade(request.resource.data.supermercado_id)
+          && (
+            isOperador()
+            || (
+              resource.data.status == "Aguardando"
+              && request.resource.data.status == "Aguardando"
+              && isCampoVazio(resource.data.operador_nome)
+              && isTextoNaoVazio(request.resource.data.operador_nome)
+            )
+          )
         )
       );
 

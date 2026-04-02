@@ -320,7 +320,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: false,
+          });
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
