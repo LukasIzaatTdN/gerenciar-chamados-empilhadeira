@@ -16,9 +16,12 @@ interface OperadorPanelProps {
   operadorStatus: OperadorStatus;
   onStatusChange: (status: OperadorStatus) => void;
   onAssumir: (id: string, operadorNome: string) => void | Promise<void>;
+  onMarcarACaminho: (id: string, operadorNome: string) => void | Promise<void>;
+  onMarcarChegada: (id: string, operadorNome: string) => void | Promise<void>;
   onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
   onVoltar: () => void;
+  backLabel?: string;
   onAccessProfile: () => void;
   onLogout: () => void;
   timeEstimates: TimeEstimatesResult;
@@ -67,9 +70,12 @@ export default function OperadorPanel({
   operadorStatus,
   onStatusChange,
   onAssumir,
+  onMarcarACaminho,
+  onMarcarChegada,
   onIniciar,
   onFinalizar,
   onVoltar,
+  backLabel = "Voltar",
   onAccessProfile,
   onLogout,
   timeEstimates,
@@ -240,7 +246,7 @@ export default function OperadorPanel({
                 className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/85 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
               >
                 <span>←</span>
-                <span>Voltar ao painel</span>
+                <span>{backLabel}</span>
               </button>
 
               <button
@@ -652,6 +658,24 @@ export default function OperadorPanel({
                           </p>
                         )}
 
+                        {chamado.assumido_em && (
+                          <p className="mt-1 text-xs text-indigo-700">
+                            👷 Assumido: {formatDateTime(chamado.assumido_em)}
+                          </p>
+                        )}
+
+                        {chamado.a_caminho_em && (
+                          <p className="mt-1 text-xs text-blue-700">
+                            🚚 A caminho: {formatDateTime(chamado.a_caminho_em)}
+                          </p>
+                        )}
+
+                        {chamado.cheguei_em && (
+                          <p className="mt-1 text-xs text-cyan-700">
+                            📍 Chegada: {formatDateTime(chamado.cheguei_em)}
+                          </p>
+                        )}
+
                         {chamado.finalizado_em && chamado.iniciado_em && (
                           <p className="mt-0.5 text-xs text-blue-700">
                             ✓ Finalizado: {formatDateTime(chamado.finalizado_em)} · Duração:{" "}
@@ -690,6 +714,39 @@ export default function OperadorPanel({
                                 ? "Assumir"
                                 : "Em pausa"}
                           </button>
+                        )}
+
+                        {isAguardando && isAssumido && (
+                          <>
+                            {!chamado.a_caminho_em && (
+                              <button
+                                onClick={() => {
+                                  void runAction(`caminho-${chamado.id}`, () =>
+                                    onMarcarACaminho(chamado.id, operadorNome)
+                                  );
+                                }}
+                                disabled={loadingActionId === `caminho-${chamado.id}`}
+                                className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 transition-all hover:bg-blue-100 active:scale-95 sm:w-auto sm:text-sm"
+                              >
+                                {loadingActionId === `caminho-${chamado.id}` ? "Salvando..." : "A caminho"}
+                              </button>
+                            )}
+
+                            {chamado.a_caminho_em && !chamado.cheguei_em && (
+                              <button
+                                onClick={() => {
+                                  void runAction(`chegada-${chamado.id}`, () =>
+                                    onMarcarChegada(chamado.id, operadorNome)
+                                  );
+                                }}
+                                disabled={loadingActionId === `chegada-${chamado.id}`}
+                                className="w-full rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-xs font-bold text-cyan-700 transition-all hover:bg-cyan-100 active:scale-95 sm:w-auto sm:text-sm"
+                              >
+                                {loadingActionId === `chegada-${chamado.id}` ? "Salvando..." : "Cheguei"}
+                              </button>
+                            )}
+
+                          </>
                         )}
 
                         {isAguardando && isAssumido && (

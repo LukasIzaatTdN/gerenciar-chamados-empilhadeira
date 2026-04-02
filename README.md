@@ -18,11 +18,24 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Modelo multiunidade com entidade `supermercados`:
   - `id`, `nome`, `codigo`, `endereco`, `status`, `criado_em`
 - Chamados vinculados por `supermercado_id`
+- Chamados com rastreamento por etapa:
+  - `criado_em`, `assumido_em`, `a_caminho_em`, `cheguei_em`, `iniciado_em`, `finalizado_em`, `cancelado_em`
+- Métricas automáticas por etapa:
+  - tempo para assumir
+  - tempo até sair a caminho
+  - tempo até chegar
+  - tempo de atendimento
+  - tempo total do chamado
 - Escopo por unidade em filas, painel, dashboard e métricas
 - Perfis e permissões:
   - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Administrador Geral`
 - Isolamento de dados por unidade no frontend e nas regras do Firestore
 - Dashboard separado do painel do operador (somente supervisor/admin)
+- Dashboard executivo do Administrador Geral com:
+  - visão consolidada das unidades
+  - filtro por período (`hoje`, `7 dias`, `30 dias`)
+  - resumo executivo com alertas de fila e urgência
+  - comparativo e ranking entre supermercados
 - Painel do operador dedicado à operação da unidade
 - Painel do operador com:
   - status do operador
@@ -45,6 +58,10 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - painel do operador
   - dashboard
   - telas administrativas
+- UX refinada entre perfis:
+  - fallback de navegação para a home correta de cada perfil
+  - botão mobile contextual (`Entrar` quando deslogado, `Conta` quando autenticado)
+  - ação de voltar com texto neutro para não confundir operador, supervisor e administrador
 - Firestore com coleções reais:
   - `chamados`
   - `supermercados`
@@ -73,7 +90,6 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 - Endurecer regras para impedir autoelevação de perfil no cadastro público
 - Adicionar testes automatizados (principalmente mobile e permissões)
-- Revisar UX final do fluxo de chamados entre perfis em produção
 
 ## Regras de negócio principais
 
@@ -106,6 +122,7 @@ Arquivos-chave:
 - `src/components/OperadorLogin.tsx`
 - `src/components/OperadorPanel.tsx`
 - `src/components/SupermercadosAdmin.tsx`
+- `src/components/AdminExecutiveSummary.tsx`
 - `src/components/UsuariosAdmin.tsx`
 - `src/components/ProfileSettings.tsx`
 - `src/components/AppErrorBoundary.tsx`

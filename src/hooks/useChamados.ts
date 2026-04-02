@@ -62,8 +62,12 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
         ? data.operador_nome
         : null,
     criado_em: sanitizeDateString(data.criado_em) ?? new Date().toISOString(),
+    assumido_em: sanitizeDateString((data as Partial<Chamado>).assumido_em),
+    a_caminho_em: sanitizeDateString((data as Partial<Chamado>).a_caminho_em),
+    cheguei_em: sanitizeDateString((data as Partial<Chamado>).cheguei_em),
     iniciado_em: sanitizeDateString(data.iniciado_em),
     finalizado_em: sanitizeDateString(data.finalizado_em),
+    cancelado_em: sanitizeDateString((data as Partial<Chamado>).cancelado_em),
   };
 }
 
@@ -278,8 +282,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         status: "Aguardando",
         operador_nome: null,
         criado_em: new Date().toISOString(),
+        assumido_em: null,
+        a_caminho_em: null,
+        cheguei_em: null,
         iniciado_em: null,
         finalizado_em: null,
+        cancelado_em: null,
       };
 
       if (db) {
@@ -316,6 +324,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
+            assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
@@ -333,7 +342,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       setChamados((prev) => {
         const updated = prev.map((c) =>
-          c.id === id ? { ...c, operador_nome: operadorNome } : c
+          c.id === id
+            ? {
+                ...c,
+                operador_nome: operadorNome,
+                assumido_em: c.assumido_em ?? new Date().toISOString(),
+              }
+            : c
         );
         const chamado = updated.find((c) => c.id === id);
         if (chamado) {
@@ -365,7 +380,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: "Em atendimento" as Status,
             iniciado_em,
             operador_nome,
+            assumido_em: chamadoAtual.assumido_em ?? iniciado_em,
+            a_caminho_em: chamadoAtual.a_caminho_em ?? iniciado_em,
+            cheguei_em: chamadoAtual.cheguei_em ?? iniciado_em,
             finalizado_em: null,
+            cancelado_em: null,
             atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
@@ -386,7 +405,16 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Em atendimento" as Status, iniciado_em, operador_nome }
+            ? {
+                ...c,
+                status: "Em atendimento" as Status,
+                iniciado_em,
+                operador_nome,
+                assumido_em: c.assumido_em ?? iniciado_em,
+                a_caminho_em: c.a_caminho_em ?? iniciado_em,
+                cheguei_em: c.cheguei_em ?? iniciado_em,
+                cancelado_em: null,
+              }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
@@ -419,6 +447,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: "Finalizado" as Status,
             finalizado_em,
             operador_nome,
+            cancelado_em: null,
             atualizado_em: new Date().toISOString(),
           });
         } catch (error) {
@@ -439,7 +468,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       setChamados((prev) => {
         const updated = prev.map((c) =>
           c.id === id
-            ? { ...c, status: "Finalizado" as Status, finalizado_em, operador_nome }
+            ? {
+                ...c,
+                status: "Finalizado" as Status,
+                finalizado_em,
+                operador_nome,
+                cancelado_em: null,
+              }
             : c
         );
         const chamado = updated.find((c) => c.id === id);
@@ -463,6 +498,98 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
 
       setChamados((prev) => prev.filter((c) => c.id !== id));
+    },
+    [chamados, scope]
+  );
+
+  const marcarACaminho = useCallback(
+    async (id: string, operadorNome: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
+      if (db) {
+        try {
+          await ensureFirebaseSessionForChamado(chamadoAtual);
+          const agora = new Date().toISOString();
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            status: "Aguardando" as Status,
+            operador_nome: chamadoAtual.operador_nome ?? operadorNome,
+            assumido_em: chamadoAtual.assumido_em ?? agora,
+            a_caminho_em: chamadoAtual.a_caminho_em ?? agora,
+            atualizado_em: agora,
+          });
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Permissão negada ao marcar deslocamento. Verifique perfil e unidade."
+          );
+        }
+        return;
+      }
+
+      setChamados((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                operador_nome: c.operador_nome ?? operadorNome,
+                assumido_em: c.assumido_em ?? new Date().toISOString(),
+                a_caminho_em: c.a_caminho_em ?? new Date().toISOString(),
+              }
+            : c
+        )
+      );
+    },
+    [chamados, scope]
+  );
+
+  const marcarChegada = useCallback(
+    async (id: string, operadorNome: string) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
+      if (db) {
+        try {
+          await ensureFirebaseSessionForChamado(chamadoAtual);
+          const agora = new Date().toISOString();
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+            status: "Aguardando" as Status,
+            operador_nome: chamadoAtual.operador_nome ?? operadorNome,
+            assumido_em: chamadoAtual.assumido_em ?? agora,
+            a_caminho_em: chamadoAtual.a_caminho_em ?? agora,
+            cheguei_em: chamadoAtual.cheguei_em ?? agora,
+            atualizado_em: agora,
+          });
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Permissão negada ao registrar chegada. Verifique perfil e unidade."
+          );
+        }
+        return;
+      }
+
+      setChamados((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                operador_nome: c.operador_nome ?? operadorNome,
+                assumido_em: c.assumido_em ?? new Date().toISOString(),
+                a_caminho_em: c.a_caminho_em ?? new Date().toISOString(),
+                cheguei_em: c.cheguei_em ?? new Date().toISOString(),
+              }
+            : c
+        )
+      );
     },
     [chamados, scope]
   );
@@ -493,6 +620,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     setFilterStatus,
     criarChamado,
     assumirChamado,
+    marcarACaminho,
+    marcarChegada,
     iniciarAtendimento,
     finalizarChamado,
     excluirChamado,

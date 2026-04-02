@@ -10,9 +10,15 @@ interface StatsProps {
   };
   mediaMin: number | null;
   totalFinalizadosComTempo: number;
+  finalizadosLabel?: string;
 }
 
-export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: StatsProps) {
+export default function Stats({
+  stats,
+  mediaMin,
+  totalFinalizadosComTempo,
+  finalizadosLabel = "Finalizados Hoje",
+}: StatsProps) {
   const cards = [
     {
       label: "Aguardando",
@@ -31,7 +37,7 @@ export default function Stats({ stats, mediaMin, totalFinalizadosComTempo }: Sta
       valueColor: "text-emerald-600",
     },
     {
-      label: "Finalizados Hoje",
+      label: finalizadosLabel,
       value: String(stats.finalizadosHoje),
       icon: "✅",
       bg: "bg-[linear-gradient(145deg,rgba(236,253,245,0.96),rgba(255,255,255,0.92))] border-emerald-200/70",

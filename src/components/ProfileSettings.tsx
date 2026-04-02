@@ -20,6 +20,7 @@ interface ProfileSettingsProps {
   onSomChange: (enabled: boolean) => void;
   onTemaChange: (theme: ThemeMode) => void;
   onVoltar: () => void;
+  backLabel?: string;
   onLogout: () => void;
 }
 
@@ -92,6 +93,7 @@ export default function ProfileSettings({
   onSomChange,
   onTemaChange,
   onVoltar,
+  backLabel = "Voltar",
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
@@ -132,7 +134,7 @@ export default function ProfileSettings({
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-700">
                   ←
                 </span>
-                Voltar ao painel
+                {backLabel}
               </button>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Perfil e configurações</h1>
               <p className={cn("mt-2 max-w-2xl text-sm leading-6", isDark ? "text-slate-400" : "text-slate-500")}>

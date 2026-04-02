@@ -126,17 +126,25 @@ service cloud.firestore {
         && isPrioridadeValida(data.prioridade)
         && isStatusChamadoValido(data.status)
         && isTextoNaoVazio(data.criado_em)
+        && (isCampoVazio(data.assumido_em) || isTextoNaoVazio(data.assumido_em))
+        && (isCampoVazio(data.a_caminho_em) || isTextoNaoVazio(data.a_caminho_em))
+        && (isCampoVazio(data.cheguei_em) || isTextoNaoVazio(data.cheguei_em))
         && (isCampoVazio(data.operador_nome) || isTextoNaoVazio(data.operador_nome))
         && (isCampoVazio(data.iniciado_em) || isTextoNaoVazio(data.iniciado_em))
-        && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em));
+        && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em))
+        && (isCampoVazio(data.cancelado_em) || isTextoNaoVazio(data.cancelado_em));
     }
 
     function isCriacaoChamadoValida() {
       return isChamadoBaseValido(request.resource.data)
         && request.resource.data.status == "Aguardando"
         && request.resource.data.operador_nome == null
+        && request.resource.data.assumido_em == null
+        && request.resource.data.a_caminho_em == null
+        && request.resource.data.cheguei_em == null
         && request.resource.data.iniciado_em == null
-        && request.resource.data.finalizado_em == null;
+        && request.resource.data.finalizado_em == null
+        && request.resource.data.cancelado_em == null;
     }
 
     function isAtualizacaoOperacionalPermitida() {
@@ -156,8 +164,12 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "status",
           "operador_nome",
+          "assumido_em",
+          "a_caminho_em",
+          "cheguei_em",
           "iniciado_em",
           "finalizado_em",
+          "cancelado_em",
           "atualizado_em"
         ])
         && isStatusChamadoValido(request.resource.data.status)
@@ -165,8 +177,12 @@ service cloud.firestore {
           isCampoVazio(request.resource.data.operador_nome)
           || isTextoNaoVazio(request.resource.data.operador_nome)
         )
+        && (request.resource.data.assumido_em == null || request.resource.data.assumido_em is string)
+        && (request.resource.data.a_caminho_em == null || request.resource.data.a_caminho_em is string)
+        && (request.resource.data.cheguei_em == null || request.resource.data.cheguei_em is string)
         && (request.resource.data.iniciado_em == null || request.resource.data.iniciado_em is string)
-        && (request.resource.data.finalizado_em == null || request.resource.data.finalizado_em is string);
+        && (request.resource.data.finalizado_em == null || request.resource.data.finalizado_em is string)
+        && (request.resource.data.cancelado_em == null || request.resource.data.cancelado_em is string);
     }
 
     function isTransicaoStatusPermitida() {

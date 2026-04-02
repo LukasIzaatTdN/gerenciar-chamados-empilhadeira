@@ -2,6 +2,7 @@ import type { Chamado } from "../types/chamado";
 import { getSupermercadoById } from "../data/supermercados";
 import type { Supermercado } from "../types/supermercado";
 import type { TimeEstimate } from "../hooks/useTimeEstimates";
+import { formatMinutesLabel, getChamadoTimeMetrics } from "../utils/chamadoMetrics";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 
 interface ChamadoCardProps {
@@ -94,6 +95,8 @@ export default function ChamadoCard({
     supermercados.length > 0 ? supermercados : undefined
   );
 
+  const timeMetrics = getChamadoTimeMetrics(chamado);
+
   const atualizacoes = [
     {
       label: "Solicitado",
@@ -106,10 +109,34 @@ export default function ChamadoCard({
       ? [
           {
             label: "Assumido por",
-            value: chamado.operador_nome,
+            value: chamado.assumido_em
+              ? `${chamado.operador_nome} · ${formatDateTime(chamado.assumido_em)}`
+              : chamado.operador_nome,
             tone: "text-indigo-600",
             dot: "bg-indigo-500",
             icon: "👷",
+          },
+        ]
+      : []),
+    ...(chamado.a_caminho_em
+      ? [
+          {
+            label: "Saiu a caminho",
+            value: formatDateTime(chamado.a_caminho_em),
+            tone: "text-blue-600",
+            dot: "bg-blue-500",
+            icon: "🚚",
+          },
+        ]
+      : []),
+    ...(chamado.cheguei_em
+      ? [
+          {
+            label: "Chegou ao local",
+            value: formatDateTime(chamado.cheguei_em),
+            tone: "text-cyan-600",
+            dot: "bg-cyan-500",
+            icon: "📍",
           },
         ]
       : []),
@@ -223,6 +250,25 @@ export default function ChamadoCard({
                 variant="light"
               />
             )}
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                { label: "Para assumir", value: timeMetrics.tempoParaAssumir },
+                { label: "Até sair", value: timeMetrics.tempoAteACaminho },
+                { label: "Até chegar", value: timeMetrics.tempoAteChegar },
+                { label: "Atendimento", value: timeMetrics.tempoAtendimento },
+                { label: "Tempo total", value: timeMetrics.tempoTotalChamado },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-slate-200 bg-white/70 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-700">
+                    {formatMinutesLabel(item.value)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">

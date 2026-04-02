@@ -16,8 +16,12 @@ export interface Chamado {
   status: Status;
   operador_nome: string | null;
   criado_em: string;
+  assumido_em: string | null;
+  a_caminho_em: string | null;
+  cheguei_em: string | null;
   iniciado_em: string | null;
   finalizado_em: string | null;
+  cancelado_em: string | null;
 }
 
 export const TIPOS_SERVICO: TipoServico[] = [

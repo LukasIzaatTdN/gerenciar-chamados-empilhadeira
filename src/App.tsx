@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { getSupermercadoById } from "./data/supermercados";
 import Header from "./components/Header";
 import AdminScopeSelector from "./components/AdminScopeSelector";
+import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
+import ChamadoTimeMetricsPanel from "./components/ChamadoTimeMetricsPanel";
 import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
 import SupermercadosAdmin from "./components/SupermercadosAdmin";
@@ -34,6 +36,7 @@ import { getPermissions } from "./utils/permissions";
 
 type View = "geral" | "operador" | "perfil" | "dashboard" | "supermercados" | "usuarios";
 type ThemeMode = "light" | "dark";
+type DashboardPeriod = "hoje" | "7d" | "30d";
 
 const USER_SESSION_KEY = "operador_empilhadeira_usuario";
 const OPERADOR_STATUS_KEY = "operador_empilhadeira_status";
@@ -93,6 +96,7 @@ export default function App() {
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
   const {
     supermercados,
@@ -187,6 +191,8 @@ export default function App() {
     setFilterStatus,
     criarChamado,
     assumirChamado,
+    marcarACaminho,
+    marcarChegada,
     iniciarAtendimento,
     finalizarChamado,
   } = useChamados(
@@ -199,6 +205,40 @@ export default function App() {
 
   // Time estimates computed from all chamados
   const timeEstimates = useTimeEstimates(allChamados);
+  const dashboardChamados = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+
+    if (dashboardPeriod === "hoje") {
+      start.setHours(0, 0, 0, 0);
+    } else if (dashboardPeriod === "7d") {
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start.setDate(start.getDate() - 29);
+      start.setHours(0, 0, 0, 0);
+    }
+
+    return allChamados.filter((chamado) => new Date(chamado.criado_em).getTime() >= start.getTime());
+  }, [allChamados, dashboardPeriod]);
+  const dashboardTimeEstimates = useTimeEstimates(dashboardChamados);
+  const dashboardStats = useMemo(
+    () => ({
+      aguardando: dashboardChamados.filter((c) => c.status === "Aguardando").length,
+      emAtendimento: dashboardChamados.filter((c) => c.status === "Em atendimento").length,
+      finalizadosHoje: dashboardChamados.filter((c) => c.status === "Finalizado").length,
+      urgentes: dashboardChamados.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
+      setorMaisAcionado: (() => {
+        if (dashboardChamados.length === 0) return "Sem dados";
+        const counts = new Map<string, number>();
+        dashboardChamados.forEach((chamado) => {
+          counts.set(chamado.setor, (counts.get(chamado.setor) ?? 0) + 1);
+        });
+        return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Sem dados";
+      })(),
+    }),
+    [dashboardChamados]
+  );
   const dashboardSetorMaisAcionado = useMemo(() => {
     if (allChamados.length === 0) return "Sem dados";
 
@@ -218,6 +258,18 @@ export default function App() {
         new Date(chamado.finalizado_em).toDateString() === hoje
     ).length;
   }, [allChamados]);
+  const dashboardPeriodLabel =
+    dashboardPeriod === "hoje"
+      ? "Finalizados hoje"
+      : dashboardPeriod === "7d"
+      ? "Finalizados em 7 dias"
+      : "Finalizados em 30 dias";
+  const dashboardPeriodHint =
+    dashboardPeriod === "hoje"
+      ? "retrato operacional do dia"
+      : dashboardPeriod === "7d"
+      ? "janela curta para ajustes táticos"
+      : "janela ampliada para tendência e ritmo";
 
   useEffect(() => {
     if (hasFirebaseConfig) return;
@@ -351,6 +403,7 @@ export default function App() {
   }, [chamados, operadorNome, permissions]);
 
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
+  const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
 
   function navigateTo(nextView: View) {
     setPreviousView(view);
@@ -358,7 +411,7 @@ export default function App() {
   }
 
   function goBackToPreviousView() {
-    setView(previousView === view ? "geral" : previousView);
+    setView(previousView === view ? defaultViewForCurrentUser : previousView);
   }
 
   function openLoginModal() {
@@ -639,9 +692,12 @@ export default function App() {
           operadorStatus={operadorStatus}
           onStatusChange={setOperadorStatus}
           onAssumir={assumirChamado}
+          onMarcarACaminho={marcarACaminho}
+          onMarcarChegada={marcarChegada}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
           onVoltar={goBackToPreviousView}
+          backLabel="Voltar"
           onAccessProfile={handleAccessProfile}
           onLogout={handleLogout}
           timeEstimates={timeEstimates}
@@ -677,6 +733,7 @@ export default function App() {
           onSomChange={setSomAtivo}
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
+          backLabel="Voltar"
           onLogout={handleLogout}
         />
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
@@ -716,47 +773,104 @@ export default function App() {
             />
           )}
 
+          {canViewAllUnits && (
+            <AdminExecutiveSummary
+              chamados={dashboardChamados}
+              supermercados={supermercados}
+              selectedSupermercadoId={adminSupermercadoFiltro === "todos" ? null : adminSupermercadoFiltro}
+              isConsolidated={adminSupermercadoFiltro === "todos"}
+            />
+          )}
+
           <div className="mb-5 rounded-[30px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  Dashboard da operação
+                  {canViewAllUnits ? "Dashboard executivo" : "Dashboard da operação"}
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
                   {unidadeAtualNome}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                  Painel exclusivo para supervisão e administração com visão de desempenho por unidade.
+                  {canViewAllUnits
+                    ? adminSupermercadoFiltro === "todos"
+                      ? "Painel consolidado para acompanhar pressão operacional, comparar lojas e tomar decisões de priorização."
+                      : "Painel gerencial da unidade selecionada com foco em desempenho, fila e ritmo de atendimento."
+                    : "Painel exclusivo para supervisão e administração com visão de desempenho por unidade."}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={goBackToPreviousView}
-                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-              >
-                <span>📋</span>
-                <span>Ir para Fila</span>
-              </button>
+              <div className="flex flex-col gap-3 sm:items-end">
+                {canViewAllUnits && (
+                  <div className="flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-slate-50/90 p-2">
+                    {([
+                      { value: "hoje", label: "Hoje" },
+                      { value: "7d", label: "7 dias" },
+                      { value: "30d", label: "30 dias" },
+                    ] as const).map((option) => {
+                      const isActive = dashboardPeriod === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setDashboardPeriod(option.value)}
+                          className={`touch-target rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
+                            isActive
+                              ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]"
+                              : "bg-white text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="text-right">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Recorte ativo
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">{dashboardPeriodHint}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={goBackToPreviousView}
+                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+                >
+                  <span>📋</span>
+                  <span>Ir para Fila</span>
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="mb-5 fade-up">
             <Stats
               stats={{
-                aguardando: stats.aguardando,
-                emAtendimento: stats.emAtendimento,
-                finalizadosHoje: dashboardFinalizadosHoje,
-                urgentes: stats.urgentes,
-                setorMaisAcionado: dashboardSetorMaisAcionado,
+                aguardando: canViewAllUnits ? dashboardStats.aguardando : stats.aguardando,
+                emAtendimento: canViewAllUnits ? dashboardStats.emAtendimento : stats.emAtendimento,
+                finalizadosHoje: canViewAllUnits ? dashboardStats.finalizadosHoje : dashboardFinalizadosHoje,
+                urgentes: canViewAllUnits ? dashboardStats.urgentes : stats.urgentes,
+                setorMaisAcionado: canViewAllUnits ? dashboardStats.setorMaisAcionado : dashboardSetorMaisAcionado,
               }}
-              mediaMin={timeEstimates.mediaMin}
-              totalFinalizadosComTempo={timeEstimates.totalFinalizados}
+              mediaMin={canViewAllUnits ? dashboardTimeEstimates.mediaMin : timeEstimates.mediaMin}
+              totalFinalizadosComTempo={
+                canViewAllUnits ? dashboardTimeEstimates.totalFinalizados : timeEstimates.totalFinalizados
+              }
+              finalizadosLabel={canViewAllUnits ? dashboardPeriodLabel : "Finalizados Hoje"}
+            />
+          </div>
+
+          <div className="mb-5 fade-up">
+            <ChamadoTimeMetricsPanel
+              chamados={canViewAllUnits ? dashboardChamados : allChamados}
+              title="Tempos por etapa do atendimento"
+              subtitle="Use estes tempos para localizar gargalos desde a abertura até a conclusão."
             />
           </div>
 
           {canViewAllUnits && adminSupermercadoFiltro === "todos" && (
             <div className="mb-5 fade-up">
-              <SupermercadoComparison chamados={allChamados} supermercados={supermercados} />
+              <SupermercadoComparison chamados={dashboardChamados} supermercados={supermercados} />
             </div>
           )}
         </main>
@@ -994,11 +1108,11 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={openLoginModal}
+            onClick={isAuthenticated ? handleAccessProfile : openLoginModal}
             className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
           >
-            <span>🔐</span>
-            Entrar
+            <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
+            {isAuthenticated ? "Conta" : "Entrar"}
           </button>
           {permissions.canCreateChamado && (
             <button

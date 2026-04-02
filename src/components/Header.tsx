@@ -57,6 +57,29 @@ export default function Header({
       ? "border-emerald-200/40 bg-emerald-500/15 text-emerald-50"
       : "border-amber-200/40 bg-amber-500/15 text-amber-50";
 
+  const fluxoAtivoLabel =
+    perfilAcesso === "Promotor" || perfilAcesso === "Funcionário"
+      ? "Fluxo ativo: abertura e acompanhamento dos seus chamados"
+      : perfilAcesso === "Operador"
+      ? "Fluxo ativo: central operacional da unidade"
+      : perfilAcesso === "Supervisor"
+      ? "Fluxo ativo: supervisão da unidade"
+      : perfilAcesso === "Administrador Geral"
+      ? "Fluxo ativo: gestão consolidada das unidades"
+      : "Fluxo ativo: acesso ao sistema";
+
+  const createActionLabel =
+    perfilAcesso === "Administrador Geral" ? "Abrir chamado" : "Solicitar Empilhadeira";
+  const operatorActionLabel =
+    perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
+  const dashboardActionLabel =
+    perfilAcesso === "Administrador Geral" ? "Gestão Geral" : "Dashboard";
+
+  const getActionClassName = (isPrimary: boolean) =>
+    isPrimary
+      ? "flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all active:scale-95 hover:bg-amber-400 hover:shadow-xl sm:px-6 sm:text-base"
+      : "flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95";
+
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_38px_rgba(15,23,42,0.18)] backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
@@ -87,10 +110,13 @@ export default function Header({
             </div>
 
             {perfilAcesso && usuarioNome && (
-              <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] sm:self-auto">
-                <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
-                {usuarioNome} · {perfilAcesso}
-                {supermercadoNome ? ` · ${supermercadoNome}` : " · Todas as unidades"}
+              <div className="flex flex-col gap-1 self-start sm:items-end sm:self-auto">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                  <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
+                  {usuarioNome} · {perfilAcesso}
+                  {supermercadoNome ? ` · ${supermercadoNome}` : " · Todas as unidades"}
+                </div>
+                <p className="text-[11px] font-medium text-slate-200/85">{fluxoAtivoLabel}</p>
               </div>
             )}
 
@@ -125,25 +151,31 @@ export default function Header({
               {showOperatorAction && (
                 <button
                   onClick={onOperadorPanel}
-                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                  className={getActionClassName(perfilAcesso === "Operador")}
                 >
                   <span>👷</span>
-                  <span>Painel Operador</span>
+                  <span>{operatorActionLabel}</span>
                 </button>
               )}
               {showDashboardAction && (
                 <button
                   onClick={onDashboard}
-                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                  className={getActionClassName(
+                    perfilAcesso === "Supervisor" || perfilAcesso === "Administrador Geral"
+                  )}
                 >
                   <span>📈</span>
-                  <span>Dashboard</span>
+                  <span>{dashboardActionLabel}</span>
                 </button>
               )}
               {showCreateAction && (
                 <button
                   onClick={onNovoChamado}
-                  className="flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all active:scale-95 hover:bg-amber-400 hover:shadow-xl sm:px-6 sm:text-base"
+                  className={getActionClassName(
+                    perfilAcesso === "Promotor" ||
+                      perfilAcesso === "Funcionário" ||
+                      (!perfilAcesso && !showOperatorAction && !showDashboardAction)
+                  )}
                 >
                   <svg
                     className="h-5 w-5"
@@ -158,7 +190,7 @@ export default function Header({
                       d="M12 4.5v15m7.5-7.5h-15"
                     />
                   </svg>
-                  <span>Solicitar Empilhadeira</span>
+                  <span>{createActionLabel}</span>
                 </button>
               )}
             </div>
