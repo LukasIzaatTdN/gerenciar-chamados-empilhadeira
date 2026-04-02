@@ -1,0 +1,27 @@
+[debug] [2026-04-02T03:49:07.904Z] ----------------------------------------------------------------------
+[debug] [2026-04-02T03:49:07.914Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only firestore:rules --project painel-772bf
+[debug] [2026-04-02T03:49:07.916Z] CLI Version:   15.12.0
+[debug] [2026-04-02T03:49:07.916Z] Platform:      linux
+[debug] [2026-04-02T03:49:07.916Z] Node Version:  v24.14.1
+[debug] [2026-04-02T03:49:07.917Z] Time:          Wed Apr 01 2026 23:49:07 GMT-0400 (Horário Padrão do Amazonas)
+[debug] [2026-04-02T03:49:07.918Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-02T03:49:15.067Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-02T03:49:15.069Z] > authorizing via signed-in user (llucas.ls157@gmail.com)
+[debug] [2026-04-02T03:49:15.069Z] [iam] checking project painel-772bf for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-04-02T03:49:15.078Z] Checked if tokens are valid: true, expires at: 1775103120298
+[debug] [2026-04-02T03:49:15.079Z] Checked if tokens are valid: true, expires at: 1775103120298
+[debug] [2026-04-02T03:49:15.084Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions [none]
+[debug] [2026-04-02T03:49:15.085Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions  x-goog-user-project=painel-772bf
+[debug] [2026-04-02T03:49:15.085Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-04-02T03:49:17.019Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions 200
+[debug] [2026-04-02T03:49:17.020Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'painel-772bf'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-04-02T03:49:17.077Z] Checked if tokens are valid: true, expires at: 1775103120298
+[debug] [2026-04-02T03:49:17.077Z] Checked if tokens are valid: true, expires at: 1775103120298
+[debug] [2026-04-02T03:49:17.085Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/painel-772bf/databases/(default) [none]

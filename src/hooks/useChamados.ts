@@ -319,7 +319,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao assumir chamado. Verifique perfil e unidade."
+            "Permissão negada ao assumir chamado. Verifique login e unidade."
           );
         }
         callbacks?.onAssumido?.(
@@ -379,7 +379,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao iniciar atendimento. Verifique perfil e unidade."
+            "Permissão negada ao iniciar atendimento. Verifique login e unidade."
           );
         }
         callbacks?.onIniciado?.({
@@ -442,7 +442,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao finalizar chamado. Verifique perfil e unidade."
+            "Permissão negada ao finalizar chamado. Verifique login e unidade."
           );
         }
         callbacks?.onFinalizado?.({
@@ -514,7 +514,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao marcar deslocamento. Verifique perfil e unidade."
+            "Permissão negada ao marcar deslocamento. Verifique login e unidade."
           );
         }
         return;
@@ -560,7 +560,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao registrar chegada. Verifique perfil e unidade."
+            "Permissão negada ao registrar chegada. Verifique login e unidade."
           );
         }
         return;
