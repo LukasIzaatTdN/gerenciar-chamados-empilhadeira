@@ -184,7 +184,32 @@ async function ensureFirebaseSessionForChamado(chamado: Chamado) {
     throw new Error("Cadastro do usuário não encontrado no Firebase.");
   }
 
+<<<<<<< HEAD
   if (supermercadoResolved !== chamado.supermercado_id) {
+=======
+  const userData = userSnap.data() as {
+    perfil?: string;
+    supermercado_id?: string | null;
+    status?: string;
+  };
+
+  if (userData.status === "Inativo") {
+    throw new Error("Seu acesso está inativo no sistema.");
+  }
+
+  if (
+    options?.requireOperationalProfile !== false &&
+    userData.perfil !== "Operador" &&
+    userData.perfil !== "Administrador Geral"
+  ) {
+    throw new Error("Somente operadores podem assumir, iniciar ou finalizar chamados.");
+  }
+
+  if (
+    userData.perfil !== "Administrador Geral" &&
+    userData.supermercado_id !== chamado.supermercado_id
+  ) {
+>>>>>>> 4197395 (att 2.2.1)
     throw new Error(
       `Unidade divergente no Firebase. Usuário: ${supermercadoResolved ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
     );

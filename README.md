@@ -53,16 +53,22 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
+<<<<<<< HEAD
 - Troca de unidade disponível no perfil para qualquer usuário ativo, respeitando unidades ativas no cadastro
+=======
+>>>>>>> 4197395 (att 2.2.1)
 - Navegação com retorno para a tela anterior:
   - perfil/configurações
   - painel do operador
   - dashboard
   - telas administrativas
+<<<<<<< HEAD
 - UX refinada entre perfis:
   - fallback de navegação para a home correta de cada perfil
   - botão mobile contextual (`Entrar` quando deslogado, `Conta` quando autenticado)
   - ação de voltar com texto neutro para não confundir operador, supervisor e administrador
+=======
+>>>>>>> 4197395 (att 2.2.1)
 - Firestore com coleções reais:
   - `chamados`
   - `supermercados`
@@ -74,6 +80,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
+<<<<<<< HEAD
   - `update` de chamados baseado em `hasUsuarioAtivo + unidade`, sem travas por perfil operacional
 - Regras operacionais atuais:
   - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
@@ -81,6 +88,12 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - usuários ativos da mesma unidade podem assumir chamados
   - usuários ativos da mesma unidade podem registrar deslocamento, chegada, iniciar e finalizar chamados
   - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade
+=======
+- Regras operacionais atuais:
+  - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
+  - `Operador` assume, inicia e finaliza chamados somente da unidade vinculada
+  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, sem executar atendimento
+>>>>>>> 4197395 (att 2.2.1)
   - `Administrador Geral` mantém visão total das unidades e autonomia administrativa
 - Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
 - Tratamento defensivo de runtime:
@@ -94,13 +107,18 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 - Endurecer regras para impedir autoelevação de perfil no cadastro público
 - Adicionar testes automatizados (principalmente mobile e permissões)
+- Revisar UX final do fluxo de chamados entre perfis em produção
 
 ## Regras de negócio principais
 
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
+<<<<<<< HEAD
 - Usuários ativos da mesma unidade podem assumir, iniciar e finalizar chamados.
 - Etapas operacionais do atendimento exigem apenas unidade correta e usuário ativo.
+=======
+- Somente operadores atendem chamados da própria unidade.
+>>>>>>> 4197395 (att 2.2.1)
 - Supervisor visualiza dashboard/fila/relatórios da unidade dele.
 - Administrador geral pode visualizar todas as unidades.
 
