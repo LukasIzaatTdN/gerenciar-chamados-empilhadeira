@@ -74,6 +74,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
+  - `update` de chamados baseado em `hasUsuarioAtivo + unidade`, sem dependência de perfil para operar
 - Regras operacionais atuais:
   - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
   - usuários ativos da mesma unidade podem acessar o painel operacional

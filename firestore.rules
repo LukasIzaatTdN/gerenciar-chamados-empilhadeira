@@ -88,6 +88,13 @@ service cloud.firestore {
       return supermercadoClaim() != null && unidadeId == supermercadoClaim();
     }
 
+    function canAccessChamadoUnidade(unidadeId) {
+      return hasUsuarioAtivo() && (
+        isAdminGeral()
+        || isMesmaUnidade(unidadeId)
+      );
+    }
+
     function isTextoNaoVazio(valor) {
       return valor is string && valor.size() > 0;
     }
@@ -224,7 +231,7 @@ service cloud.firestore {
     }
 
     match /chamados/{id} {
-      allow read: if isAdminGeral() || isMesmaUnidade(resource.data.supermercado_id);
+      allow read: if canAccessChamadoUnidade(resource.data.supermercado_id);
 
       allow create: if (
         (isAdminGeral()
@@ -238,16 +245,11 @@ service cloud.firestore {
         )
       );
 
-      allow update: if (
-        isAdminGeral()
-        || (
-          hasUsuarioAtivo()
-          && isAtualizacaoOperacionalPermitida()
-          && isTransicaoStatusPermitida()
-          && isMesmaUnidade(resource.data.supermercado_id)
-          && isMesmaUnidade(request.resource.data.supermercado_id)
-        )
-      );
+      allow update: if
+        canAccessChamadoUnidade(resource.data.supermercado_id)
+        && canAccessChamadoUnidade(request.resource.data.supermercado_id)
+        && isAtualizacaoOperacionalPermitida()
+        && isTransicaoStatusPermitida();
 
       allow delete: if isAdminGeral();
     }
