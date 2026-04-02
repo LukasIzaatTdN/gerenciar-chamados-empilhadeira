@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
+import type { PerfilAcesso } from "../types/usuario";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";

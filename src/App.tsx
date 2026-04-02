@@ -28,7 +28,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import type { Chamado } from "./types/chamado";
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
@@ -285,8 +285,15 @@ export default function App() {
     const firebaseAuth = auth;
     if (!hasFirebaseConfig || !firebaseAuth) return;
 
+    let unsubscribeUserDoc: (() => void) | undefined;
+
     return onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
       try {
+        if (unsubscribeUserDoc) {
+          unsubscribeUserDoc();
+          unsubscribeUserDoc = undefined;
+        }
+
         if (!firebaseUser) {
           setUsuarioAtual(null);
           return;
@@ -299,63 +306,84 @@ export default function App() {
 
         let usuarioResolved: UsuarioSistema | null = null;
 
-        // Prioriza o documento de usuário no Firestore para manter alinhamento com as rules.
-        if (db) {
-          const userDoc = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
-            if (userData.status === "Inativo") {
-              setUsuarioAtual(null);
+        const applyUsuarioResolved = async (
+          nextUsuario: UsuarioSistema | null,
+          shouldOpenLogin = false
+        ) => {
+          if (!nextUsuario) {
+            setUsuarioAtual(null);
+            if (shouldOpenLogin) {
               await signOut(firebaseAuth);
               setShowLoginModal(true);
-              return;
             }
+            return;
+          }
 
-            if (isPerfilAcesso(userData.perfil)) {
-              usuarioResolved = {
+          setUsuarioAtual(nextUsuario);
+          setView((prev) => {
+            if (prev === "perfil" || prev === "supermercados" || prev === "usuarios") return prev;
+            return getViewByPerfil(nextUsuario.perfil);
+          });
+        };
+
+        const buildFallbackUsuario = () =>
+          isPerfilAcesso(perfilClaim)
+            ? {
                 id: firebaseUser.uid,
                 nome:
-                  typeof userData.nome === "string" && userData.nome.trim()
-                    ? userData.nome.trim()
-                    : firebaseUser.email?.trim() || "Usuário",
-                perfil: userData.perfil,
+                  typeof nomeClaim === "string" && nomeClaim.trim()
+                    ? nomeClaim.trim()
+                    : firebaseUser.displayName?.trim() ||
+                      firebaseUser.email?.trim() ||
+                      "Usuário",
+                perfil: perfilClaim,
                 supermercado_id:
-                  typeof userData.supermercado_id === "string"
-                    ? userData.supermercado_id
+                  typeof supermercadoClaim === "string" && supermercadoClaim.trim()
+                    ? supermercadoClaim.trim()
                     : null,
-              };
+              }
+            : null;
+
+        if (db) {
+          unsubscribeUserDoc = onSnapshot(
+            doc(db, "usuarios", firebaseUser.uid),
+            async (userDoc) => {
+              if (userDoc.exists()) {
+                const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
+                if (userData.status === "Inativo") {
+                  await applyUsuarioResolved(null, true);
+                  return;
+                }
+
+                if (isPerfilAcesso(userData.perfil)) {
+                  usuarioResolved = {
+                    id: firebaseUser.uid,
+                    nome:
+                      typeof userData.nome === "string" && userData.nome.trim()
+                        ? userData.nome.trim()
+                        : firebaseUser.email?.trim() || "Usuário",
+                    perfil: userData.perfil,
+                    supermercado_id:
+                      typeof userData.supermercado_id === "string"
+                        ? userData.supermercado_id
+                        : null,
+                  };
+                  await applyUsuarioResolved(usuarioResolved);
+                  return;
+                }
+              }
+
+              await applyUsuarioResolved(buildFallbackUsuario());
+            },
+            async () => {
+              await applyUsuarioResolved(buildFallbackUsuario());
             }
-          }
-        }
-
-        // Fallback para claims quando não houver doc válido.
-        if (!usuarioResolved && isPerfilAcesso(perfilClaim)) {
-          usuarioResolved = {
-            id: firebaseUser.uid,
-            nome:
-              typeof nomeClaim === "string" && nomeClaim.trim()
-                ? nomeClaim.trim()
-                : firebaseUser.displayName?.trim() ||
-                  firebaseUser.email?.trim() ||
-                  "Usuário",
-            perfil: perfilClaim,
-            supermercado_id:
-              typeof supermercadoClaim === "string" && supermercadoClaim.trim()
-                ? supermercadoClaim.trim()
-                : null,
-          };
-        }
-
-        if (!usuarioResolved) {
-          setUsuarioAtual(null);
+          );
           return;
         }
 
-        setUsuarioAtual(usuarioResolved);
-        setView((prev) => {
-          if (prev === "perfil" || prev === "supermercados" || prev === "usuarios") return prev;
-          return getViewByPerfil(usuarioResolved.perfil);
-        });
+        usuarioResolved = buildFallbackUsuario();
+        await applyUsuarioResolved(usuarioResolved);
       } catch {
         setUsuarioAtual(null);
       }
