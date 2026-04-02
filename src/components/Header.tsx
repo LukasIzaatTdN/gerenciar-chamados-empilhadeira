@@ -6,6 +6,7 @@ interface HeaderProps {
   onNovoChamado: () => void;
   onOperadorPanel: () => void;
   onDashboard: () => void;
+  onOpenSupermercadosAdmin?: () => void;
   onAccessProfile: () => void;
   onOpenLogin: () => void;
   notifications: AppNotification[];
@@ -20,12 +21,14 @@ interface HeaderProps {
   showCreateAction: boolean;
   showOperatorAction: boolean;
   showDashboardAction: boolean;
+  showSupermercadosAction?: boolean;
 }
 
 export default function Header({
   onNovoChamado,
   onOperadorPanel,
   onDashboard,
+  onOpenSupermercadosAdmin,
   onAccessProfile,
   onOpenLogin,
   notifications,
@@ -40,6 +43,7 @@ export default function Header({
   showCreateAction,
   showOperatorAction,
   showDashboardAction,
+  showSupermercadosAction = false,
 }: HeaderProps) {
   const firebaseProjectId =
     typeof import.meta.env.VITE_FIREBASE_PROJECT_ID === "string"
@@ -166,6 +170,15 @@ export default function Header({
                 >
                   <span>📈</span>
                   <span>{dashboardActionLabel}</span>
+                </button>
+              )}
+              {showSupermercadosAction && onOpenSupermercadosAdmin && (
+                <button
+                  onClick={onOpenSupermercadosAdmin}
+                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                >
+                  <span>🏬</span>
+                  <span>Supermercados</span>
                 </button>
               )}
               {showCreateAction && (

@@ -23,6 +23,8 @@ interface ProfileSettingsProps {
   backLabel?: string;
   showManageChamadosAction?: boolean;
   onManageChamados?: () => void;
+  showManageSupermercadosAction?: boolean;
+  onManageSupermercados?: () => void;
   onLogout: () => void;
 }
 
@@ -98,6 +100,8 @@ export default function ProfileSettings({
   backLabel = "Voltar",
   showManageChamadosAction = false,
   onManageChamados,
+  showManageSupermercadosAction = false,
+  onManageSupermercados,
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
@@ -160,6 +164,22 @@ export default function ProfileSettings({
               >
                 <span>🗂️</span>
                 Gerenciar chamados
+              </button>
+            )}
+
+            {showManageSupermercadosAction && onManageSupermercados && (
+              <button
+                type="button"
+                onClick={onManageSupermercados}
+                className={cn(
+                  "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
+                  isDark
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                )}
+              >
+                <span>🏬</span>
+                Gerenciar supermercados
               </button>
             )}
 

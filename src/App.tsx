@@ -740,6 +740,8 @@ export default function App() {
           backLabel="Voltar"
           showManageChamadosAction={canViewAllUnits}
           onManageChamados={handleOpenChamadosManager}
+          showManageSupermercadosAction={canViewAllUnits}
+          onManageSupermercados={handleOpenSupermercadosAdmin}
           onLogout={handleLogout}
         />
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
@@ -754,6 +756,7 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
+          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -768,6 +771,7 @@ export default function App() {
           showCreateAction={permissions.canCreateChamado}
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showSupermercadosAction={canViewAllUnits}
         />
 
         <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
@@ -901,6 +905,7 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
+          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -915,6 +920,7 @@ export default function App() {
           showCreateAction={permissions.canCreateChamado}
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showSupermercadosAction={canViewAllUnits}
         />
         <SupermercadosAdmin
           supermercados={supermercados}
@@ -934,6 +940,7 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
+          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -948,6 +955,7 @@ export default function App() {
           showCreateAction={permissions.canCreateChamado}
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showSupermercadosAction={canViewAllUnits}
         />
         <UsuariosAdmin
           usuarios={usuarios}
@@ -968,6 +976,7 @@ export default function App() {
         onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
         onDashboard={handleDashboardAccess}
+        onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
         onAccessProfile={handleAccessProfile}
         onOpenLogin={openLoginModal}
         notifications={notifications}
@@ -982,6 +991,7 @@ export default function App() {
         showCreateAction={permissions.canCreateChamado}
         showOperatorAction={permissions.canAccessOperatorPanel}
         showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+        showSupermercadosAction={canViewAllUnits}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
