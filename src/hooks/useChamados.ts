@@ -141,7 +141,10 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
 }
 
-async function ensureFirebaseSessionForChamado(chamado: Chamado) {
+async function ensureFirebaseSessionForChamado(
+  chamado: Chamado,
+  options?: { requireOperationalProfile?: boolean }
+) {
   if (!db) return;
 
   const currentUser = auth?.currentUser;
@@ -164,6 +167,15 @@ async function ensureFirebaseSessionForChamado(chamado: Chamado) {
 
   if (userData.status === "Inativo") {
     throw new Error("Seu acesso está inativo no sistema.");
+  }
+
+  if (
+    options?.requireOperationalProfile &&
+    userData.perfil !== "Operador" &&
+    userData.perfil !== "Supervisor" &&
+    userData.perfil !== "Administrador Geral"
+  ) {
+    throw new Error("Seu perfil não pode executar etapas operacionais do chamado.");
   }
 
   if (
@@ -364,7 +376,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: true,
+          });
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
@@ -431,7 +445,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: true,
+          });
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
@@ -502,7 +518,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: true,
+          });
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
@@ -547,7 +565,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: true,
+          });
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,

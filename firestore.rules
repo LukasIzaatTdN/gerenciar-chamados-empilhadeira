@@ -77,6 +77,12 @@ service cloud.firestore {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
 
+    function hasPerfilOperacional() {
+      return perfil() == "Operador"
+        || perfil() == "Supervisor"
+        || isAdminGeral();
+    }
+
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
@@ -230,6 +236,19 @@ service cloud.firestore {
       );
     }
 
+    function isAssumirChamadoPermitido() {
+      return resource.data.status == "Aguardando"
+        && request.resource.data.status == "Aguardando"
+        && isCampoVazio(resource.data.operador_nome)
+        && isTextoNaoVazio(request.resource.data.operador_nome)
+        && request.resource.data.assumido_em != null
+        && isCampoVazio(request.resource.data.a_caminho_em)
+        && isCampoVazio(request.resource.data.cheguei_em)
+        && isCampoVazio(request.resource.data.iniciado_em)
+        && isCampoVazio(request.resource.data.finalizado_em)
+        && isCampoVazio(request.resource.data.cancelado_em);
+    }
+
     match /chamados/{id} {
       allow read: if canAccessChamadoUnidade(resource.data.supermercado_id);
 
@@ -249,7 +268,13 @@ service cloud.firestore {
         canAccessChamadoUnidade(resource.data.supermercado_id)
         && canAccessChamadoUnidade(request.resource.data.supermercado_id)
         && isAtualizacaoOperacionalPermitida()
-        && isTransicaoStatusPermitida();
+        && (
+          isAssumirChamadoPermitido()
+          || (
+            hasPerfilOperacional()
+            && isTransicaoStatusPermitida()
+          )
+        );
 
       allow delete: if isAdminGeral();
     }
