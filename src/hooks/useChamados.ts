@@ -360,7 +360,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
 
       const iniciado_em = new Date().toISOString();
-      const operador_nome = chamadoAtual.operador_nome ?? operadorNome;
+      const operador_nome = operadorNome;
 
       if (db) {
         try {
@@ -427,7 +427,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
 
       const finalizado_em = new Date().toISOString();
-      const operador_nome = chamadoAtual.operador_nome ?? operadorNome;
+      const operador_nome = operadorNome;
 
       if (db) {
         try {
@@ -506,7 +506,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
-            operador_nome: chamadoAtual.operador_nome ?? operadorNome,
+            operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? agora,
             a_caminho_em: chamadoAtual.a_caminho_em ?? agora,
             atualizado_em: agora,
@@ -525,7 +525,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           c.id === id
             ? {
                 ...c,
-                operador_nome: c.operador_nome ?? operadorNome,
+                operador_nome: operadorNome,
                 assumido_em: c.assumido_em ?? new Date().toISOString(),
                 a_caminho_em: c.a_caminho_em ?? new Date().toISOString(),
               }
@@ -551,7 +551,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
-            operador_nome: chamadoAtual.operador_nome ?? operadorNome,
+            operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? agora,
             a_caminho_em: chamadoAtual.a_caminho_em ?? agora,
             cheguei_em: chamadoAtual.cheguei_em ?? agora,
@@ -571,7 +571,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           c.id === id
             ? {
                 ...c,
-                operador_nome: c.operador_nome ?? operadorNome,
+                operador_nome: operadorNome,
                 assumido_em: c.assumido_em ?? new Date().toISOString(),
                 a_caminho_em: c.a_caminho_em ?? new Date().toISOString(),
                 cheguei_em: c.cheguei_em ?? new Date().toISOString(),

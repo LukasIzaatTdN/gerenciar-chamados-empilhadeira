@@ -716,7 +716,7 @@ export default function OperadorPanel({
                           </button>
                         )}
 
-                        {isAguardando && isAssumido && (
+                        {isAguardando && Boolean(chamado.operador_nome) && (
                           <>
                             {!chamado.a_caminho_em && (
                               <button
@@ -749,7 +749,7 @@ export default function OperadorPanel({
                           </>
                         )}
 
-                        {isAguardando && isAssumido && (
+                        {isAguardando && Boolean(chamado.operador_nome) && (
                           <button
                             onClick={() => {
                               void runAction(`iniciar-${chamado.id}`, () =>
@@ -763,7 +763,7 @@ export default function OperadorPanel({
                           </button>
                         )}
 
-                        {isEmAtendimento && isAssumido && (
+                        {isEmAtendimento && Boolean(chamado.operador_nome) && (
                           <button
                             onClick={() => {
                               void runAction(`finalizar-${chamado.id}`, () =>
