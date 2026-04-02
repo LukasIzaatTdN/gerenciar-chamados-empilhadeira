@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { USUARIOS_SISTEMA } from "../data/usuarios";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
 
 const USUARIOS_COLLECTION = "usuarios";
@@ -54,12 +53,13 @@ function normalizeUsuario(
 }
 
 export function useUsuarios() {
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(
-    USUARIOS_SISTEMA.map((u) => ({ ...u, status: "Ativo" as UsuarioStatus }))
-  );
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
 
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      setUsuarios([]);
+      return;
+    }
 
     return onSnapshot(
       collection(db, USUARIOS_COLLECTION),
@@ -74,10 +74,10 @@ export function useUsuarios() {
             return bDate - aDate;
           });
 
-        setUsuarios(remote.length > 0 ? remote : USUARIOS_SISTEMA.map((u) => ({ ...u, status: "Ativo" as UsuarioStatus })));
+        setUsuarios(remote);
       },
       () => {
-        setUsuarios(USUARIOS_SISTEMA.map((u) => ({ ...u, status: "Ativo" as UsuarioStatus })));
+        setUsuarios([]);
       }
     );
   }, []);
