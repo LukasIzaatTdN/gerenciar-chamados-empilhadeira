@@ -118,18 +118,20 @@ export default function ProfileSettings({
             <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[linear-gradient(135deg,#f59e0b,#f97316)] text-2xl text-white shadow-[0_18px_40px_rgba(249,115,22,0.28)]">
               {nome.charAt(0).toUpperCase()}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <button
                 type="button"
                 onClick={onVoltar}
                 className={cn(
-                  "mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "mb-4 inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5",
                   isDark
-                    ? "border-slate-700 bg-slate-900/70 text-slate-300 hover:text-white"
-                    : "border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                    ? "border-slate-700 bg-slate-900/80 text-slate-200 hover:border-slate-500 hover:text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900"
                 )}
               >
-                <span>←</span>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                  ←
+                </span>
                 Voltar ao painel
               </button>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Perfil e configurações</h1>

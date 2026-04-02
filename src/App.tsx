@@ -61,6 +61,7 @@ function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
 export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<View>("geral");
+  const [previousView, setPreviousView] = useState<View>("geral");
   const [usuarioAtual, setUsuarioAtual] = useState<UsuarioSistema | null>(() => {
     const saved = localStorage.getItem(USER_SESSION_KEY);
     if (!saved) return null;
@@ -351,13 +352,22 @@ export default function App() {
 
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
 
+  function navigateTo(nextView: View) {
+    setPreviousView(view);
+    setView(nextView);
+  }
+
+  function goBackToPreviousView() {
+    setView(previousView === view ? "geral" : previousView);
+  }
+
   function openLoginModal() {
     setShowLoginModal(true);
   }
 
   function handleOperadorAccess() {
     if (isAuthenticated && permissions.canAccessOperatorPanel) {
-      setView("operador");
+      navigateTo("operador");
     } else {
       openLoginModal();
     }
@@ -365,7 +375,7 @@ export default function App() {
 
   function handleDashboardAccess() {
     if (isAuthenticated && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)) {
-      setView("dashboard");
+      navigateTo("dashboard");
       return;
     }
 
@@ -392,6 +402,7 @@ export default function App() {
     setShowLoginModal(false);
 
     if (usuarioPersistido.perfil === "Operador") {
+      setPreviousView(view);
       setView("operador");
       return;
     }
@@ -400,10 +411,12 @@ export default function App() {
       usuarioPersistido.perfil === "Supervisor" ||
       usuarioPersistido.perfil === "Administrador Geral"
     ) {
+      setPreviousView(view);
       setView("dashboard");
       return;
     }
 
+    setPreviousView(view);
     setView("geral");
   }
 
@@ -521,19 +534,19 @@ export default function App() {
 
   function handleOpenSupermercadosAdmin() {
     if (permissions.canViewAllUnits) {
-      setView("supermercados");
+      navigateTo("supermercados");
     }
   }
 
   function handleOpenUsuariosAdmin() {
     if (permissions.canViewAllUnits) {
-      setView("usuarios");
+      navigateTo("usuarios");
     }
   }
 
   function handleAccessProfile() {
     if (isAuthenticated) {
-      setView("perfil");
+      navigateTo("perfil");
       return;
     }
 
@@ -628,7 +641,8 @@ export default function App() {
           onAssumir={assumirChamado}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
-          onVoltar={() => setView("geral")}
+          onVoltar={goBackToPreviousView}
+          onAccessProfile={handleAccessProfile}
           onLogout={handleLogout}
           timeEstimates={timeEstimates}
           notifications={notifications}
@@ -662,7 +676,7 @@ export default function App() {
           onNotificacoesChange={setNotificacoesAtivas}
           onSomChange={setSomAtivo}
           onTemaChange={setTema}
-          onVoltar={() => setView("geral")}
+          onVoltar={goBackToPreviousView}
           onLogout={handleLogout}
         />
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
@@ -717,7 +731,7 @@ export default function App() {
               </div>
               <button
                 type="button"
-                onClick={() => setView("geral")}
+                onClick={goBackToPreviousView}
                 className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
               >
                 <span>📋</span>
@@ -777,7 +791,7 @@ export default function App() {
           onCreate={handleCreateSupermercado}
           onUpdate={handleUpdateSupermercado}
           onToggleStatus={handleToggleSupermercadoStatus}
-          onVoltar={() => setView("geral")}
+          onVoltar={goBackToPreviousView}
         />
       </>
     );
@@ -811,7 +825,7 @@ export default function App() {
           currentAdminId={usuarioAtual?.id ?? null}
           onUpdate={handleUpdateUsuarioAdmin}
           onToggleStatus={handleToggleUsuarioStatus}
-          onVoltar={() => setView("geral")}
+          onVoltar={goBackToPreviousView}
         />
       </>
     );
@@ -970,13 +984,15 @@ export default function App() {
               Dashboard
             </button>
           )}
-          <button
-            onClick={permissions.canAccessOperatorPanel ? handleOperadorAccess : handleAccessProfile}
-            className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
-          >
-            <span>👷</span>
-            {permissions.canAccessOperatorPanel ? "Operador" : "Perfil"}
-          </button>
+          {permissions.canAccessOperatorPanel && (
+            <button
+              onClick={handleOperadorAccess}
+              className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
+            >
+              <span>👷</span>
+              Operador
+            </button>
+          )}
           <button
             onClick={openLoginModal}
             className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"

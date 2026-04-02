@@ -73,14 +73,6 @@ service cloud.firestore {
       );
     }
 
-    function isSupervisor() {
-      return perfil() == "Supervisor";
-    }
-
-    function isOperador() {
-      return perfil() == "Operador";
-    }
-
     function isPromotorOuFuncionario() {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
@@ -213,16 +205,6 @@ service cloud.firestore {
           )
         )
       );
-    }
-
-    function isAssumirChamadoPermitido() {
-      return isAtualizacaoOperacionalPermitida()
-        && resource.data.status == "Aguardando"
-        && request.resource.data.status == "Aguardando"
-        && isCampoVazio(resource.data.operador_nome)
-        && isTextoNaoVazio(request.resource.data.operador_nome)
-        && isCampoVazio(request.resource.data.iniciado_em)
-        && isCampoVazio(request.resource.data.finalizado_em);
     }
 
     match /chamados/{id} {

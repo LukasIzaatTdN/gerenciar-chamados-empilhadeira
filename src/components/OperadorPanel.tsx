@@ -19,6 +19,7 @@ interface OperadorPanelProps {
   onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
   onVoltar: () => void;
+  onAccessProfile: () => void;
   onLogout: () => void;
   timeEstimates: TimeEstimatesResult;
   notifications: AppNotification[];
@@ -69,6 +70,7 @@ export default function OperadorPanel({
   onIniciar,
   onFinalizar,
   onVoltar,
+  onAccessProfile,
   onLogout,
   timeEstimates,
   notifications,
@@ -235,10 +237,18 @@ export default function OperadorPanel({
 
               <button
                 onClick={onVoltar}
-                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/80 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
+                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/85 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
               >
                 <span>←</span>
-                <span>Painel Geral</span>
+                <span>Voltar ao painel</span>
+              </button>
+
+              <button
+                onClick={onAccessProfile}
+                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/85 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
+              >
+                <span>⚙️</span>
+                <span>Configurações</span>
               </button>
 
               <button
