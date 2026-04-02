@@ -6,58 +6,45 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasUsuarioAtivo() {
+    function usuarioDocExiste() {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function usuarioDocAtivo() {
+      return usuarioDocExiste()
         && (
           !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
           || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
         );
     }
 
-    function hasClaimsAtivas() {
-      return isSignedIn()
-        && request.auth.token.perfil != null
-        && (
-          request.auth.token.perfil == "Administrador Geral"
-          || request.auth.token.supermercado_id != null
-        );
-    }
-
-    function hasAccessIdentity() {
-      return isSignedIn();
-    }
-
     function perfilDoc() {
-      return hasUsuarioAtivo()
+      return usuarioDocAtivo()
         ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
         : null;
     }
 
     function supermercadoDoc() {
-      return hasUsuarioAtivo()
+      return usuarioDocAtivo()
         ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
         : null;
     }
 
     function perfil() {
-      return isSignedIn()
-        ? (perfilDoc() != null
-            ? perfilDoc()
-            : (request.auth.token.perfil != null
-                ? request.auth.token.perfil
-                : null))
-        : null;
+      return perfilDoc() != null
+        ? perfilDoc()
+        : (isSignedIn() && request.auth.token.perfil != null
+            ? request.auth.token.perfil
+            : null);
     }
 
-    function supermercadoClaim() {
-      return isSignedIn()
-        ? (supermercadoDoc() != null
-            ? supermercadoDoc()
-            : (request.auth.token.supermercado_id != null
-                ? request.auth.token.supermercado_id
-                : null))
-        : null;
+    function supermercadoAtual() {
+      return supermercadoDoc() != null
+        ? supermercadoDoc()
+        : (isSignedIn() && request.auth.token.supermercado_id != null
+            ? request.auth.token.supermercado_id
+            : null);
     }
 
     function isAdminGeral() {
@@ -72,28 +59,6 @@ service cloud.firestore {
         || perfilInput == "Administrador Geral";
     }
 
-    function isSupermercadoVinculoValido(perfilInput, supermercadoId) {
-      return (
-        perfilInput == "Administrador Geral"
-        && (
-          supermercadoId == null
-          || (supermercadoId is string && supermercadoId.size() > 0)
-        )
-      ) || (
-        perfilInput != "Administrador Geral"
-        && supermercadoId is string
-        && supermercadoId.size() > 0
-      );
-    }
-
-    function isPromotorOuFuncionario() {
-      return perfil() == "Promotor" || perfil() == "Funcionário";
-    }
-
-    function isOperador() {
-      return perfil() == "Operador";
-    }
-
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
@@ -101,15 +66,25 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo";
     }
 
+    function isSupermercadoVinculoValido(perfilInput, supermercadoId) {
+      return (
+        perfilInput == "Administrador Geral"
+        && (
+          supermercadoId == null
+          || isSupermercadoAtivo(supermercadoId)
+        )
+      ) || (
+        perfilInput != "Administrador Geral"
+        && isSupermercadoAtivo(supermercadoId)
+      );
+    }
+
     function isMesmaUnidade(unidadeId) {
-      return supermercadoClaim() != null && unidadeId == supermercadoClaim();
+      return supermercadoAtual() != null && unidadeId == supermercadoAtual();
     }
 
     function canAccessChamadoUnidade(unidadeId) {
-      return isSignedIn() && (
-        isAdminGeral()
-        || isMesmaUnidade(unidadeId)
-      );
+      return isSignedIn() && (isAdminGeral() || isMesmaUnidade(unidadeId));
     }
 
     function isTextoNaoVazio(valor) {
@@ -167,63 +142,37 @@ service cloud.firestore {
         && request.resource.data.cancelado_em == null;
     }
 
-    function isAtualizacaoOperacionalPermitida() {
-      return request.resource.data.supermercado_id == resource.data.supermercado_id
+    function isAtualizacaoChamadoValida() {
+      return isChamadoBaseValido(request.resource.data)
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.id == resource.data.id
         && request.resource.data.solicitante_nome == resource.data.solicitante_nome
         && request.resource.data.setor == resource.data.setor
         && request.resource.data.tipo_servico == resource.data.tipo_servico
         && request.resource.data.prioridade == resource.data.prioridade
         && request.resource.data.criado_em == resource.data.criado_em
-        && (
-          request.resource.data.id == resource.data.id
-          || (
-            !("id" in resource.data)
-            && !("id" in request.resource.data)
-          )
-        )
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "status",
-          "operador_nome",
-          "assumido_em",
-          "a_caminho_em",
-          "cheguei_em",
-          "iniciado_em",
-          "finalizado_em",
-          "cancelado_em",
-          "atualizado_em"
-        ])
-        && isStatusChamadoValido(request.resource.data.status)
-        && (
-          isCampoVazio(request.resource.data.operador_nome)
-          || isTextoNaoVazio(request.resource.data.operador_nome)
-        )
-        && (request.resource.data.assumido_em == null || request.resource.data.assumido_em is string)
-        && (request.resource.data.a_caminho_em == null || request.resource.data.a_caminho_em is string)
-        && (request.resource.data.cheguei_em == null || request.resource.data.cheguei_em is string)
-        && (request.resource.data.iniciado_em == null || request.resource.data.iniciado_em is string)
-        && (request.resource.data.finalizado_em == null || request.resource.data.finalizado_em is string)
-        && (request.resource.data.cancelado_em == null || request.resource.data.cancelado_em is string);
+        && isStatusChamadoValido(request.resource.data.status);
     }
 
     match /chamados/{id} {
       allow read: if canAccessChamadoUnidade(resource.data.supermercado_id);
 
-      allow create: if (
-        (isAdminGeral()
-          && request.resource.data.id == id
-          && isCriacaoChamadoValida())
-        || (
-          isPromotorOuFuncionario()
-          && request.resource.data.id == id
-          && isCriacaoChamadoValida()
-          && isMesmaUnidade(request.resource.data.supermercado_id)
-        )
-      );
+      allow create: if isSignedIn()
+        && request.resource.data.id == id
+        && isCriacaoChamadoValida()
+        && (
+          isAdminGeral()
+          || (
+            supermercadoAtual() != null
+            && request.resource.data.supermercado_id == supermercadoAtual()
+            && isSupermercadoAtivo(request.resource.data.supermercado_id)
+          )
+        );
 
-      allow update: if
-        canAccessChamadoUnidade(resource.data.supermercado_id)
+      allow update: if isSignedIn()
+        && canAccessChamadoUnidade(resource.data.supermercado_id)
         && canAccessChamadoUnidade(request.resource.data.supermercado_id)
-        && isAtualizacaoOperacionalPermitida();
+        && isAtualizacaoChamadoValida();
 
       allow delete: if isAdminGeral();
     }
@@ -234,7 +183,7 @@ service cloud.firestore {
     }
 
     match /usuarios/{id} {
-      allow read: if isAdminGeral() || (isSignedIn() && request.auth.uid == id);
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && request.auth.uid == id
@@ -250,15 +199,16 @@ service cloud.firestore {
         || (
           isSignedIn()
           && request.auth.uid == id
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.nome == resource.data.nome
+          && request.resource.data.email == resource.data.email
           && request.resource.data.perfil == resource.data.perfil
           && request.resource.data.status == resource.data.status
+          && request.resource.data.criado_em == resource.data.criado_em
           && (
             request.resource.data.supermercado_id == resource.data.supermercado_id
-            || (
-              resource.data.perfil == "Administrador Geral"
-              && request.resource.data.supermercado_id == null
-            )
             || isSupermercadoAtivo(request.resource.data.supermercado_id)
+            || (resource.data.perfil == "Administrador Geral" && request.resource.data.supermercado_id == null)
           )
         );
 
