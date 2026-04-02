@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Supermercado } from "../types/supermercado";
+import { SUPERMERCADOS } from "../data/supermercados";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
@@ -36,13 +37,13 @@ function normalizeSupermercado(
 }
 
 export function useSupermercados() {
-  const [supermercados, setSupermercados] = useState<Supermercado[]>([]);
+  const [supermercados, setSupermercados] = useState<Supermercado[]>(SUPERMERCADOS);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     const firestore = db;
     if (!firestore) {
-      setSupermercados([]);
+      setSupermercados(SUPERMERCADOS);
       return;
     }
 
@@ -58,10 +59,10 @@ export function useSupermercados() {
           )
           .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
 
-        setSupermercados(remote);
+        setSupermercados(remote.length > 0 ? remote : SUPERMERCADOS);
       },
       () => {
-        setSupermercados([]);
+        setSupermercados(SUPERMERCADOS);
       }
     );
   }, []);
