@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
+import type { PerfilAcesso } from "../types/usuario";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -129,6 +130,12 @@ interface ChamadoScope {
   canViewAll: boolean;
 }
 
+const PERFIS_OPERACIONAIS: PerfilAcesso[] = [
+  "Operador",
+  "Supervisor",
+  "Administrador Geral",
+];
+
 function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
   if (scope.canViewAll) return true;
   if (!scope.supermercadoId) return false;
@@ -139,6 +146,20 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   if (scope.canViewAll) return chamados;
   if (!scope.supermercadoId) return [];
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
+}
+
+function normalizePerfil(value: unknown): PerfilAcesso | null {
+  return value === "Promotor" ||
+    value === "Funcionário" ||
+    value === "Operador" ||
+    value === "Supervisor" ||
+    value === "Administrador Geral"
+    ? value
+    : null;
+}
+
+function normalizeSupermercadoId(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 async function ensureFirebaseSessionForChamado(
@@ -152,38 +173,43 @@ async function ensureFirebaseSessionForChamado(
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 
-  await currentUser.getIdToken(true);
+  const tokenResult = await currentUser.getIdTokenResult(true);
 
   const userSnap = await getDoc(doc(db, "usuarios", currentUser.uid));
-  if (!userSnap.exists()) {
+  const userData = userSnap.exists()
+    ? (userSnap.data() as {
+        perfil?: string;
+        supermercado_id?: string | null;
+        status?: string;
+      })
+    : null;
+
+  const perfilResolved =
+    normalizePerfil(userData?.perfil) ?? normalizePerfil(tokenResult.claims.perfil);
+  const supermercadoResolved =
+    normalizeSupermercadoId(userData?.supermercado_id) ??
+    normalizeSupermercadoId(tokenResult.claims.supermercado_id);
+  const statusResolved =
+    typeof userData?.status === "string" ? userData.status : "Ativo";
+
+  if (!userSnap.exists() && !perfilResolved) {
     throw new Error("Cadastro do usuário não encontrado no Firebase.");
   }
 
-  const userData = userSnap.data() as {
-    perfil?: string;
-    supermercado_id?: string | null;
-    status?: string;
-  };
-
-  if (userData.status === "Inativo") {
+  if (statusResolved === "Inativo") {
     throw new Error("Seu acesso está inativo no sistema.");
   }
 
-  if (
-    options?.requireOperationalProfile &&
-    userData.perfil !== "Operador" &&
-    userData.perfil !== "Supervisor" &&
-    userData.perfil !== "Administrador Geral"
-  ) {
+  if (options?.requireOperationalProfile && !PERFIS_OPERACIONAIS.includes(perfilResolved ?? "Promotor")) {
     throw new Error("Seu perfil não pode executar etapas operacionais do chamado.");
   }
 
   if (
-    userData.perfil !== "Administrador Geral" &&
-    userData.supermercado_id !== chamado.supermercado_id
+    perfilResolved !== "Administrador Geral" &&
+    supermercadoResolved !== chamado.supermercado_id
   ) {
     throw new Error(
-      `Unidade divergente no Firebase. Usuário: ${userData.supermercado_id ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
+      `Unidade divergente no Firebase. Usuário: ${supermercadoResolved ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
     );
   }
 }
