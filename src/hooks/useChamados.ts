@@ -6,7 +6,6 @@ import {
   deleteDoc,
   doc,
   type FirestoreError,
-  getDoc,
   onSnapshot,
   query,
   setDoc,
@@ -141,44 +140,12 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
 }
 
-function normalizeSupermercadoId(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-async function ensureFirebaseSessionForChamado(chamado: Chamado) {
+async function ensureFirebaseSessionForChamado() {
   if (!db) return;
 
   const currentUser = auth?.currentUser;
   if (!currentUser) {
     throw new Error("Sessão expirada. Faça login novamente.");
-  }
-
-  const tokenResult = await currentUser.getIdTokenResult(true);
-
-  const userSnap = await getDoc(doc(db, "usuarios", currentUser.uid));
-  const userData = userSnap.exists()
-    ? (userSnap.data() as {
-        perfil?: string;
-        supermercado_id?: string | null;
-        status?: string;
-      })
-    : null;
-
-  const supermercadoResolved =
-    normalizeSupermercadoId(userData?.supermercado_id) ??
-    normalizeSupermercadoId(tokenResult.claims.supermercado_id);
-  if (!userSnap.exists() && !supermercadoResolved) {
-    throw new Error("Cadastro do usuário não encontrado no Firebase.");
-  }
-
-  if (userData?.status === "Inativo") {
-    throw new Error("Seu acesso está inativo no sistema.");
-  }
-
-  if (supermercadoResolved !== chamado.supermercado_id) {
-    throw new Error(
-      `Unidade divergente no Firebase. Usuário: ${supermercadoResolved ?? "sem unidade"} · Chamado: ${chamado.supermercado_id}`
-    );
   }
 }
 
@@ -315,7 +282,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
@@ -370,7 +337,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
@@ -437,7 +404,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
@@ -508,7 +475,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado();
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
@@ -553,7 +520,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado();
           const agora = new Date().toISOString();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,

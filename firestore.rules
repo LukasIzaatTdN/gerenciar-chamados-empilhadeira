@@ -6,49 +6,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function usuarioDocExiste() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
-    }
-
-    function usuarioDocAtivo() {
-      return usuarioDocExiste()
-        && (
-          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-        );
-    }
-
-    function perfilDoc() {
-      return usuarioDocAtivo()
-        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
-        : null;
-    }
-
-    function supermercadoDoc() {
-      return usuarioDocAtivo()
-        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
-        : null;
-    }
-
-    function perfil() {
-      return perfilDoc() != null
-        ? perfilDoc()
-        : (isSignedIn() && request.auth.token.perfil != null
-            ? request.auth.token.perfil
-            : null);
-    }
-
-    function supermercadoAtual() {
-      return supermercadoDoc() != null
-        ? supermercadoDoc()
-        : (isSignedIn() && request.auth.token.supermercado_id != null
-            ? request.auth.token.supermercado_id
-            : null);
-    }
-
     function isAdminGeral() {
-      return perfil() == "Administrador Geral";
+      return isSignedIn()
+        && request.auth.token.perfil == "Administrador Geral";
     }
 
     function isPerfilValido(perfilInput) {
@@ -77,14 +37,6 @@ service cloud.firestore {
         perfilInput != "Administrador Geral"
         && isSupermercadoAtivo(supermercadoId)
       );
-    }
-
-    function isMesmaUnidade(unidadeId) {
-      return supermercadoAtual() != null && unidadeId == supermercadoAtual();
-    }
-
-    function canAccessChamadoUnidade(unidadeId) {
-      return isSignedIn() && (isAdminGeral() || isMesmaUnidade(unidadeId));
     }
 
     function isTextoNaoVazio(valor) {
@@ -155,23 +107,14 @@ service cloud.firestore {
     }
 
     match /chamados/{id} {
-      allow read: if canAccessChamadoUnidade(resource.data.supermercado_id);
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && request.resource.data.id == id
         && isCriacaoChamadoValida()
-        && (
-          isAdminGeral()
-          || (
-            supermercadoAtual() != null
-            && request.resource.data.supermercado_id == supermercadoAtual()
-            && isSupermercadoAtivo(request.resource.data.supermercado_id)
-          )
-        );
+        && (isAdminGeral() || isSupermercadoAtivo(request.resource.data.supermercado_id));
 
       allow update: if isSignedIn()
-        && canAccessChamadoUnidade(resource.data.supermercado_id)
-        && canAccessChamadoUnidade(request.resource.data.supermercado_id)
         && isAtualizacaoChamadoValida();
 
       allow delete: if isAdminGeral();
