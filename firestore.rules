@@ -215,6 +215,16 @@ service cloud.firestore {
       );
     }
 
+    function isAssumirChamadoPermitido() {
+      return isAtualizacaoOperacionalPermitida()
+        && resource.data.status == "Aguardando"
+        && request.resource.data.status == "Aguardando"
+        && isCampoVazio(resource.data.operador_nome)
+        && isTextoNaoVazio(request.resource.data.operador_nome)
+        && isCampoVazio(request.resource.data.iniciado_em)
+        && isCampoVazio(request.resource.data.finalizado_em);
+    }
+
     match /chamados/{id} {
       allow read: if isAdminGeral() || isMesmaUnidade(resource.data.supermercado_id);
 
@@ -232,6 +242,12 @@ service cloud.firestore {
 
       allow update: if (
         isAdminGeral()
+        || (
+          hasUsuarioAtivo()
+          && isAssumirChamadoPermitido()
+          && isMesmaUnidade(resource.data.supermercado_id)
+          && isMesmaUnidade(request.resource.data.supermercado_id)
+        )
         || (
           (isOperador() || isSupervisor())
           && isAtualizacaoOperacionalPermitida()
