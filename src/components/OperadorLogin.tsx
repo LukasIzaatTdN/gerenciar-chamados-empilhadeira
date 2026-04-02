@@ -45,6 +45,7 @@ export default function OperadorLogin({
     () => supermercados.filter((item) => item.status === "Ativo"),
     [supermercados]
   );
+  const hasUnidadesAtivas = supermercadosAtivos.length > 0;
 
   useEffect(() => {
     if (perfilSelecionado && !supermercadoId) {
@@ -97,7 +98,11 @@ export default function OperadorLogin({
         return;
       }
       if (!supermercadoId) {
-        setError("Selecione a unidade para criar a conta");
+        setError(
+          hasUnidadesAtivas
+            ? "Selecione a unidade para criar a conta"
+            : "Nenhuma unidade ativa encontrada. Refaça o bootstrap do Firestore."
+        );
         return;
       }
       if (!onFirebaseRegister) {
@@ -132,7 +137,11 @@ export default function OperadorLogin({
     }
 
     if (!supermercadoId) {
-      setError("Selecione uma unidade para continuar");
+      setError(
+        hasUnidadesAtivas
+          ? "Selecione uma unidade para continuar"
+          : "Nenhuma unidade ativa encontrada. Refaça o bootstrap do Firestore."
+      );
       return;
     }
 
@@ -145,6 +154,8 @@ export default function OperadorLogin({
 
     await onLogin(usuario);
   }
+
+  const shouldDisableSubmit = !hasUnidadesAtivas && authMode === "firebase" && authTab === "register";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-100/90 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
@@ -277,6 +288,12 @@ export default function OperadorLogin({
 
               {authTab === "register" && (
                 <>
+                  {!hasUnidadesAtivas && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      Nenhuma unidade ativa encontrada no Firestore. Para recomeçar o projeto, rode o bootstrap e faça login novamente.
+                    </div>
+                  )}
+
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-slate-700">
                       Nome do colaborador
@@ -433,7 +450,12 @@ export default function OperadorLogin({
 
           <button
             type="submit"
-            className="touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] transition-all hover:brightness-105 active:scale-[0.99]"
+            disabled={shouldDisableSubmit}
+            className={`touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] transition-all ${
+              shouldDisableSubmit
+                ? "cursor-not-allowed opacity-60"
+                : "hover:brightness-105 active:scale-[0.99]"
+            }`}
           >
             {authMode === "firebase" && authTab === "register" ? "Criar Conta" : "Entrar"}
           </button>
