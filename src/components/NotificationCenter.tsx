@@ -32,6 +32,10 @@ const COLOR_CLASSES: Record<string, { light: string; dark: string }> = {
     light: "bg-green-100 text-green-700",
     dark: "bg-green-500/20 text-green-300",
   },
+  red: {
+    light: "bg-red-100 text-red-700",
+    dark: "bg-red-500/20 text-red-300",
+  },
 };
 
 function formatRelative(iso: string): string {
@@ -167,7 +171,8 @@ export default function NotificationCenter({
               </div>
             ) : (
               notifications.slice(0, 30).map((notif) => {
-                const config = NOTIFICATION_CONFIG[notif.type];
+                const config =
+                  NOTIFICATION_CONFIG[notif.type] ?? NOTIFICATION_CONFIG.chamado_criado;
                 const colorClass = COLOR_CLASSES[config.color] || COLOR_CLASSES.blue;
                 const chipColor = isDark ? colorClass.dark : colorClass.light;
 

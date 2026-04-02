@@ -38,13 +38,19 @@ const COLOR_MAP: Record<string, { bg: string; border: string; bar: string; icon:
     bar: "bg-green-500",
     icon: "bg-green-100 text-green-600",
   },
+  red: {
+    bg: "bg-white",
+    border: "border-red-200",
+    bar: "bg-red-500",
+    icon: "bg-red-100 text-red-600",
+  },
 };
 
 function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: () => void }) {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
-  const config = NOTIFICATION_CONFIG[toast.type];
+  const config = NOTIFICATION_CONFIG[toast.type] ?? NOTIFICATION_CONFIG.chamado_criado;
   const colors = COLOR_MAP[config.color] || COLOR_MAP.blue;
 
   useEffect(() => {

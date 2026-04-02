@@ -7,12 +7,32 @@ import { dispatchWhatsApp } from "../services/whatsapp";
 
 const STORAGE_KEY = "notificacoes_empilhadeira";
 const MAX_NOTIFICATIONS = 50;
+const DEFAULT_NOTIFICATION_TYPE: NotificationType = "chamado_criado";
+
+function isNotificationType(value: unknown): value is NotificationType {
+  return typeof value === "string" && value in NOTIFICATION_CONFIG;
+}
 
 function loadNotifications(): AppNotification[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return [];
-    return JSON.parse(data);
+    const parsed = JSON.parse(data) as Partial<AppNotification>[];
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        id: typeof item.id === "string" ? item.id : uuidv4(),
+        type: isNotificationType(item.type) ? item.type : DEFAULT_NOTIFICATION_TYPE,
+        title: typeof item.title === "string" ? item.title : "Notificação",
+        message: typeof item.message === "string" ? item.message : "",
+        timestamp:
+          typeof item.timestamp === "string" ? item.timestamp : new Date().toISOString(),
+        read: Boolean(item.read),
+        chamadoId: typeof item.chamadoId === "string" ? item.chamadoId : undefined,
+        meta: item.meta && typeof item.meta === "object" ? item.meta : undefined,
+      }));
   } catch {
     return [];
   }
@@ -61,7 +81,7 @@ export function useNotifications({
         return;
       }
 
-      const config = NOTIFICATION_CONFIG[type];
+      const config = NOTIFICATION_CONFIG[type] ?? NOTIFICATION_CONFIG[DEFAULT_NOTIFICATION_TYPE];
 
       const notif: AppNotification = {
         id: uuidv4(),
