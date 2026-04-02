@@ -555,25 +555,39 @@ export default function App() {
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
 
-    const credential = await createUserWithEmailAndPassword(
-      auth,
-      input.email,
-      input.password
-    );
+    let credential;
+    try {
+      credential = await createUserWithEmailAndPassword(
+        auth,
+        input.email,
+        input.password
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Não foi possível criar o usuário no Firebase Auth.";
+      throw new Error(`Falha ao criar autenticação: ${message}`);
+    }
 
-    await setDoc(
-      doc(db, "usuarios", credential.user.uid),
-      {
-        id: credential.user.uid,
-        nome: input.nome.trim(),
-        perfil: input.perfil,
-        supermercado_id: input.supermercado_id,
-        status: "Ativo",
-        email: input.email.trim().toLowerCase(),
-        criado_em: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    try {
+      await setDoc(
+        doc(db, "usuarios", credential.user.uid),
+        {
+          id: credential.user.uid,
+          nome: input.nome.trim(),
+          perfil: input.perfil,
+          supermercado_id: input.supermercado_id,
+          status: "Ativo",
+          email: input.email.trim().toLowerCase(),
+          criado_em: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
+      throw new Error(`Falha ao salvar perfil/unidade no Firestore: ${message}`);
+    }
+
     setShowLoginModal(false);
   }
 

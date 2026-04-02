@@ -124,8 +124,12 @@ export default function OperadorLogin({
           perfil: perfilSelecionado,
           supermercado_id: isAdminGeral ? null : supermercadoId,
         });
-      } catch {
-        setError("Não foi possível criar a conta. Tente novamente.");
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível criar a conta. Tente novamente."
+        );
       }
       return;
     }
