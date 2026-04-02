@@ -15,6 +15,19 @@ service cloud.firestore {
         );
     }
 
+    function hasClaimsAtivas() {
+      return isSignedIn()
+        && request.auth.token.perfil != null
+        && (
+          request.auth.token.perfil == "Administrador Geral"
+          || request.auth.token.supermercado_id != null
+        );
+    }
+
+    function hasAccessIdentity() {
+      return hasUsuarioAtivo() || hasClaimsAtivas();
+    }
+
     function perfilDoc() {
       return hasUsuarioAtivo()
         ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
@@ -77,12 +90,6 @@ service cloud.firestore {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
 
-    function hasPerfilOperacional() {
-      return perfil() == "Operador"
-        || perfil() == "Supervisor"
-        || isAdminGeral();
-    }
-
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
@@ -95,7 +102,7 @@ service cloud.firestore {
     }
 
     function canAccessChamadoUnidade(unidadeId) {
-      return hasUsuarioAtivo() && (
+      return hasAccessIdentity() && (
         isAdminGeral()
         || isMesmaUnidade(unidadeId)
       );
@@ -237,14 +244,29 @@ service cloud.firestore {
     }
 
     function isAssumirChamadoPermitido() {
-      return resource.data.status == "Aguardando"
+      return (
+          resource.data.status == "Aguardando"
+          || !isStatusChamadoValido(resource.data.status)
+        )
         && request.resource.data.status == "Aguardando"
         && isCampoVazio(resource.data.operador_nome)
         && isTextoNaoVazio(request.resource.data.operador_nome)
-        && request.resource.data.assumido_em != null
+        && isTextoNaoVazio(request.resource.data.assumido_em)
         && isCampoVazio(request.resource.data.a_caminho_em)
         && isCampoVazio(request.resource.data.cheguei_em)
         && isCampoVazio(request.resource.data.iniciado_em)
+        && isCampoVazio(request.resource.data.finalizado_em)
+        && isCampoVazio(request.resource.data.cancelado_em);
+    }
+
+    function isIniciarChamadoPermitido() {
+      return (
+          resource.data.status == "Aguardando"
+          || !isStatusChamadoValido(resource.data.status)
+        )
+        && request.resource.data.status == "Em atendimento"
+        && isTextoNaoVazio(request.resource.data.operador_nome)
+        && isTextoNaoVazio(request.resource.data.iniciado_em)
         && isCampoVazio(request.resource.data.finalizado_em)
         && isCampoVazio(request.resource.data.cancelado_em);
     }
@@ -270,10 +292,8 @@ service cloud.firestore {
         && isAtualizacaoOperacionalPermitida()
         && (
           isAssumirChamadoPermitido()
-          || (
-            hasPerfilOperacional()
-            && isTransicaoStatusPermitida()
-          )
+          || isIniciarChamadoPermitido()
+          || isTransicaoStatusPermitida()
         );
 
       allow delete: if isAdminGeral();
