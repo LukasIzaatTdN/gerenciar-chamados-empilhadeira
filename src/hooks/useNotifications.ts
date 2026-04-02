@@ -53,11 +53,14 @@ export function useNotifications({
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const { play } = useNotificationSound();
   const mountedRef = useRef(true);
+  const toastTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      toastTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      toastTimersRef.current = [];
     };
   }, []);
 
@@ -106,11 +109,12 @@ export function useNotifications({
       }
 
       // Auto-dismiss toast after 5 seconds
-      setTimeout(() => {
+      const timer = window.setTimeout(() => {
         if (mountedRef.current) {
           setToasts((prev) => prev.filter((t) => t.id !== notif.id));
         }
       }, 5000);
+      toastTimersRef.current.push(timer);
 
       // Dispatch to WhatsApp service (future integration)
       dispatchWhatsApp(notif);

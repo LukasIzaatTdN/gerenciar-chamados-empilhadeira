@@ -6,6 +6,7 @@ import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 import NotificationCenter from "./NotificationCenter";
+import { recordAppActivity } from "../utils/appActivity";
 
 export type OperadorStatus = "Disponível" | "Pausa";
 
@@ -97,17 +98,20 @@ export default function OperadorPanel({
     try {
       setActionError(null);
       setLoadingActionId(actionId);
+      recordAppActivity(`operador:${actionId}`);
       await action();
       if (actionId.startsWith("assumir-")) {
         setFilterSetor("Todos");
         setActiveTab("meus");
       }
+      recordAppActivity(`operador:concluido:${actionId}`);
     } catch (error) {
       const message =
         error instanceof Error && error.message
           ? error.message
           : "Não foi possível concluir esta ação agora.";
       setActionError(message);
+      recordAppActivity(`operador:erro:${actionId}`);
     } finally {
       setLoadingActionId(null);
     }

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { readLastAppActivity, clearAppActivity } from "../utils/appActivity";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -7,6 +8,7 @@ interface AppErrorBoundaryProps {
 interface AppErrorBoundaryState {
   hasError: boolean;
   message: string;
+  lastActivity: string;
 }
 
 export default class AppErrorBoundary extends Component<
@@ -16,12 +18,14 @@ export default class AppErrorBoundary extends Component<
   state: AppErrorBoundaryState = {
     hasError: false,
     message: "",
+    lastActivity: "",
   };
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return {
       hasError: true,
       message: error.message || "Erro inesperado ao renderizar a aplicação.",
+      lastActivity: readLastAppActivity(),
     };
   }
 
@@ -43,9 +47,17 @@ export default class AppErrorBoundary extends Component<
             <p className="mt-3 text-sm text-slate-600">
               {this.state.message}
             </p>
+            {this.state.lastActivity && (
+              <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                Última ação registrada: <span className="font-semibold text-slate-700">{this.state.lastActivity}</span>
+              </p>
+            )}
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                clearAppActivity();
+                window.location.reload();
+              }}
               className="mt-5 rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white"
             >
               Recarregar aplicacao

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AppNotification } from "../types/notification";
 import { NOTIFICATION_CONFIG } from "../types/notification";
 
@@ -49,27 +49,45 @@ const COLOR_MAP: Record<string, { bg: string; border: string; bar: string; icon:
 function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: () => void }) {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const dismissTimerRef = useRef<number | null>(null);
+  const visibleTimerRef = useRef<number | null>(null);
+  const autoExitTimerRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
+  const dismissRequestedRef = useRef(false);
 
   const config = NOTIFICATION_CONFIG[toast.type] ?? NOTIFICATION_CONFIG.chamado_criado;
   const colors = COLOR_MAP[config.color] || COLOR_MAP.blue;
 
   useEffect(() => {
-    // Animate in
-    const t = setTimeout(() => setVisible(true), 50);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    // Auto exit animation before dismiss
-    const t = setTimeout(() => {
-      setExiting(true);
+    isMountedRef.current = true;
+    visibleTimerRef.current = window.setTimeout(() => {
+      if (isMountedRef.current) {
+        setVisible(true);
+      }
+    }, 50);
+    autoExitTimerRef.current = window.setTimeout(() => {
+      if (isMountedRef.current) {
+        setExiting(true);
+      }
     }, 4500);
-    return () => clearTimeout(t);
+
+    return () => {
+      isMountedRef.current = false;
+      if (visibleTimerRef.current) window.clearTimeout(visibleTimerRef.current);
+      if (autoExitTimerRef.current) window.clearTimeout(autoExitTimerRef.current);
+      if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
+    };
   }, []);
 
   function handleDismiss() {
+    if (dismissRequestedRef.current) return;
+    dismissRequestedRef.current = true;
     setExiting(true);
-    setTimeout(onDismiss, 300);
+    dismissTimerRef.current = window.setTimeout(() => {
+      if (isMountedRef.current) {
+        onDismiss();
+      }
+    }, 300);
   }
 
   return (
