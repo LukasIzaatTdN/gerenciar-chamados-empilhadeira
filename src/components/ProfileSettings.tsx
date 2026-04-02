@@ -21,6 +21,8 @@ interface ProfileSettingsProps {
   onTemaChange: (theme: ThemeMode) => void;
   onVoltar: () => void;
   backLabel?: string;
+  showManageChamadosAction?: boolean;
+  onManageChamados?: () => void;
   onLogout: () => void;
 }
 
@@ -94,6 +96,8 @@ export default function ProfileSettings({
   onTemaChange,
   onVoltar,
   backLabel = "Voltar",
+  showManageChamadosAction = false,
+  onManageChamados,
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
@@ -142,19 +146,37 @@ export default function ProfileSettings({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onLogout}
-            className={cn(
-              "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
-              isDark
-                ? "border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-                : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {showManageChamadosAction && onManageChamados && (
+              <button
+                type="button"
+                onClick={onManageChamados}
+                className={cn(
+                  "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
+                  isDark
+                    ? "border-blue-500/20 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15"
+                    : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                )}
+              >
+                <span>🗂️</span>
+                Gerenciar chamados
+              </button>
             )}
-          >
-            <span>⎋</span>
-            Sair
-          </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className={cn(
+                "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
+                isDark
+                  ? "border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15"
+                  : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              )}
+            >
+              <span>⎋</span>
+              Sair
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">

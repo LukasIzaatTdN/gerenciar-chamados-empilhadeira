@@ -606,6 +606,10 @@ export default function App() {
     openLoginModal();
   }
 
+  function handleOpenChamadosManager() {
+    navigateTo("geral");
+  }
+
   async function handleOperadorSupermercadoChange(nextSupermercadoId: string) {
     if (!usuarioAtual) return;
     if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
@@ -734,6 +738,8 @@ export default function App() {
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"
+          showManageChamadosAction={canViewAllUnits}
+          onManageChamados={handleOpenChamadosManager}
           onLogout={handleLogout}
         />
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
@@ -839,6 +845,16 @@ export default function App() {
                   <span>📋</span>
                   <span>Ir para Fila</span>
                 </button>
+                {canViewAllUnits && (
+                  <button
+                    type="button"
+                    onClick={handleOpenChamadosManager}
+                    className="touch-target inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 shadow-[0_10px_24px_rgba(59,130,246,0.12)] transition-all hover:bg-blue-100"
+                  >
+                    <span>🗂️</span>
+                    <span>Gerenciar chamados</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
