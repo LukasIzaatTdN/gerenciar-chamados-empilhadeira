@@ -220,24 +220,10 @@ service cloud.firestore {
         )
       );
 
-<<<<<<< HEAD
       allow update: if
         canAccessChamadoUnidade(resource.data.supermercado_id)
         && canAccessChamadoUnidade(request.resource.data.supermercado_id)
         && isAtualizacaoOperacionalPermitida();
-=======
-      allow update: if (
-        isAdminGeral()
-        || (
-          hasUsuarioAtivo()
-          && isOperador()
-          && isAtualizacaoOperacionalPermitida()
-          && isTransicaoStatusPermitida()
-          && isMesmaUnidade(resource.data.supermercado_id)
-          && isMesmaUnidade(request.resource.data.supermercado_id)
-        )
-      );
->>>>>>> 4197395 (att 2.2.1)
 
       allow delete: if isAdminGeral();
     }

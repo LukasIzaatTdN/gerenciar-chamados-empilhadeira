@@ -1,6 +1,6 @@
 # Gerenciar Chamados de Empilhadeira
 
-Sistema web para gerenciamento de chamados operacionais de empilhadeira, com operação multiunidade (supermercados), controle por perfil e sincronização com Firebase.
+Sistema web para gerenciamento de chamados operacionais de empilhadeira, com operação multiunidade, controle por usuário e sincronização com Firebase.
 
 ## Stack
 
@@ -15,8 +15,7 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 ### Já implementado
 
-- Modelo multiunidade com entidade `supermercados`:
-  - `id`, `nome`, `codigo`, `endereco`, `status`, `criado_em`
+- Modelo multiunidade com entidade `supermercados`
 - Chamados vinculados por `supermercado_id`
 - Chamados com rastreamento por etapa:
   - `criado_em`, `assumido_em`, `a_caminho_em`, `cheguei_em`, `iniciado_em`, `finalizado_em`, `cancelado_em`
@@ -27,75 +26,44 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - tempo de atendimento
   - tempo total do chamado
 - Escopo por unidade em filas, painel, dashboard e métricas
-- Perfis e permissões:
+- Perfis:
   - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Administrador Geral`
 - Isolamento de dados por unidade no frontend e nas regras do Firestore
-- Dashboard separado do painel do operador (somente supervisor/admin)
+- Dashboard separado do painel do operador
 - Dashboard executivo do Administrador Geral com:
   - visão consolidada das unidades
   - filtro por período (`hoje`, `7 dias`, `30 dias`)
   - resumo executivo com alertas de fila e urgência
   - comparativo e ranking entre supermercados
 - Painel do operador dedicado à operação da unidade
-- Painel do operador com:
-  - status do operador
-  - pendentes da unidade
-  - chamado recomendado
-  - listas por aba (`pendentes`, `meus`, `finalizados`)
-  - acesso direto a `Configurações`
-- Tela administrativa de supermercados (admin geral):
-  - listar, criar, editar, ativar/inativar
-- Seletor global de unidade para administrador geral
-- Login responsivo (desktop/mobile) com modal otimizado para telas menores
-- Fluxo de autenticação:
-  - sem Firebase: login local por perfil + nome + unidade
-  - com Firebase: entrar por e-mail/senha, entrar com Google e criar conta (nome, perfil e unidade)
+- Tela administrativa de supermercados para `Administrador Geral`
+- Seletor global de unidade para `Administrador Geral`
+- Login responsivo com:
+  - login local por perfil + nome + unidade
+  - Firebase Auth com e-mail/senha
+  - login com Google
+  - criação de conta com nome, perfil e unidade
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
-<<<<<<< HEAD
-- Troca de unidade disponível no perfil para qualquer usuário ativo, respeitando unidades ativas no cadastro
-=======
->>>>>>> 4197395 (att 2.2.1)
-- Navegação com retorno para a tela anterior:
-  - perfil/configurações
-  - painel do operador
-  - dashboard
-  - telas administrativas
-<<<<<<< HEAD
-- UX refinada entre perfis:
-  - fallback de navegação para a home correta de cada perfil
-  - botão mobile contextual (`Entrar` quando deslogado, `Conta` quando autenticado)
-  - ação de voltar com texto neutro para não confundir operador, supervisor e administrador
-=======
->>>>>>> 4197395 (att 2.2.1)
+- Troca de unidade disponível no perfil
+- Navegação com retorno para a tela anterior
+- UX refinada entre perfis
 - Firestore com coleções reais:
   - `chamados`
   - `supermercados`
   - `usuarios`
-- Gestão administrativa de usuários (Administrador Geral):
+- Gestão administrativa de usuários:
   - listar usuários
   - alterar perfil/unidade
   - bloquear/inativar e reativar usuário
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
-<<<<<<< HEAD
-  - `update` de chamados baseado em `hasUsuarioAtivo + unidade`, sem travas por perfil operacional
 - Regras operacionais atuais:
-  - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
-  - usuários ativos da mesma unidade podem acessar o painel operacional
-  - usuários ativos da mesma unidade podem assumir chamados
-  - usuários ativos da mesma unidade podem registrar deslocamento, chegada, iniciar e finalizar chamados
-  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade
-=======
-- Regras operacionais atuais:
-  - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
-  - `Operador` assume, inicia e finaliza chamados somente da unidade vinculada
-  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, sem executar atendimento
->>>>>>> 4197395 (att 2.2.1)
-  - `Administrador Geral` mantém visão total das unidades e autonomia administrativa
-- Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
+  - chamados dependem de unidade correta e usuário autenticado
+  - etapa operacional não depende mais de perfil
+- Suporte a custom claims administrativas (`perfil`, `supermercado_id`)
 - Tratamento defensivo de runtime:
   - normalização de chamados/remotos
   - sanitização de notificações salvas
@@ -103,26 +71,30 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Badge visual com projeto Firebase ativo no header
 - Script de diagnóstico de acesso para operador/chamado
 
-### Em andamento / faltando
+## Primeiro Boot Depois de Zerar o Firestore
 
-- Endurecer regras para impedir autoelevação de perfil no cadastro público
-- Adicionar testes automatizados (principalmente mobile e permissões)
-- Revisar UX final do fluxo de chamados entre perfis em produção
+Se você apagou o banco, o app pode subir “vazio” até recriar os dados básicos. O mínimo esperado é:
 
-## Regras de negócio principais
+- ao menos 1 supermercado ativo em `supermercados`
+- os usuários cadastrados em `usuarios`
+- claims atualizadas quando necessário para login administrativo
+
+Depois de recriar os dados:
+
+1. faça logout no navegador
+2. limpe o cache/localStorage do app, se houver sessão antiga
+3. faça login novamente
+4. confirme se o `supermercado_id` do usuário bate com o chamado
+
+## Regras de Negócio Principais
 
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
-<<<<<<< HEAD
-- Usuários ativos da mesma unidade podem assumir, iniciar e finalizar chamados.
-- Etapas operacionais do atendimento exigem apenas unidade correta e usuário ativo.
-=======
-- Somente operadores atendem chamados da própria unidade.
->>>>>>> 4197395 (att 2.2.1)
+- Usuários autenticados da mesma unidade podem assumir, iniciar e finalizar chamados.
 - Supervisor visualiza dashboard/fila/relatórios da unidade dele.
 - Administrador geral pode visualizar todas as unidades.
 
-## Estrutura relevante
+## Estrutura Relevante
 
 ```text
 src/
@@ -157,7 +129,7 @@ Arquivos-chave:
 - `firestore.rules`
 - `firebase.json`
 
-## Como rodar
+## Como Rodar
 
 ### 1. Instalar dependências
 
@@ -190,13 +162,14 @@ npm run dev
 npm run build
 ```
 
-## Scripts úteis
+## Scripts Úteis
 
 ```bash
 npm run auth:set-claims
 npm run auth:create-token
 npm run auth:approve-user
 npm run auth:check-access
+npm run firebase:bootstrap
 ```
 
 Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
@@ -215,7 +188,21 @@ npm run auth:check-access -- \
   --service-account "/caminho/serviceAccountKey.json"
 ```
 
-## Deploy de regras do Firestore
+Exemplo de bootstrap completo do Firestore recém-zerado:
+
+```bash
+npm run firebase:bootstrap -- \
+  --service-account "/caminho/serviceAccountKey.json" \
+  --supermercado-nome "Supermercado Centro" \
+  --supermercado-codigo "CTR" \
+  --supermercado-endereco "Av. Principal, 1000 - Centro" \
+  --admin-nome "Administrador Geral" \
+  --admin-email "admin@empresa.com" \
+  --admin-password "SENHA_FORTE_AQUI" \
+  --admin-perfil "Administrador Geral"
+```
+
+## Deploy de Regras do Firestore
 
 ```bash
 firebase deploy --only firestore:rules --project painel-772bf
@@ -227,4 +214,10 @@ firebase deploy --only firestore:rules --project painel-772bf
 npx tsc --noEmit
 ```
 
-Sem erros de TypeScript na última validação local.
+## Próximo Passo Natural
+
+Recriar a base mínima do Firestore:
+
+- supermercados ativos
+- usuários de acesso
+- custom claims consistentes com os documentos
