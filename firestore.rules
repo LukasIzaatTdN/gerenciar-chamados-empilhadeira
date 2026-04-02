@@ -244,12 +244,6 @@ service cloud.firestore {
         isAdminGeral()
         || (
           hasUsuarioAtivo()
-          && isAssumirChamadoPermitido()
-          && isMesmaUnidade(resource.data.supermercado_id)
-          && isMesmaUnidade(request.resource.data.supermercado_id)
-        )
-        || (
-          (isOperador() || isSupervisor())
           && isAtualizacaoOperacionalPermitida()
           && isTransicaoStatusPermitida()
           && isMesmaUnidade(resource.data.supermercado_id)

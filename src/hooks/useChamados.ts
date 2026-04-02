@@ -363,7 +363,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: false,
+          });
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
@@ -417,7 +419,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual);
+          await ensureFirebaseSessionForChamado(chamadoAtual, {
+            requireOperationalProfile: false,
+          });
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
