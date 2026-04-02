@@ -104,11 +104,7 @@ export default function OperadorLogin({
         return;
       }
       if (!isAdminGeral && !supermercadoId) {
-        setError(
-          hasUnidadesAtivas
-            ? "Selecione a unidade para criar a conta"
-            : "Nenhuma unidade ativa encontrada. Refaça o bootstrap do Firestore."
-        );
+        setError("Selecione a unidade para criar a conta");
         return;
       }
       if (!onFirebaseRegister) {
@@ -147,11 +143,7 @@ export default function OperadorLogin({
     }
 
     if (!isAdminGeral && !supermercadoId) {
-      setError(
-        hasUnidadesAtivas
-          ? "Selecione uma unidade para continuar"
-          : "Nenhuma unidade ativa encontrada. Refaça o bootstrap do Firestore."
-      );
+      setError("Selecione uma unidade para continuar");
       return;
     }
 
@@ -302,18 +294,6 @@ export default function OperadorLogin({
 
               {authTab === "register" && (
                 <>
-                  {!hasUnidadesAtivas && !isAdminGeral && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Nenhuma unidade ativa encontrada no Firestore. Para recomeçar o projeto, rode o bootstrap e faça login novamente.
-                    </div>
-                  )}
-
-                  {!hasUnidadesAtivas && isAdminGeral && (
-                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                      Nenhuma unidade ativa foi encontrada agora, mas o Administrador Geral pode criar a conta sem vincular supermercado.
-                    </div>
-                  )}
-
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-slate-700">
                       Nome do colaborador

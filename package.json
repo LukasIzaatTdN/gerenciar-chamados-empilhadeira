@@ -10,8 +10,7 @@
     "auth:set-claims": "node scripts/firebase/set-custom-claims.mjs",
     "auth:create-token": "node scripts/firebase/create-custom-token.mjs",
     "auth:approve-user": "node scripts/firebase/approve-user.mjs",
-    "auth:check-access": "node scripts/firebase/check-operator-access.mjs",
-    "firebase:bootstrap": "node scripts/firebase/bootstrap-project.mjs"
+    "auth:check-access": "node scripts/firebase/check-operator-access.mjs"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",

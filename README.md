@@ -71,21 +71,6 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Badge visual com projeto Firebase ativo no header
 - Script de diagnóstico de acesso para operador/chamado
 
-## Primeiro Boot Depois de Zerar o Firestore
-
-Se você apagou o banco, o app pode subir “vazio” até recriar os dados básicos. O mínimo esperado é:
-
-- ao menos 1 supermercado ativo em `supermercados`
-- os usuários cadastrados em `usuarios`
-- claims atualizadas quando necessário para login administrativo
-
-Depois de recriar os dados:
-
-1. faça logout no navegador
-2. limpe o cache/localStorage do app, se houver sessão antiga
-3. faça login novamente
-4. confirme se o `supermercado_id` do usuário bate com o chamado
-
 ## Regras de Negócio Principais
 
 - Todo chamado pertence a um supermercado.
@@ -169,7 +154,6 @@ npm run auth:set-claims
 npm run auth:create-token
 npm run auth:approve-user
 npm run auth:check-access
-npm run firebase:bootstrap
 ```
 
 Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
@@ -188,20 +172,6 @@ npm run auth:check-access -- \
   --service-account "/caminho/serviceAccountKey.json"
 ```
 
-Exemplo de bootstrap completo do Firestore recém-zerado:
-
-```bash
-npm run firebase:bootstrap -- \
-  --service-account "/caminho/serviceAccountKey.json" \
-  --supermercado-nome "Supermercado Centro" \
-  --supermercado-codigo "CTR" \
-  --supermercado-endereco "Av. Principal, 1000 - Centro" \
-  --admin-nome "Administrador Geral" \
-  --admin-email "admin@empresa.com" \
-  --admin-password "SENHA_FORTE_AQUI" \
-  --admin-perfil "Administrador Geral"
-```
-
 ## Deploy de Regras do Firestore
 
 ```bash
@@ -213,11 +183,3 @@ firebase deploy --only firestore:rules --project painel-772bf
 ```bash
 npx tsc --noEmit
 ```
-
-## Próximo Passo Natural
-
-Recriar a base mínima do Firestore:
-
-- supermercados ativos
-- usuários de acesso
-- custom claims consistentes com os documentos
