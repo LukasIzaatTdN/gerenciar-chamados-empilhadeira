@@ -74,13 +74,13 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
-  - `update` de chamados baseado em `hasUsuarioAtivo + unidade`, com `assumir` liberado por unidade e etapas operacionais validadas por perfil
+  - `update` de chamados baseado em `hasUsuarioAtivo + unidade`, sem travas por perfil operacional
 - Regras operacionais atuais:
   - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
   - usuários ativos da mesma unidade podem acessar o painel operacional
   - usuários ativos da mesma unidade podem assumir chamados
-  - `Operador`, `Supervisor` e `Administrador Geral` podem registrar deslocamento, chegada, iniciar e finalizar chamados na unidade permitida
-  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, e também pode atuar na operação quando necessário
+  - usuários ativos da mesma unidade podem registrar deslocamento, chegada, iniciar e finalizar chamados
+  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade
   - `Administrador Geral` mantém visão total das unidades e autonomia administrativa
 - Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
 - Tratamento defensivo de runtime:
@@ -99,9 +99,9 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
-- Usuários ativos da mesma unidade podem assumir chamados e acessar o painel operacional.
+- Usuários ativos da mesma unidade podem assumir, iniciar e finalizar chamados.
 - Etapas operacionais do atendimento exigem apenas unidade correta e usuário ativo.
-- Supervisor visualiza dashboard/fila/relatórios da unidade dele e pode atuar operacionalmente na mesma unidade.
+- Supervisor visualiza dashboard/fila/relatórios da unidade dele.
 - Administrador geral pode visualizar todas as unidades.
 
 ## Estrutura relevante

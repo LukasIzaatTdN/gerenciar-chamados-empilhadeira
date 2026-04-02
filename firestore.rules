@@ -201,76 +201,6 @@ service cloud.firestore {
         && (request.resource.data.cancelado_em == null || request.resource.data.cancelado_em is string);
     }
 
-    function isTransicaoStatusPermitida() {
-      return (
-        resource.data.status == "Aguardando"
-        && (
-          request.resource.data.status == "Aguardando"
-          || (
-            request.resource.data.status == "Em atendimento"
-            && request.resource.data.iniciado_em != null
-            && isCampoVazio(request.resource.data.finalizado_em)
-          )
-        )
-      ) || (
-        resource.data.status == "Em atendimento"
-        && (
-          request.resource.data.status == "Em atendimento"
-          || (
-            request.resource.data.status == "Finalizado"
-            && request.resource.data.iniciado_em != null
-            && request.resource.data.finalizado_em != null
-          )
-        )
-      ) || (
-        resource.data.status == "Finalizado"
-        && request.resource.data.status == "Finalizado"
-      ) || (
-        !isStatusChamadoValido(resource.data.status)
-        && (
-          request.resource.data.status == "Aguardando"
-          || (
-            request.resource.data.status == "Em atendimento"
-            && request.resource.data.iniciado_em != null
-            && isCampoVazio(request.resource.data.finalizado_em)
-          )
-          || (
-            request.resource.data.status == "Finalizado"
-            && request.resource.data.iniciado_em != null
-            && request.resource.data.finalizado_em != null
-          )
-        )
-      );
-    }
-
-    function isAssumirChamadoPermitido() {
-      return (
-          resource.data.status == "Aguardando"
-          || !isStatusChamadoValido(resource.data.status)
-        )
-        && request.resource.data.status == "Aguardando"
-        && isCampoVazio(resource.data.operador_nome)
-        && isTextoNaoVazio(request.resource.data.operador_nome)
-        && isTextoNaoVazio(request.resource.data.assumido_em)
-        && isCampoVazio(request.resource.data.a_caminho_em)
-        && isCampoVazio(request.resource.data.cheguei_em)
-        && isCampoVazio(request.resource.data.iniciado_em)
-        && isCampoVazio(request.resource.data.finalizado_em)
-        && isCampoVazio(request.resource.data.cancelado_em);
-    }
-
-    function isIniciarChamadoPermitido() {
-      return (
-          resource.data.status == "Aguardando"
-          || !isStatusChamadoValido(resource.data.status)
-        )
-        && request.resource.data.status == "Em atendimento"
-        && isTextoNaoVazio(request.resource.data.operador_nome)
-        && isTextoNaoVazio(request.resource.data.iniciado_em)
-        && isCampoVazio(request.resource.data.finalizado_em)
-        && isCampoVazio(request.resource.data.cancelado_em);
-    }
-
     match /chamados/{id} {
       allow read: if canAccessChamadoUnidade(resource.data.supermercado_id);
 
@@ -289,12 +219,7 @@ service cloud.firestore {
       allow update: if
         canAccessChamadoUnidade(resource.data.supermercado_id)
         && canAccessChamadoUnidade(request.resource.data.supermercado_id)
-        && isAtualizacaoOperacionalPermitida()
-        && (
-          isAssumirChamadoPermitido()
-          || isIniciarChamadoPermitido()
-          || isTransicaoStatusPermitida()
-        );
+        && isAtualizacaoOperacionalPermitida();
 
       allow delete: if isAdminGeral();
     }
