@@ -21,9 +21,15 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Escopo por unidade em filas, painel, dashboard e métricas
 - Perfis e permissões:
   - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Administrador Geral`
-- Isolamento de dados por unidade no frontend
+- Isolamento de dados por unidade no frontend e nas regras do Firestore
 - Dashboard separado do painel do operador (somente supervisor/admin)
 - Painel do operador dedicado à operação da unidade
+- Painel do operador com:
+  - status do operador
+  - pendentes da unidade
+  - chamado recomendado
+  - listas por aba (`pendentes`, `meus`, `finalizados`)
+  - acesso direto a `Configurações`
 - Tela administrativa de supermercados (admin geral):
   - listar, criar, editar, ativar/inativar
 - Seletor global de unidade para administrador geral
@@ -34,6 +40,11 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Sessão persistida:
   - localStorage no modo local
   - Firebase Auth no modo Firebase
+- Navegação com retorno para a tela anterior:
+  - perfil/configurações
+  - painel do operador
+  - dashboard
+  - telas administrativas
 - Firestore com coleções reais:
   - `chamados`
   - `supermercados`
@@ -45,20 +56,30 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras do Firestore versionadas no projeto:
   - arquivo `firestore.rules`
   - mapeamento em `firebase.json`
+- Regras operacionais atuais:
+  - `Promotor` e `Funcionário` abrem chamados e acompanham apenas suas próprias solicitações
+  - `Operador` assume, inicia e finaliza chamados somente da unidade vinculada
+  - `Supervisor` acompanha fila, dashboard, histórico e relatórios da própria unidade, sem executar atendimento
+  - `Administrador Geral` mantém visão total das unidades e autonomia administrativa
 - Suporte a custom claims administrativas (`perfil`, `supermercado_id`) quando necessário
+- Tratamento defensivo de runtime:
+  - normalização de chamados/remotos
+  - sanitização de notificações salvas
+  - `ErrorBoundary` para evitar tela branca total
+- Badge visual com projeto Firebase ativo no header
+- Script de diagnóstico de acesso para operador/chamado
 
 ### Em andamento / faltando
 
-- Aplicar e validar regras em produção:
-  - `firebase deploy --only firestore:rules`
 - Endurecer regras para impedir autoelevação de perfil no cadastro público
 - Adicionar testes automatizados (principalmente mobile e permissões)
+- Revisar UX final do fluxo de chamados entre perfis em produção
 
 ## Regras de negócio principais
 
 - Todo chamado pertence a um supermercado.
 - Usuários comuns operam somente na própria unidade.
-- Operador só atende chamados da unidade dele.
+- Somente operadores atendem chamados da própria unidade.
 - Supervisor visualiza dashboard/fila/relatórios da unidade dele.
 - Administrador geral pode visualizar todas as unidades.
 
@@ -86,9 +107,12 @@ Arquivos-chave:
 - `src/components/OperadorPanel.tsx`
 - `src/components/SupermercadosAdmin.tsx`
 - `src/components/UsuariosAdmin.tsx`
+- `src/components/ProfileSettings.tsx`
+- `src/components/AppErrorBoundary.tsx`
 - `src/hooks/useChamados.ts`
 - `src/hooks/useSupermercados.ts`
 - `src/hooks/useUsuarios.ts`
+- `src/hooks/useNotifications.ts`
 - `src/config/firebase.ts`
 - `firestore.rules`
 - `firebase.json`
@@ -132,6 +156,7 @@ npm run build
 npm run auth:set-claims
 npm run auth:create-token
 npm run auth:approve-user
+npm run auth:check-access
 ```
 
 Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
@@ -141,10 +166,19 @@ Observação importante:
 - `--supermercado-id` é obrigatório em todos os scripts de claims/token
 - para Administrador Geral, use `--supermercado-id all`
 
+Exemplo de diagnóstico de acesso:
+
+```bash
+npm run auth:check-access -- \
+  --uid "UID_DO_USUARIO" \
+  --chamado-id "ID_DO_CHAMADO" \
+  --service-account "/caminho/serviceAccountKey.json"
+```
+
 ## Deploy de regras do Firestore
 
 ```bash
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules --project painel-772bf
 ```
 
 ## Validação

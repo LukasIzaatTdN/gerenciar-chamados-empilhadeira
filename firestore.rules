@@ -77,6 +77,10 @@ service cloud.firestore {
       return perfil() == "Promotor" || perfil() == "Funcionário";
     }
 
+    function isOperador() {
+      return perfil() == "Operador";
+    }
+
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
@@ -226,6 +230,7 @@ service cloud.firestore {
         isAdminGeral()
         || (
           hasUsuarioAtivo()
+          && isOperador()
           && isAtualizacaoOperacionalPermitida()
           && isTransicaoStatusPermitida()
           && isMesmaUnidade(resource.data.supermercado_id)

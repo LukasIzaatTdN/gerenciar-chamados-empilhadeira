@@ -168,10 +168,9 @@ async function ensureFirebaseSessionForChamado(
   if (
     options?.requireOperationalProfile !== false &&
     userData.perfil !== "Operador" &&
-    userData.perfil !== "Supervisor" &&
     userData.perfil !== "Administrador Geral"
   ) {
-    throw new Error("Seu perfil atual não pode operar chamados.");
+    throw new Error("Somente operadores podem assumir, iniciar ou finalizar chamados.");
   }
 
   if (
@@ -313,9 +312,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual, {
-            requireOperationalProfile: false,
-          });
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Aguardando" as Status,
             operador_nome: operadorNome,
@@ -363,9 +360,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual, {
-            requireOperationalProfile: false,
-          });
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Em atendimento" as Status,
             iniciado_em,
@@ -419,9 +414,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
-          await ensureFirebaseSessionForChamado(chamadoAtual, {
-            requireOperationalProfile: false,
-          });
+          await ensureFirebaseSessionForChamado(chamadoAtual);
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
