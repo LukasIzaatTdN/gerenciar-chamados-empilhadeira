@@ -551,7 +551,7 @@ export default function App() {
     email: string;
     password: string;
     perfil: UsuarioSistema["perfil"];
-    supermercado_id: string;
+    supermercado_id: string | null;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
 

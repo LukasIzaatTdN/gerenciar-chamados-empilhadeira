@@ -11,7 +11,7 @@ interface OperadorLoginProps {
     email: string;
     password: string;
     perfil: PerfilAcesso;
-    supermercado_id: string;
+    supermercado_id: string | null;
   }) => void | Promise<void>;
   onCancel: () => void;
   supermercados: Supermercado[];
@@ -46,12 +46,18 @@ export default function OperadorLogin({
     [supermercados]
   );
   const hasUnidadesAtivas = supermercadosAtivos.length > 0;
+  const isAdminGeral = perfilSelecionado === "Administrador Geral";
 
   useEffect(() => {
+    if (isAdminGeral) {
+      setSupermercadoId("");
+      return;
+    }
+
     if (perfilSelecionado && !supermercadoId) {
       setSupermercadoId(supermercadosAtivos[0]?.id ?? "");
     }
-  }, [perfilSelecionado, supermercadoId, supermercadosAtivos]);
+  }, [perfilSelecionado, supermercadoId, supermercadosAtivos, isAdminGeral]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +103,7 @@ export default function OperadorLogin({
         setError("Selecione um perfil para criar a conta");
         return;
       }
-      if (!supermercadoId) {
+      if (!isAdminGeral && !supermercadoId) {
         setError(
           hasUnidadesAtivas
             ? "Selecione a unidade para criar a conta"
@@ -116,7 +122,7 @@ export default function OperadorLogin({
           email: normalizedEmail,
           password,
           perfil: perfilSelecionado,
-          supermercado_id: supermercadoId,
+          supermercado_id: isAdminGeral ? null : supermercadoId,
         });
       } catch {
         setError("Não foi possível criar a conta. Tente novamente.");
@@ -136,7 +142,7 @@ export default function OperadorLogin({
       return;
     }
 
-    if (!supermercadoId) {
+    if (!isAdminGeral && !supermercadoId) {
       setError(
         hasUnidadesAtivas
           ? "Selecione uma unidade para continuar"
@@ -149,7 +155,7 @@ export default function OperadorLogin({
       id: `session-${perfilSelecionado.toLowerCase().replace(/\s+/g, "-")}-${supermercadoId || "all"}`,
       nome: nomeFinal,
       perfil: perfilSelecionado,
-      supermercado_id: supermercadoId,
+      supermercado_id: isAdminGeral ? null : supermercadoId,
     };
 
     await onLogin(usuario);
@@ -334,28 +340,34 @@ export default function OperadorLogin({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      Supermercado / Unidade
-                    </label>
-                    <select
-                      value={supermercadoId}
-                      onChange={(e) => {
-                        setSupermercadoId(e.target.value);
-                        setError("");
-                      }}
-                      className={`w-full rounded-xl border ${
-                        error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-                      } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-                    >
-                      <option value="">Selecione a unidade</option>
-                      {supermercadosAtivos.map((supermercado) => (
-                        <option key={supermercado.id} value={supermercado.id}>
-                          {supermercado.nome} ({supermercado.codigo})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {isAdminGeral ? (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                      Administrador Geral tem acesso a todas as unidades, então não precisa selecionar supermercado.
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Supermercado / Unidade
+                      </label>
+                      <select
+                        value={supermercadoId}
+                        onChange={(e) => {
+                          setSupermercadoId(e.target.value);
+                          setError("");
+                        }}
+                        className={`w-full rounded-xl border ${
+                          error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                        } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                      >
+                        <option value="">Selecione a unidade</option>
+                        {supermercadosAtivos.map((supermercado) => (
+                          <option key={supermercado.id} value={supermercado.id}>
+                            {supermercado.nome} ({supermercado.codigo})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -411,26 +423,34 @@ export default function OperadorLogin({
 
               {perfilSelecionado && (
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Unidade
-                  </label>
-                  <select
-                    value={supermercadoId}
-                    onChange={(e) => {
-                      setSupermercadoId(e.target.value);
-                      setError("");
-                    }}
-                    className={`w-full rounded-xl border ${
-                      error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-                    } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-                  >
-                    <option value="">Selecione a unidade</option>
-                    {supermercadosAtivos.map((supermercado) => (
-                      <option key={supermercado.id} value={supermercado.id}>
-                        {supermercado.nome} ({supermercado.codigo})
-                      </option>
-                    ))}
-                  </select>
+                  {isAdminGeral ? (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                      Administrador Geral usa visão consolidada e não precisa vincular unidade.
+                    </div>
+                  ) : (
+                    <>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Unidade
+                      </label>
+                      <select
+                        value={supermercadoId}
+                        onChange={(e) => {
+                          setSupermercadoId(e.target.value);
+                          setError("");
+                        }}
+                        className={`w-full rounded-xl border ${
+                          error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                        } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                      >
+                        <option value="">Selecione a unidade</option>
+                        {supermercadosAtivos.map((supermercado) => (
+                          <option key={supermercado.id} value={supermercado.id}>
+                            {supermercado.nome} ({supermercado.codigo})
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -441,7 +461,11 @@ export default function OperadorLogin({
                   </p>
                   <p className="mt-1">Perfil: {perfilSelecionado}</p>
                   <p className="mt-1">
-                    Unidade: {supermercadosAtivos.find((item) => item.id === supermercadoId)?.nome ?? "Não definida"}
+                    Unidade: {
+                      isAdminGeral
+                        ? "Todas as unidades"
+                        : supermercadosAtivos.find((item) => item.id === supermercadoId)?.nome ?? "Não definida"
+                    }
                   </p>
                 </div>
               )}

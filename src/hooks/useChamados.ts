@@ -14,7 +14,6 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
-import type { PerfilAcesso } from "../types/usuario";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -140,16 +139,6 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   if (scope.canViewAll) return chamados;
   if (!scope.supermercadoId) return [];
   return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
-}
-
-function normalizePerfil(value: unknown): PerfilAcesso | null {
-  return value === "Promotor" ||
-    value === "Funcionário" ||
-    value === "Operador" ||
-    value === "Supervisor" ||
-    value === "Administrador Geral"
-    ? value
-    : null;
 }
 
 function normalizeSupermercadoId(value: unknown): string | null {
