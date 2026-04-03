@@ -75,7 +75,8 @@ service cloud.firestore {
       return tipo == "Descarga"
         || tipo == "Reposição"
         || tipo == "Retirada"
-        || tipo == "Movimentação";
+        || tipo == "Movimentação"
+        || tipo == "Apoio interno";
     }
 
     function isChamadoBaseValido(data) {

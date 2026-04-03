@@ -22,6 +22,7 @@ const TIPOS_SERVICO_VALIDOS: TipoServico[] = [
   "Reposição",
   "Retirada",
   "Movimentação",
+  "Apoio interno",
 ];
 const PRIORIDADES_VALIDAS: Prioridade[] = ["Normal", "Urgente"];
 const STATUS_VALIDOS: Status[] = ["Aguardando", "Em atendimento", "Finalizado"];
@@ -53,8 +54,28 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
         ? data.solicitante_nome
         : "Solicitante",
     setor: typeof data.setor === "string" && data.setor.trim() ? data.setor : "Setor não informado",
+    local_exato:
+      typeof (data as Partial<Chamado>).local_exato === "string" &&
+      (data as Partial<Chamado>).local_exato!.trim()
+        ? (data as Partial<Chamado>).local_exato!.trim()
+        : null,
     tipo_servico: tipoServico,
     prioridade,
+    observacoes:
+      typeof (data as Partial<Chamado>).observacoes === "string" &&
+      (data as Partial<Chamado>).observacoes!.trim()
+        ? (data as Partial<Chamado>).observacoes!.trim()
+        : null,
+    foto_nome:
+      typeof (data as Partial<Chamado>).foto_nome === "string" &&
+      (data as Partial<Chamado>).foto_nome!.trim()
+        ? (data as Partial<Chamado>).foto_nome!.trim()
+        : null,
+    foto_data_url:
+      typeof (data as Partial<Chamado>).foto_data_url === "string" &&
+      (data as Partial<Chamado>).foto_data_url!.trim()
+        ? (data as Partial<Chamado>).foto_data_url!.trim()
+        : null,
     status,
     operador_nome:
       typeof data.operador_nome === "string" && data.operador_nome.trim()
@@ -109,8 +130,12 @@ export interface NovoChamadoInput {
   supermercado_id: string;
   solicitante_nome: string;
   setor: Setor;
+  local_exato?: string | null;
   tipo_servico: TipoServico;
   prioridade: Prioridade;
+  observacoes?: string | null;
+  foto_nome?: string | null;
+  foto_data_url?: string | null;
 }
 
 export type FilterStatus = "Todos" | Status;
@@ -239,8 +264,24 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         supermercado_id: input.supermercado_id,
         solicitante_nome: input.solicitante_nome,
         setor: input.setor,
+        local_exato:
+          typeof input.local_exato === "string" && input.local_exato.trim()
+            ? input.local_exato.trim()
+            : null,
         tipo_servico: input.tipo_servico,
         prioridade: input.prioridade,
+        observacoes:
+          typeof input.observacoes === "string" && input.observacoes.trim()
+            ? input.observacoes.trim()
+            : null,
+        foto_nome:
+          typeof input.foto_nome === "string" && input.foto_nome.trim()
+            ? input.foto_nome.trim()
+            : null,
+        foto_data_url:
+          typeof input.foto_data_url === "string" && input.foto_data_url.trim()
+            ? input.foto_data_url.trim()
+            : null,
         status: "Aguardando",
         operador_nome: null,
         criado_em: new Date().toISOString(),

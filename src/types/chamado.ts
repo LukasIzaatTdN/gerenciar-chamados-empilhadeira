@@ -1,6 +1,6 @@
 export type Setor = string;
 
-export type TipoServico = "Descarga" | "Reposição" | "Retirada" | "Movimentação";
+export type TipoServico = "Descarga" | "Reposição" | "Retirada" | "Movimentação" | "Apoio interno";
 
 export type Prioridade = "Normal" | "Urgente";
 
@@ -11,8 +11,12 @@ export interface Chamado {
   supermercado_id: string;
   solicitante_nome: string;
   setor: Setor;
+  local_exato: string | null;
   tipo_servico: TipoServico;
   prioridade: Prioridade;
+  observacoes: string | null;
+  foto_nome: string | null;
+  foto_data_url: string | null;
   status: Status;
   operador_nome: string | null;
   criado_em: string;
@@ -29,6 +33,7 @@ export const TIPOS_SERVICO: TipoServico[] = [
   "Reposição",
   "Retirada",
   "Movimentação",
+  "Apoio interno",
 ];
 
 export const PRIORIDADES: Prioridade[] = ["Normal", "Urgente"];

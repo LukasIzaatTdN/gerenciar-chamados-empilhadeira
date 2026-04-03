@@ -63,6 +63,7 @@ export default function ChamadoCard({
     Reposição: "🔄",
     Retirada: "📤",
     Movimentação: "🚚",
+    "Apoio interno": "🧰",
   };
 
   const statusConfig = {
@@ -223,6 +224,11 @@ export default function ChamadoCard({
               <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
                 Setor: {chamado.setor}
               </span>
+              {chamado.local_exato && (
+                <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                  Local: {chamado.local_exato}
+                </span>
+              )}
               <span className={`rounded-full px-2.5 py-1 font-semibold ${getPrioridadeTone(chamado.prioridade)}`}>
                 Prioridade: {chamado.prioridade}
               </span>
@@ -241,6 +247,16 @@ export default function ChamadoCard({
             <p className={`mt-3 text-sm ${isFinalizado ? "text-slate-400" : "text-slate-500"}`}>
               Solicitante: <span className="font-medium">{chamado.solicitante_nome}</span>
             </p>
+            {chamado.observacoes && (
+              <p className={`mt-1 text-sm ${isFinalizado ? "text-slate-400" : "text-slate-600"}`}>
+                Observações: <span className="font-medium">{chamado.observacoes}</span>
+              </p>
+            )}
+            {chamado.foto_nome && (
+              <p className={`mt-1 text-xs ${isFinalizado ? "text-slate-400" : "text-slate-500"}`}>
+                Foto anexada: {chamado.foto_nome}
+              </p>
+            )}
 
             {/* ─── Time Estimate Badge ─── */}
             {!isFinalizado && (

@@ -175,6 +175,7 @@ export default function OperadorPanel({
     Reposição: "🔄",
     Retirada: "📤",
     Movimentação: "🚚",
+    "Apoio interno": "🧰",
   };
 
   const tabs: { key: FilterTab; label: string; count: number; icon: string }[] = [
