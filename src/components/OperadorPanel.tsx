@@ -64,6 +64,23 @@ function getDuration(start: string, end: string): string {
 
 type FilterTab = "pendentes" | "meus" | "finalizados";
 
+function normalizeOperatorName(value: string | null | undefined) {
+  if (!value) return "";
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function isSameOperatorName(a: string | null | undefined, b: string | null | undefined) {
+  const na = normalizeOperatorName(a);
+  const nb = normalizeOperatorName(b);
+  if (!na || !nb) return false;
+  return na === nb;
+}
+
 export default function OperadorPanel({
   chamados,
   operadorNome,
@@ -169,7 +186,7 @@ export default function OperadorPanel({
   const meusChamados = useMemo(
     () =>
       chamados
-        .filter((c) => c.operador_nome === operadorNome && c.status !== "Finalizado")
+        .filter((c) => isSameOperatorName(c.operador_nome, operadorNome) && c.status !== "Finalizado")
         .sort((a, b) => {
           if (a.status === "Em atendimento" && b.status !== "Em atendimento") return -1;
           if (a.status !== "Em atendimento" && b.status === "Em atendimento") return 1;
@@ -183,7 +200,7 @@ export default function OperadorPanel({
   const finalizados = useMemo(
     () =>
       chamados
-        .filter((c) => c.operador_nome === operadorNome && c.status === "Finalizado")
+        .filter((c) => isSameOperatorName(c.operador_nome, operadorNome) && c.status === "Finalizado")
         .sort((a, b) => new Date(b.finalizado_em!).getTime() - new Date(a.finalizado_em!).getTime()),
     [chamados, operadorNome]
   );
@@ -575,7 +592,7 @@ export default function OperadorPanel({
               const isAguardando = chamado.status === "Aguardando";
               const isEmAtendimento = chamado.status === "Em atendimento";
               const isFinalizado = chamado.status === "Finalizado";
-              const isAssumido = chamado.operador_nome === operadorNome;
+              const isAssumido = isSameOperatorName(chamado.operador_nome, operadorNome);
               const estimate = timeEstimates.estimates[chamado.id];
               const remainingMin = timeEstimates.tempoRestanteEmAtendimento[chamado.id];
 
