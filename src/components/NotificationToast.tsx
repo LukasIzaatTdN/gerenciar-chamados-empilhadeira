@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import type { AppNotification } from "../types/notification";
 import { NOTIFICATION_CONFIG } from "../types/notification";
 
@@ -47,56 +46,12 @@ const COLOR_MAP: Record<string, { bg: string; border: string; bar: string; icon:
 };
 
 function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: () => void }) {
-  const [visible, setVisible] = useState(false);
-  const [exiting, setExiting] = useState(false);
-  const dismissTimerRef = useRef<number | null>(null);
-  const visibleTimerRef = useRef<number | null>(null);
-  const autoExitTimerRef = useRef<number | null>(null);
-  const isMountedRef = useRef(true);
-  const dismissRequestedRef = useRef(false);
-
   const config = NOTIFICATION_CONFIG[toast.type] ?? NOTIFICATION_CONFIG.chamado_criado;
   const colors = COLOR_MAP[config.color] || COLOR_MAP.blue;
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    visibleTimerRef.current = window.setTimeout(() => {
-      if (isMountedRef.current) {
-        setVisible(true);
-      }
-    }, 50);
-    autoExitTimerRef.current = window.setTimeout(() => {
-      if (isMountedRef.current) {
-        setExiting(true);
-      }
-    }, 4500);
-
-    return () => {
-      isMountedRef.current = false;
-      if (visibleTimerRef.current) window.clearTimeout(visibleTimerRef.current);
-      if (autoExitTimerRef.current) window.clearTimeout(autoExitTimerRef.current);
-      if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
-    };
-  }, []);
-
-  function handleDismiss() {
-    if (dismissRequestedRef.current) return;
-    dismissRequestedRef.current = true;
-    setExiting(true);
-    dismissTimerRef.current = window.setTimeout(() => {
-      if (isMountedRef.current) {
-        onDismiss();
-      }
-    }, 300);
-  }
-
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border shadow-[0_18px_36px_rgba(15,23,42,0.14)] transition-all duration-300 ${colors.bg} ${colors.border} ${
-        visible && !exiting
-          ? "translate-x-0 opacity-100"
-          : "translate-x-full opacity-0"
-      }`}
+      className={`relative overflow-hidden rounded-2xl border shadow-[0_18px_36px_rgba(15,23,42,0.14)] transition-opacity duration-200 ${colors.bg} ${colors.border} opacity-100`}
       style={{ maxWidth: 380 }}
     >
       {/* Progress bar */}
@@ -130,7 +85,7 @@ function ToastItem({ toast, onDismiss }: { toast: AppNotification; onDismiss: ()
 
         {/* Dismiss */}
         <button
-          onClick={handleDismiss}
+          onClick={onDismiss}
           className="shrink-0 rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -53,14 +53,14 @@ export function useNotifications({
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const { play } = useNotificationSound();
   const mountedRef = useRef(true);
-  const toastTimersRef = useRef<number[]>([]);
+  const toastTimersRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       toastTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      toastTimersRef.current = [];
+      toastTimersRef.current.clear();
     };
   }, []);
 
@@ -113,8 +113,9 @@ export function useNotifications({
         if (mountedRef.current) {
           setToasts((prev) => prev.filter((t) => t.id !== notif.id));
         }
+        toastTimersRef.current.delete(notif.id);
       }, 5000);
-      toastTimersRef.current.push(timer);
+      toastTimersRef.current.set(notif.id, timer);
 
       // Dispatch to WhatsApp service (future integration)
       dispatchWhatsApp(notif);
@@ -133,6 +134,11 @@ export function useNotifications({
   }, []);
 
   const dismissToast = useCallback((id: string) => {
+    const timer = toastTimersRef.current.get(id);
+    if (timer) {
+      window.clearTimeout(timer);
+      toastTimersRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

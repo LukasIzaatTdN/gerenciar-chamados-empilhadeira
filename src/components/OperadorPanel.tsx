@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import type { Chamado, Setor } from "../types/chamado";
 import type { AppNotification } from "../types/notification";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
@@ -92,13 +92,25 @@ export default function OperadorPanel({
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
   const isDisponivel = operadorStatus === "Disponível";
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   async function runAction(actionId: string, action: () => void | Promise<void>) {
     try {
+      if (!isMountedRef.current) return;
       setActionError(null);
       setLoadingActionId(actionId);
       recordAppActivity(`operador:${actionId}`);
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
       await action();
       recordAppActivity(`operador:concluido:${actionId}`);
     } catch (error) {
@@ -106,10 +118,14 @@ export default function OperadorPanel({
         error instanceof Error && error.message
           ? error.message
           : "Não foi possível concluir esta ação agora.";
-      setActionError(message);
+      if (isMountedRef.current) {
+        setActionError(message);
+      }
       recordAppActivity(`operador:erro:${actionId}`);
     } finally {
-      setLoadingActionId(null);
+      if (isMountedRef.current) {
+        setLoadingActionId(null);
+      }
     }
   }
 
