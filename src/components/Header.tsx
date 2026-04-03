@@ -207,6 +207,95 @@ export default function Header({
                 </button>
               )}
             </div>
+
+            <div className="sm:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <NotificationCenter
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  onMarkAsRead={onMarkAsRead}
+                  onMarkAllAsRead={onMarkAllAsRead}
+                  onClearAll={onClearAll}
+                  variant="light"
+                />
+
+                {perfilAcesso && usuarioNome && (
+                  <button
+                    onClick={onAccessProfile}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-semibold text-white"
+                  >
+                    <span>⚙️</span>
+                    <span>Perfil</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={onOpenLogin}
+                  className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-semibold text-white"
+                >
+                  <span>🔐</span>
+                  <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>
+                </button>
+
+                {showOperatorAction && (
+                  <button
+                    onClick={onOperadorPanel}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                      perfilAcesso === "Operador"
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>👷</span>
+                    <span>{operatorActionLabel}</span>
+                  </button>
+                )}
+
+                {showDashboardAction && (
+                  <button
+                    onClick={onDashboard}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                      perfilAcesso === "Supervisor" || perfilAcesso === "Administrador Geral"
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>📈</span>
+                    <span>{dashboardActionLabel}</span>
+                  </button>
+                )}
+
+                {showSupermercadosAction && onOpenSupermercadosAdmin && (
+                  <button
+                    onClick={onOpenSupermercadosAdmin}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                      perfilAcesso === "Administrador Geral"
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>🏬</span>
+                    <span>Supermercados</span>
+                  </button>
+                )}
+
+                {showCreateAction && (
+                  <button
+                    onClick={onNovoChamado}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                      perfilAcesso === "Promotor" ||
+                      perfilAcesso === "Funcionário" ||
+                      (!perfilAcesso && !showOperatorAction && !showDashboardAction)
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>＋</span>
+                    <span>{createActionLabel}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
