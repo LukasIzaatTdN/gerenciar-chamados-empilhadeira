@@ -210,3 +210,17 @@ canvas {
     width: calc(100% - 1rem);
   }
 }
+
+@media (max-width: 380px) {
+  html {
+    font-size: 14px;
+  }
+
+  .app-main {
+    width: calc(100% - 0.75rem);
+  }
+
+  .touch-target {
+    min-height: 44px;
+  }
+}

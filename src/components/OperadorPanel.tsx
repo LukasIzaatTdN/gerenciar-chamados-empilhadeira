@@ -194,7 +194,7 @@ export default function OperadorPanel({
   return (
     <div className="min-h-screen bg-transparent">
       <header className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_34px_rgba(15,23,42,0.16)]">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <div className="app-main px-2 py-4 sm:px-0">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
@@ -273,7 +273,7 @@ export default function OperadorPanel({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
         {syncError && (
           <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
             {syncError}

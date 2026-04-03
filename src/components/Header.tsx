@@ -86,17 +86,17 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[linear-gradient(140deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_38px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-      <div className="app-main px-2 py-3 sm:px-0 sm:py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="app-main px-2 py-2.5 sm:px-0 sm:py-4">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-slate-950/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-sm">
               <span className="text-2xl">🏗️</span>
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-white sm:text-2xl">
+              <h1 className="text-[1.7rem] font-black leading-none tracking-tight text-white sm:text-2xl">
                 Painel Empilhadeira
               </h1>
-              <p className="text-xs text-slate-200/90 sm:text-sm">
+              <p className="text-[13px] text-slate-200/90 sm:text-sm">
                 Operação ágil para pátio, docas e estoque
               </p>
             </div>
@@ -115,12 +115,12 @@ export default function Header({
 
             {perfilAcesso && usuarioNome && (
               <div className="flex flex-col gap-1 self-start sm:items-end sm:self-auto">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/10 px-3 py-1 text-[11px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] sm:text-xs">
                   <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
                   {usuarioNome} · {perfilAcesso}
                   {supermercadoNome ? ` · ${supermercadoNome}` : " · Todas as unidades"}
                 </div>
-                <p className="text-[11px] font-medium text-slate-200/85">{fluxoAtivoLabel}</p>
+                <p className="hidden text-[11px] font-medium text-slate-200/85 sm:block">{fluxoAtivoLabel}</p>
               </div>
             )}
 
@@ -209,7 +209,7 @@ export default function Header({
             </div>
 
             <div className="sm:hidden">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <NotificationCenter
                   notifications={notifications}
                   unreadCount={unreadCount}
@@ -222,7 +222,7 @@ export default function Header({
                 {perfilAcesso && usuarioNome && (
                   <button
                     onClick={onAccessProfile}
-                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-semibold text-white"
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
                   >
                     <span>⚙️</span>
                     <span>Perfil</span>
@@ -231,7 +231,7 @@ export default function Header({
 
                 <button
                   onClick={onOpenLogin}
-                  className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-semibold text-white"
+                  className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
                 >
                   <span>🔐</span>
                   <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>
@@ -240,7 +240,7 @@ export default function Header({
                 {showOperatorAction && (
                   <button
                     onClick={onOperadorPanel}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Operador"
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"
@@ -254,7 +254,7 @@ export default function Header({
                 {showDashboardAction && (
                   <button
                     onClick={onDashboard}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Supervisor" || perfilAcesso === "Administrador Geral"
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"
@@ -268,7 +268,7 @@ export default function Header({
                 {showSupermercadosAction && onOpenSupermercadosAdmin && (
                   <button
                     onClick={onOpenSupermercadosAdmin}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Administrador Geral"
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"
@@ -282,7 +282,7 @@ export default function Header({
                 {showCreateAction && (
                   <button
                     onClick={onNovoChamado}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Promotor" ||
                       perfilAcesso === "Funcionário" ||
                       (!perfilAcesso && !showOperatorAction && !showDashboardAction)
