@@ -145,6 +145,18 @@ export default function OperadorPanel({
   const pendentes = useMemo(
     () =>
       chamados
+        .filter((c) => c.status === "Aguardando")
+        .sort((a, b) => {
+          if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
+          if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
+          return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
+        }),
+    [chamados]
+  );
+
+  const pendentesNaoAssumidos = useMemo(
+    () =>
+      chamados
         .filter((c) => c.status === "Aguardando" && !c.operador_nome)
         .sort((a, b) => {
           if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
@@ -206,7 +218,7 @@ export default function OperadorPanel({
   }).length;
 
   const emAtendimentoAtual = meusChamados.filter((c) => c.status === "Em atendimento").length;
-  const chamadoRecomendado = pendentes[0] ?? null;
+  const chamadoRecomendado = pendentesNaoAssumidos[0] ?? pendentes[0] ?? null;
 
   return (
     <div className="min-h-screen bg-transparent">
