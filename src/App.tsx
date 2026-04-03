@@ -62,6 +62,7 @@ function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
 }
 
 export default function App() {
+  const [authHydrated, setAuthHydrated] = useState(!hasFirebaseConfig);
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<View>("geral");
   const [previousView, setPreviousView] = useState<View>("geral");
@@ -272,8 +273,6 @@ export default function App() {
       : "janela ampliada para tendência e ritmo";
 
   useEffect(() => {
-    if (hasFirebaseConfig) return;
-
     if (usuarioAtual) {
       localStorage.setItem(USER_SESSION_KEY, JSON.stringify(usuarioAtual));
     } else {
@@ -296,6 +295,7 @@ export default function App() {
 
         if (!firebaseUser) {
           setUsuarioAtual(null);
+          setAuthHydrated(true);
           return;
         }
 
@@ -352,6 +352,7 @@ export default function App() {
                 const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
                 if (userData.status === "Inativo") {
                   await applyUsuarioResolved(null, true);
+                  setAuthHydrated(true);
                   return;
                 }
 
@@ -369,14 +370,17 @@ export default function App() {
                         : null,
                   };
                   await applyUsuarioResolved(usuarioResolved);
+                  setAuthHydrated(true);
                   return;
                 }
               }
 
               await applyUsuarioResolved(buildFallbackUsuario());
+              setAuthHydrated(true);
             },
             async () => {
               await applyUsuarioResolved(buildFallbackUsuario());
+              setAuthHydrated(true);
             }
           );
           return;
@@ -384,8 +388,10 @@ export default function App() {
 
         usuarioResolved = buildFallbackUsuario();
         await applyUsuarioResolved(usuarioResolved);
+        setAuthHydrated(true);
       } catch {
         setUsuarioAtual(null);
+        setAuthHydrated(true);
       }
     });
   }, []);
@@ -432,6 +438,26 @@ export default function App() {
 
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
+
+  if (hasFirebaseConfig && !authHydrated) {
+    return (
+      <div className="app-page min-h-screen bg-transparent">
+        <main className="app-main px-4 py-10 sm:px-0">
+          <div className="mx-auto max-w-xl rounded-[28px] border border-slate-200 bg-white p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+              Autenticação
+            </p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+              Restaurando sua sessão
+            </h1>
+            <p className="mt-3 text-sm text-slate-600">
+              Aguarde um instante enquanto conectamos seu perfil.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   function renderGlobalOverlays() {
     return (
