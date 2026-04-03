@@ -100,10 +100,6 @@ export default function OperadorPanel({
       setLoadingActionId(actionId);
       recordAppActivity(`operador:${actionId}`);
       await action();
-      if (actionId.startsWith("assumir-")) {
-        setFilterSetor("Todos");
-        setActiveTab("meus");
-      }
       recordAppActivity(`operador:concluido:${actionId}`);
     } catch (error) {
       const message =

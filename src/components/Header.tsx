@@ -85,11 +85,11 @@ export default function Header({
       : "flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_38px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[linear-gradient(140deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_38px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+      <div className="app-main px-2 py-3 sm:px-0 sm:py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-slate-950/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-sm">
               <span className="text-2xl">🏗️</span>
             </div>
             <div>
@@ -124,7 +124,7 @@ export default function Header({
               </div>
             )}
 
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="hidden items-center gap-2 sm:flex md:flex-wrap md:justify-end">
               <NotificationCenter
                 notifications={notifications}
                 unreadCount={unreadCount}
@@ -137,7 +137,7 @@ export default function Header({
               {perfilAcesso && usuarioNome && (
                 <button
                   onClick={onAccessProfile}
-                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                  className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 lg:px-5"
                 >
                   <span>⚙️</span>
                   <span>Perfil</span>
@@ -146,7 +146,7 @@ export default function Header({
 
               <button
                 onClick={onOpenLogin}
-                className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95"
+                className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 lg:px-5"
               >
                 <span>🔐</span>
                 <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>

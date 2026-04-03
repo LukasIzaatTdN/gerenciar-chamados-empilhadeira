@@ -21,8 +21,6 @@ interface ProfileSettingsProps {
   onTemaChange: (theme: ThemeMode) => void;
   onVoltar: () => void;
   backLabel?: string;
-  showManageChamadosAction?: boolean;
-  onManageChamados?: () => void;
   showManageSupermercadosAction?: boolean;
   onManageSupermercados?: () => void;
   onLogout: () => void;
@@ -98,8 +96,6 @@ export default function ProfileSettings({
   onTemaChange,
   onVoltar,
   backLabel = "Voltar",
-  showManageChamadosAction = false,
-  onManageChamados,
   showManageSupermercadosAction = false,
   onManageSupermercados,
   onLogout,
@@ -151,22 +147,6 @@ export default function ProfileSettings({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {showManageChamadosAction && onManageChamados && (
-              <button
-                type="button"
-                onClick={onManageChamados}
-                className={cn(
-                  "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
-                  isDark
-                    ? "border-blue-500/20 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15"
-                    : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                )}
-              >
-                <span>🗂️</span>
-                Gerenciar chamados
-              </button>
-            )}
-
             {showManageSupermercadosAction && onManageSupermercados && (
               <button
                 type="button"

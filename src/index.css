@@ -2,6 +2,7 @@
 
 :root {
   --app-bg: #eef3f8;
+  --app-bg-soft: #f8fbff;
   --surface-primary: rgba(255, 255, 255, 0.94);
   --surface-secondary: rgba(255, 255, 255, 0.82);
   --border-soft: rgba(148, 163, 184, 0.18);
@@ -19,6 +20,7 @@
 
 html[data-theme="dark"] {
   --app-bg: #020617;
+  --app-bg-soft: #0f172a;
   --surface-primary: rgba(15, 23, 42, 0.84);
   --surface-secondary: rgba(15, 23, 42, 0.7);
   --border-soft: rgba(71, 85, 105, 0.35);
@@ -28,12 +30,15 @@ html[data-theme="dark"] {
 
 html {
   background:
-    radial-gradient(circle at top left, rgba(15, 61, 117, 0.09), transparent 24%),
-    radial-gradient(circle at top right, rgba(249, 115, 22, 0.08), transparent 20%),
-    linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
+    radial-gradient(circle at 8% 2%, rgba(15, 61, 117, 0.11), transparent 22%),
+    radial-gradient(circle at 92% 4%, rgba(249, 115, 22, 0.1), transparent 18%),
+    radial-gradient(circle at 50% 105%, rgba(59, 130, 246, 0.08), transparent 26%),
+    linear-gradient(180deg, var(--app-bg-soft) 0%, var(--app-bg) 100%);
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 html[data-theme="dark"] {
@@ -50,18 +55,47 @@ body {
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
-  font-family:
-    "Segoe UI",
-    "IBM Plex Sans",
-    "Inter",
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
+  font-family: "Manrope", "IBM Plex Sans", "Segoe UI", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 #root {
   min-height: 100vh;
+}
+
+.app-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(64rem 24rem at 0% -6%, rgba(15, 61, 117, 0.12), transparent 55%),
+    radial-gradient(48rem 20rem at 100% -8%, rgba(249, 115, 22, 0.12), transparent 56%),
+    radial-gradient(56rem 20rem at 50% 118%, rgba(16, 185, 129, 0.08), transparent 60%);
+}
+
+.app-main {
+  width: min(1200px, 100% - 1.5rem);
+  margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  .app-main {
+    width: min(1240px, 100% - 3rem);
+  }
+}
+
+.professional-panel {
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
 }
 
 *,
@@ -165,10 +199,14 @@ canvas {
 
 @media (max-width: 640px) {
   body {
-    padding-bottom: max(88px, env(safe-area-inset-bottom));
+    padding-bottom: max(96px, env(safe-area-inset-bottom));
   }
 
   html {
     font-size: 15px;
+  }
+
+  .app-main {
+    width: calc(100% - 1rem);
   }
 }

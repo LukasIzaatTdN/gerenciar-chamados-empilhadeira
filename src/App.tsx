@@ -433,6 +433,58 @@ export default function App() {
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
 
+  function renderGlobalOverlays() {
+    return (
+      <>
+        {showForm && (
+          <ChamadoForm
+            solicitanteNome={operadorNome ?? ""}
+            solicitantePerfil={perfilAcesso}
+            supermercadoNome={
+              permissions.canViewAllUnits
+                ? getSupermercadoById(adminChamadoSupermercadoId, supermercados)?.nome ?? null
+                : supermercadoNome
+            }
+            isAdminGeral={permissions.canViewAllUnits}
+            supermercados={supermercados}
+            supermercadoSelecionadoId={adminChamadoSupermercadoId}
+            onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
+            onSubmit={async (data) => {
+              const supermercadoChamadoId = permissions.canViewAllUnits
+                ? adminChamadoSupermercadoId
+                : supermercadoId;
+
+              if (!supermercadoChamadoId) {
+                throw new Error("Supermercado não definido");
+              }
+
+              await criarChamado({
+                ...data,
+                supermercado_id: supermercadoChamadoId,
+              });
+              setShowForm(false);
+            }}
+            onCancel={() => setShowForm(false)}
+          />
+        )}
+
+        {showLoginModal && (
+          <OperadorLogin
+            onLogin={handleOperadorLogin}
+            onFirebaseLogin={handleFirebaseEmailLogin}
+            onFirebaseGoogleLogin={handleFirebaseGoogleLogin}
+            onFirebaseRegister={handleFirebaseRegister}
+            onCancel={() => setShowLoginModal(false)}
+            supermercados={supermercados}
+            authMode={hasFirebaseConfig ? "firebase" : "local"}
+          />
+        )}
+
+        <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+      </>
+    );
+  }
+
   function navigateTo(nextView: View) {
     setPreviousView(view);
     setView(nextView);
@@ -600,6 +652,11 @@ export default function App() {
     setView("geral");
   }
 
+  function handleLogoutToLogin() {
+    handleLogout();
+    setShowLoginModal(true);
+  }
+
   async function handleCreateSupermercado(input: {
     nome: string;
     codigo: string;
@@ -745,7 +802,7 @@ export default function App() {
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"
           onAccessProfile={handleAccessProfile}
-          onLogout={handleLogout}
+          onLogout={handleLogoutToLogin}
           timeEstimates={timeEstimates}
           notifications={notifications}
           unreadCount={unreadCount}
@@ -755,7 +812,7 @@ export default function App() {
           onSimulateProximo={handleSimulateProximo}
           syncError={syncError}
         />
-        <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+        {renderGlobalOverlays()}
       </>
     );
   }
@@ -780,21 +837,20 @@ export default function App() {
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"
-          showManageChamadosAction={canViewAllUnits}
-          onManageChamados={handleOpenChamadosManager}
           showManageSupermercadosAction={canViewAllUnits}
           onManageSupermercados={handleOpenSupermercadosAdmin}
-          onLogout={handleLogout}
+          onLogout={handleLogoutToLogin}
         />
-        <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+        {renderGlobalOverlays()}
       </>
     );
   }
 
   if (view === "dashboard" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)) {
     return (
-      <div className="min-h-screen bg-transparent">
-        <Header
+      <>
+        <div className="app-page min-h-screen bg-transparent">
+          <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
@@ -816,7 +872,7 @@ export default function App() {
           showSupermercadosAction={canViewAllUnits}
         />
 
-        <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+          <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
           {canViewAllUnits && (
             <AdminScopeSelector
               value={adminSupermercadoFiltro}
@@ -834,7 +890,7 @@ export default function App() {
             />
           )}
 
-          <div className="mb-5 rounded-[30px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+          <div className="professional-panel mb-5 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -935,8 +991,10 @@ export default function App() {
               <SupermercadoComparison chamados={dashboardChamados} supermercados={supermercados} />
             </div>
           )}
-        </main>
-      </div>
+          </main>
+        </div>
+        {renderGlobalOverlays()}
+      </>
     );
   }
 
@@ -971,6 +1029,7 @@ export default function App() {
           onToggleStatus={handleToggleSupermercadoStatus}
           onVoltar={goBackToPreviousView}
         />
+        {renderGlobalOverlays()}
       </>
     );
   }
@@ -1007,13 +1066,14 @@ export default function App() {
           onToggleStatus={handleToggleUsuarioStatus}
           onVoltar={goBackToPreviousView}
         />
+        {renderGlobalOverlays()}
       </>
     );
   }
 
   // General panel view (promoter)
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="app-page min-h-screen bg-transparent">
       <Header
         onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
@@ -1036,7 +1096,7 @@ export default function App() {
         showSupermercadosAction={canViewAllUnits}
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+      <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
         {canViewAllUnits && (
           <AdminScopeSelector
             value={adminSupermercadoFiltro}
@@ -1146,8 +1206,9 @@ export default function App() {
         Painel Empilhadeira · Sistema de Gerenciamento de Chamados
       </footer>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/90 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(15,23,42,0.1)] backdrop-blur-xl sm:hidden">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/92 px-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:hidden">
+        <div className="app-main overflow-x-auto pb-0.5">
+          <div className="flex min-w-max items-center gap-2">
           {isAuthenticated && (
             <button
               onClick={handleAccessProfile}
@@ -1160,7 +1221,7 @@ export default function App() {
           {(permissions.canViewUnitDashboard || permissions.canViewAllUnits) && (
             <button
               onClick={handleDashboardAccess}
-              className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+              className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
             >
               <span>📈</span>
               Dashboard
@@ -1169,7 +1230,7 @@ export default function App() {
           {permissions.canAccessOperatorPanel && (
             <button
               onClick={handleOperadorAccess}
-              className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
+              className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
             >
               <span>👷</span>
               Operador
@@ -1177,7 +1238,7 @@ export default function App() {
           )}
           <button
             onClick={isAuthenticated ? handleAccessProfile : openLoginModal}
-            className="touch-target flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
           >
             <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
             {isAuthenticated ? "Conta" : "Entrar"}
@@ -1185,63 +1246,17 @@ export default function App() {
           {permissions.canCreateChamado && (
             <button
               onClick={handleNovoChamadoAccess}
-              className="touch-target flex flex-[1.35] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(249,115,22,0.32)]"
+              className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(249,115,22,0.32)]"
             >
               <span className="text-base">＋</span>
               Novo Chamado
             </button>
           )}
+          </div>
         </div>
       </div>
 
-      {/* New Chamado Modal */}
-      {showForm && (
-        <ChamadoForm
-          solicitanteNome={operadorNome ?? ""}
-          solicitantePerfil={perfilAcesso}
-          supermercadoNome={
-            permissions.canViewAllUnits
-              ? getSupermercadoById(adminChamadoSupermercadoId, supermercados)?.nome ?? null
-              : supermercadoNome
-          }
-          isAdminGeral={permissions.canViewAllUnits}
-          supermercados={supermercados}
-          supermercadoSelecionadoId={adminChamadoSupermercadoId}
-          onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
-          onSubmit={async (data) => {
-            const supermercadoChamadoId = permissions.canViewAllUnits
-              ? adminChamadoSupermercadoId
-              : supermercadoId;
-
-            if (!supermercadoChamadoId) {
-              throw new Error("Supermercado não definido");
-            }
-
-            await criarChamado({
-              ...data,
-              supermercado_id: supermercadoChamadoId,
-            });
-            setShowForm(false);
-          }}
-          onCancel={() => setShowForm(false)}
-        />
-      )}
-
-      {/* Operator Login Modal */}
-      {showLoginModal && (
-        <OperadorLogin
-          onLogin={handleOperadorLogin}
-          onFirebaseLogin={handleFirebaseEmailLogin}
-          onFirebaseGoogleLogin={handleFirebaseGoogleLogin}
-          onFirebaseRegister={handleFirebaseRegister}
-          onCancel={() => setShowLoginModal(false)}
-          supermercados={supermercados}
-          authMode={hasFirebaseConfig ? "firebase" : "local"}
-        />
-      )}
-
-      {/* Toast Notifications */}
-      <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+      {renderGlobalOverlays()}
     </div>
   );
 }
