@@ -439,26 +439,6 @@ export default function App() {
   const isAuthenticated = Boolean(operadorNome && perfilAcesso);
   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
 
-  if (hasFirebaseConfig && !authHydrated) {
-    return (
-      <div className="app-page min-h-screen bg-transparent">
-        <main className="app-main px-4 py-10 sm:px-0">
-          <div className="mx-auto max-w-xl rounded-[28px] border border-slate-200 bg-white p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-              Autenticação
-            </p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-              Restaurando sua sessão
-            </h1>
-            <p className="mt-3 text-sm text-slate-600">
-              Aguarde um instante enquanto conectamos seu perfil.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   function renderGlobalOverlays() {
     return (
       <>
@@ -809,6 +789,26 @@ export default function App() {
       );
     }
   }, [allChamados, operadorNome, notify]);
+
+  if (hasFirebaseConfig && !authHydrated) {
+    return (
+      <div className="app-page min-h-screen bg-transparent">
+        <main className="app-main px-4 py-10 sm:px-0">
+          <div className="mx-auto max-w-xl rounded-[28px] border border-slate-200 bg-white p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+              Autenticação
+            </p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+              Restaurando sua sessão
+            </h1>
+            <p className="mt-3 text-sm text-slate-600">
+              Aguarde um instante enquanto conectamos seu perfil.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // Operator panel view
   if (view === "operador" && operadorNome && permissions.canAccessOperatorPanel) {
