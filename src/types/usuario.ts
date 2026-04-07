@@ -3,6 +3,7 @@ export type PerfilAcesso =
   | "Funcionário"
   | "Operador"
   | "Supervisor"
+  | "Televendas"
   | "Administrador Geral";
 
 export type UsuarioStatus = "Ativo" | "Inativo";

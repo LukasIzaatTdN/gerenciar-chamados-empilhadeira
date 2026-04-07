@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Chamado, TipoServico } from "../types/chamado";
+import { TIPOS_SERVICO } from "../types/chamado";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
 
@@ -12,7 +13,6 @@ type ChartDatum = {
   value: number;
 };
 
-const SERVICE_LABELS: TipoServico[] = ["Descarga", "Reposição", "Retirada", "Movimentação"];
 type PeriodoFiltro = "Hoje" | "7 dias" | "30 dias";
 
 function sameDay(iso: string, reference: Date) {
@@ -77,7 +77,7 @@ function buildSectorData(chamados: Chamado[]): ChartDatum[] {
 }
 
 function buildServiceData(chamados: Chamado[]): ChartDatum[] {
-  return SERVICE_LABELS.map((tipo) => ({
+  return TIPOS_SERVICO.map((tipo) => ({
     label: tipo,
     value: chamados.filter((chamado) => chamado.tipo_servico === tipo).length,
   }));
@@ -279,6 +279,7 @@ function polarToCartesian(centerX: number, centerY: number, radius: number, angl
 
 export default function DashboardProdutividade({ chamados }: DashboardProdutividadeProps) {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("Hoje");
+  const [tipoSelecionado, setTipoSelecionado] = useState<"Todos" | TipoServico>("Todos");
 
   const {
     chamadosFiltrados,
@@ -299,16 +300,18 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
         ? isWithinDays(iso, now, 7)
         : isWithinDays(iso, now, 30);
 
-    const chamadosFiltrados = chamados.filter((chamado) => inPeriod(chamado.criado_em));
+    const chamadosFiltradosPorPeriodo = chamados.filter((chamado) => inPeriod(chamado.criado_em));
+    const chamadosFiltrados =
+      tipoSelecionado === "Todos"
+        ? chamadosFiltradosPorPeriodo
+        : chamadosFiltradosPorPeriodo.filter((chamado) => chamado.tipo_servico === tipoSelecionado);
     const urgentesFiltrados = chamadosFiltrados.filter((chamado) => chamado.prioridade === "Urgente");
     const setorMaisAcionado = getTopSetor(chamadosFiltrados);
     const setorData = buildSectorData(chamadosFiltrados);
-    const lineData = buildHourlySeries(
-      chamados.filter((chamado) => inPeriod(chamado.finalizado_em ?? chamado.iniciado_em ?? chamado.criado_em))
-    );
+    const lineData = buildHourlySeries(chamadosFiltrados);
     const serviceData = buildServiceData(chamadosFiltrados);
     const setoresMaisSolicitados = [...setorData].slice(0, 5);
-    const ultimosAtendimentos = chamados
+    const ultimosAtendimentos = chamadosFiltrados
       .filter(
         (chamado) =>
           chamado.status === "Finalizado" &&
@@ -319,7 +322,7 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
       .sort((a, b) => new Date(b.finalizado_em!).getTime() - new Date(a.finalizado_em!).getTime())
       .slice(0, 5);
 
-    const finalizadosNoPeriodo = chamados.filter(
+    const finalizadosNoPeriodo = chamadosFiltrados.filter(
       (chamado) =>
         chamado.status === "Finalizado" &&
         chamado.iniciado_em &&
@@ -355,7 +358,7 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
       ultimosAtendimentos,
       mediaMinPeriodo,
     };
-  }, [chamados, periodo]);
+  }, [chamados, periodo, tipoSelecionado]);
 
   const cards = [
     {
@@ -411,6 +414,37 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
               </button>
             ))}
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTipoSelecionado("Todos")}
+            className={cn(
+              "rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+              tipoSelecionado === "Todos"
+                ? "bg-slate-900 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            Todos os tipos
+          </button>
+          {TIPOS_SERVICO.map((tipo) => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => setTipoSelecionado(tipo)}
+              className={cn(
+                "rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+                tipoSelecionado === tipo
+                  ? tipo === "Atendimento Televendas"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              {tipo}
+            </button>
+          ))}
         </div>
       </div>
 

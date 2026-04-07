@@ -27,7 +27,9 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
   - tempo total do chamado
 - Escopo por unidade em filas, painel, dashboard e métricas
 - Perfis:
-  - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Administrador Geral`
+  - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Televendas`, `Administrador Geral`
+- Novo tipo de serviço suportado:
+  - `Atendimento Televendas`
 - Isolamento de dados por unidade no frontend e nas regras do Firestore
 - Dashboard separado do painel do operador
 - Dashboard executivo do Administrador Geral com:
@@ -63,11 +65,22 @@ Sistema web para gerenciamento de chamados operacionais de empilhadeira, com ope
 - Regras operacionais atuais:
   - chamados dependem de unidade correta e usuário autenticado
   - etapa operacional não depende mais de perfil
+  - perfil `Televendas` pode abrir e acompanhar os próprios chamados da unidade
 - Suporte a custom claims administrativas (`perfil`, `supermercado_id`)
 - Tratamento defensivo de runtime:
   - normalização de chamados/remotos
   - sanitização de notificações salvas
   - `ErrorBoundary` para evitar tela branca total
+- Estabilidade mobile reforçada no painel do operador:
+  - bloqueio de ações concorrentes (toque duplo) ao assumir/iniciar/finalizar
+  - proteção local da lista de chamados com `SectionErrorBoundary`
+  - mitigação de erros de renderização intermitentes no Android
+- Hidratação de sessão no refresh:
+  - tela de carregamento de autenticação antes de renderizar a experiência principal
+  - evita “flash” de tela de acesso restrito durante restauração da sessão Firebase
+- Normalização de identificação do operador no painel:
+  - comparação tolerante de nome (acento/maiúsculas/espaços)
+  - correção de contagem em “Meus Chamados”
 - Badge visual com projeto Firebase ativo no header
 - Script de diagnóstico de acesso para operador/chamado
 

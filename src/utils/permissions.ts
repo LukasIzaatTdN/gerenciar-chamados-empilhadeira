@@ -21,8 +21,10 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
     canCreateChamado:
       perfil === "Promotor" ||
       perfil === "Funcionário" ||
+      perfil === "Televendas" ||
       perfil === "Administrador Geral",
-    canTrackOwnChamados: perfil === "Promotor" || perfil === "Funcionário",
+    canTrackOwnChamados:
+      perfil === "Promotor" || perfil === "Funcionário" || perfil === "Televendas",
     canAccessOperatorPanel,
     canManageOperatorQueue: canAccessOperatorPanel,
     canViewUnitDashboard: perfil === "Supervisor" || perfil === "Administrador Geral",

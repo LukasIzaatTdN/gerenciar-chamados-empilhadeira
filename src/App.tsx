@@ -51,6 +51,7 @@ function isPerfilAcesso(value: unknown): value is UsuarioSistema["perfil"] {
     value === "Funcionário" ||
     value === "Operador" ||
     value === "Supervisor" ||
+    value === "Televendas" ||
     value === "Administrador Geral"
   );
 }

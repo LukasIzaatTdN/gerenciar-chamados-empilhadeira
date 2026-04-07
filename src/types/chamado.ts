@@ -1,6 +1,12 @@
 export type Setor = string;
 
-export type TipoServico = "Descarga" | "Reposição" | "Retirada" | "Movimentação" | "Apoio interno";
+export type TipoServico =
+  | "Descarga"
+  | "Reposição"
+  | "Retirada"
+  | "Movimentação"
+  | "Apoio interno"
+  | "Atendimento Televendas";
 
 export type Prioridade = "Normal" | "Urgente";
 
@@ -34,6 +40,7 @@ export const TIPOS_SERVICO: TipoServico[] = [
   "Retirada",
   "Movimentação",
   "Apoio interno",
+  "Atendimento Televendas",
 ];
 
 export const PRIORIDADES: Prioridade[] = ["Normal", "Urgente"];

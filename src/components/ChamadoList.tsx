@@ -1,4 +1,7 @@
+import { useMemo, useState } from "react";
 import type { Chamado } from "../types/chamado";
+import type { TipoServico } from "../types/chamado";
+import { TIPOS_SERVICO } from "../types/chamado";
 import type { FilterStatus } from "../hooks/useChamados";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import type { Supermercado } from "../types/supermercado";
@@ -28,6 +31,15 @@ export default function ChamadoList({
   showSupermercado,
   supermercados = [],
 }: ChamadoListProps) {
+  const [filterTipo, setFilterTipo] = useState<"Todos" | TipoServico>("Todos");
+  const chamadosFiltradosPorTipo = useMemo(
+    () =>
+      filterTipo === "Todos"
+        ? chamados
+        : chamados.filter((chamado) => chamado.tipo_servico === filterTipo),
+    [chamados, filterTipo]
+  );
+
   return (
     <div className="space-y-4">
       {/* Filter tabs */}
@@ -49,22 +61,52 @@ export default function ChamadoList({
         </div>
       </div>
 
+      <div className="overflow-x-auto pb-1">
+        <div className="inline-flex min-w-full gap-2 rounded-[20px] border border-slate-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:min-w-0">
+          <button
+            onClick={() => setFilterTipo("Todos")}
+            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              filterTipo === "Todos"
+                ? "bg-slate-900 text-white"
+                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            Todos os tipos
+          </button>
+          {TIPOS_SERVICO.map((tipo) => (
+            <button
+              key={tipo}
+              onClick={() => setFilterTipo(tipo)}
+              className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                filterTipo === tipo
+                  ? tipo === "Atendimento Televendas"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-900 text-white"
+                  : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              {tipo}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* List */}
-      {chamados.length === 0 ? (
+      {chamadosFiltradosPorTipo.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[30px] border border-dashed border-slate-200 bg-white py-16 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
           <span className="text-5xl">🏗️</span>
           <p className="mt-4 text-sm font-semibold text-slate-500">
             Nenhum chamado encontrado
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {filterStatus !== "Todos"
+            {filterStatus !== "Todos" || filterTipo !== "Todos"
               ? "Tente mudar o filtro ou crie um novo chamado"
               : 'Clique em "Solicitar Empilhadeira" para criar um chamado'}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {chamados.map((chamado) => (
+          {chamadosFiltradosPorTipo.map((chamado) => (
             <ChamadoCard
               key={chamado.id}
               chamado={chamado}

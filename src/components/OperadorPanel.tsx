@@ -6,6 +6,7 @@ import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 import NotificationCenter from "./NotificationCenter";
+import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
 
 export type OperadorStatus = "Disponível" | "Pausa";
@@ -110,6 +111,7 @@ export default function OperadorPanel({
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const runningActionRef = useRef<string | null>(null);
   const isDisponivel = operadorStatus === "Disponível";
 
   useEffect(() => {
@@ -120,8 +122,10 @@ export default function OperadorPanel({
   }, []);
 
   async function runAction(actionId: string, action: () => void | Promise<void>) {
+    if (runningActionRef.current) return;
     try {
       if (!isMountedRef.current) return;
+      runningActionRef.current = actionId;
       setActionError(null);
       setLoadingActionId(actionId);
       recordAppActivity(`operador:${actionId}`);
@@ -140,6 +144,7 @@ export default function OperadorPanel({
       }
       recordAppActivity(`operador:erro:${actionId}`);
     } finally {
+      runningActionRef.current = null;
       if (isMountedRef.current) {
         setLoadingActionId(null);
       }
@@ -221,6 +226,7 @@ export default function OperadorPanel({
     Retirada: "📤",
     Movimentação: "🚚",
     "Apoio interno": "🧰",
+    "Atendimento Televendas": "📞",
   };
 
   const tabs: { key: FilterTab; label: string; count: number; icon: string }[] = [
@@ -565,29 +571,30 @@ export default function OperadorPanel({
           </div>
         </div>
 
-        {currentList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-slate-200 bg-white py-16 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-            <span className="text-5xl">
-              {activeTab === "pendentes" ? "✨" : activeTab === "meus" ? "👷" : "📊"}
-            </span>
-            <p className="mt-4 text-sm font-semibold text-slate-600">
-              {activeTab === "pendentes"
-                ? "Nenhum chamado pendente"
-                : activeTab === "meus"
-                ? "Nenhum chamado assumido"
-                : "Nenhum chamado finalizado"}
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              {activeTab === "pendentes"
-                ? "Todos os chamados foram atendidos!"
-                : activeTab === "meus"
-                ? "Assuma chamados na aba Pendentes"
-                : "Seus chamados finalizados aparecerão aqui"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {currentList.map((chamado) => {
+        <SectionErrorBoundary title="A lista de chamados encontrou um erro, mas o painel continua ativo.">
+          {currentList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-slate-200 bg-white py-16 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
+              <span className="text-5xl">
+                {activeTab === "pendentes" ? "✨" : activeTab === "meus" ? "👷" : "📊"}
+              </span>
+              <p className="mt-4 text-sm font-semibold text-slate-600">
+                {activeTab === "pendentes"
+                  ? "Nenhum chamado pendente"
+                  : activeTab === "meus"
+                  ? "Nenhum chamado assumido"
+                  : "Nenhum chamado finalizado"}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {activeTab === "pendentes"
+                  ? "Todos os chamados foram atendidos!"
+                  : activeTab === "meus"
+                  ? "Assuma chamados na aba Pendentes"
+                  : "Seus chamados finalizados aparecerão aqui"}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {currentList.map((chamado) => {
               const isUrgente = chamado.prioridade === "Urgente";
               const isAguardando = chamado.status === "Aguardando";
               const isEmAtendimento = chamado.status === "Em atendimento";
@@ -837,9 +844,10 @@ export default function OperadorPanel({
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
+              })}
+            </div>
+          )}
+        </SectionErrorBoundary>
       </main>
 
       <footer className="mt-8 border-t border-slate-200 py-4 text-center text-xs text-slate-400">

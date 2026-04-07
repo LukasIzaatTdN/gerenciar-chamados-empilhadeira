@@ -19,6 +19,7 @@ const PERFIS: PerfilAcesso[] = [
   "Funcionário",
   "Operador",
   "Supervisor",
+  "Televendas",
   "Administrador Geral",
 ];
 

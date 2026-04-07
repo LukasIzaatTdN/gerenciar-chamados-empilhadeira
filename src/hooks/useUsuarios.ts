@@ -31,6 +31,7 @@ function normalizeUsuario(
     data.perfil === "Funcionário" ||
     data.perfil === "Operador" ||
     data.perfil === "Supervisor" ||
+    data.perfil === "Televendas" ||
     data.perfil === "Administrador Geral"
       ? data.perfil
       : "Promotor";

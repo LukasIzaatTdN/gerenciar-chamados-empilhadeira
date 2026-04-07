@@ -30,6 +30,7 @@ service cloud.firestore {
         || perfilInput == "Funcionário"
         || perfilInput == "Operador"
         || perfilInput == "Supervisor"
+        || perfilInput == "Televendas"
         || perfilInput == "Administrador Geral";
     }
 
@@ -76,7 +77,8 @@ service cloud.firestore {
         || tipo == "Reposição"
         || tipo == "Retirada"
         || tipo == "Movimentação"
-        || tipo == "Apoio interno";
+        || tipo == "Apoio interno"
+        || tipo == "Atendimento Televendas";
     }
 
     function isChamadoBaseValido(data) {

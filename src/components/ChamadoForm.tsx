@@ -48,10 +48,17 @@ export default function ChamadoForm({
   const [fotoDataUrl, setFotoDataUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isTelevendas = solicitantePerfil === "Televendas";
 
   useEffect(() => {
     setNomeSolicitante((prev) => (prev.trim() ? prev : solicitanteNome || ""));
   }, [solicitanteNome]);
+
+  useEffect(() => {
+    if (isTelevendas) {
+      setTipoServico("Atendimento Televendas");
+    }
+  }, [isTelevendas]);
 
   const tipoIcons = useMemo<Record<TipoServico, string>>(
     () => ({
@@ -60,6 +67,7 @@ export default function ChamadoForm({
       Retirada: "📤",
       Movimentação: "🚚",
       "Apoio interno": "🧰",
+      "Atendimento Televendas": "📞",
     }),
     []
   );
@@ -156,6 +164,12 @@ export default function ChamadoForm({
                   <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
                     <span className="inline-block h-2 w-2 rounded-full bg-emerald-300" />
                     Unidade: {supermercadoNome}
+                  </div>
+                )}
+                {isTelevendas && (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
+                    <span>📞</span>
+                    Chamado do setor de Televendas
                   </div>
                 )}
               </div>
@@ -305,7 +319,11 @@ export default function ChamadoForm({
             <textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Informações adicionais para agilizar o atendimento (opcional)."
+              placeholder={
+                isTelevendas
+                  ? "Detalhes do pedido de televendas (produto, quantidade, prazo e observações do cliente)."
+                  : "Informações adicionais para agilizar o atendimento (opcional)."
+              }
               rows={3}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
             />

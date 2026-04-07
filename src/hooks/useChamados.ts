@@ -23,6 +23,7 @@ const TIPOS_SERVICO_VALIDOS: TipoServico[] = [
   "Retirada",
   "Movimentação",
   "Apoio interno",
+  "Atendimento Televendas",
 ];
 const PRIORIDADES_VALIDAS: Prioridade[] = ["Normal", "Urgente"];
 const STATUS_VALIDOS: Status[] = ["Aguardando", "Em atendimento", "Finalizado"];

@@ -64,6 +64,7 @@ export default function ChamadoCard({
     Retirada: "📤",
     Movimentação: "🚚",
     "Apoio interno": "🧰",
+    "Atendimento Televendas": "📞",
   };
 
   const statusConfig = {

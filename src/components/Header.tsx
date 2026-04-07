@@ -62,7 +62,7 @@ export default function Header({
       : "border-amber-200/40 bg-amber-500/15 text-amber-50";
 
   const fluxoAtivoLabel =
-    perfilAcesso === "Promotor" || perfilAcesso === "Funcionário"
+    perfilAcesso === "Promotor" || perfilAcesso === "Funcionário" || perfilAcesso === "Televendas"
       ? "Fluxo ativo: abertura e acompanhamento dos seus chamados"
       : perfilAcesso === "Operador"
       ? "Fluxo ativo: central operacional da unidade"
@@ -187,6 +187,7 @@ export default function Header({
                   className={getActionClassName(
                     perfilAcesso === "Promotor" ||
                       perfilAcesso === "Funcionário" ||
+                      perfilAcesso === "Televendas" ||
                       (!perfilAcesso && !showOperatorAction && !showDashboardAction)
                   )}
                 >
@@ -285,6 +286,7 @@ export default function Header({
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Promotor" ||
                       perfilAcesso === "Funcionário" ||
+                      perfilAcesso === "Televendas" ||
                       (!perfilAcesso && !showOperatorAction && !showDashboardAction)
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"

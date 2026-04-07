@@ -22,6 +22,8 @@ const PERFIS_LOGIN: PerfilAcesso[] = [
   "Promotor",
   "Funcionário",
   "Operador",
+  "Supervisor",
+  "Televendas",
   "Administrador Geral",
 ];
 
