@@ -374,20 +374,25 @@ export default function ChamadoForm({
                     />
                     {errors.cliente && <p className="mt-1 text-xs text-red-500">{errors.cliente}</p>}
                   </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">Produto *</label>
-                    <input
-                      type="text"
+                  <div className="sm:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Produtos para separação *
+                    </label>
+                    <textarea
                       value={produto}
                       onChange={(e) => {
                         setProduto(e.target.value);
                         setErrors((prev) => ({ ...prev, produto: "" }));
                       }}
-                      placeholder="Ex.: Leite Integral 1L"
-                      className={`touch-target w-full rounded-2xl border ${
+                      placeholder={"Ex.:\nLeite Integral 1L - 12 caixas\nArroz Tipo 1 5kg - 8 fardos\nRefrigerante Cola 2L - 6 unidades"}
+                      rows={4}
+                      className={`w-full rounded-2xl border ${
                         errors.produto ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
-                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                      } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
                     />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Dica: informe um item por linha para facilitar a conferência do operador.
+                    </p>
                     {errors.produto && <p className="mt-1 text-xs text-red-500">{errors.produto}</p>}
                   </div>
                   <div>
