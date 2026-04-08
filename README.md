@@ -1,98 +1,164 @@
-# Gerenciar Chamados de Empilhadeira
+# Painel Empilhadeira
 
-Sistema web para gerenciamento de chamados operacionais de empilhadeira, com operação multiunidade, controle por usuário e sincronização com Firebase.
+Aplicação web para gerenciamento de chamados de empilhadeira em operação multiunidade, com controle por perfil, sincronização com Firebase e suporte a fluxos operacionais e de televendas.
 
-## Stack
+O projeto foi desenhado para atender supermercados ou centros de distribuição que precisam organizar solicitações internas com visibilidade por loja, painel operacional para operadores, dashboard gerencial e rastreabilidade completa do atendimento.
+
+## Visão Geral
+
+O sistema permite:
+
+- abrir chamados operacionais por unidade
+- acompanhar a fila de atendimento em tempo real
+- operar chamados em painel dedicado para operador
+- separar visualmente chamados de televendas e chamados operacionais
+- consolidar indicadores por supermercado
+- gerenciar usuários e supermercados em ambiente administrativo
+- manter isolamento de dados por unidade
+
+## Principais Funcionalidades
+
+### Multiunidade
+
+- entidade `supermercados`
+- vínculo de usuários por `supermercado_id`
+- vínculo de chamados por `supermercado_id`
+- leitura segmentada por unidade em filas, dashboards e operação
+- visão consolidada apenas para `Administrador Geral`
+
+### Perfis de Acesso
+
+Perfis atualmente suportados:
+
+- `Promotor`
+- `Funcionário`
+- `Operador`
+- `Supervisor`
+- `Televendas`
+- `Administrador Geral`
+
+Resumo do comportamento por perfil:
+
+- `Promotor` e `Funcionário`: abrem chamados e acompanham os próprios chamados da unidade
+- `Operador`: atua no painel operacional da unidade e executa o fluxo do atendimento
+- `Supervisor`: acompanha dashboard e operação da unidade
+- `Televendas`: abre pedidos internos com estrutura própria de itens
+- `Administrador Geral`: visualiza todas as unidades e acessa a gestão administrativa
+
+### Chamados Operacionais
+
+Fluxo principal:
+
+- `Aguardando`
+- `Em atendimento`
+- `Finalizado`
+
+Campos rastreados:
+
+- `criado_em`
+- `assumido_em`
+- `a_caminho_em`
+- `cheguei_em`
+- `iniciado_em`
+- `finalizado_em`
+- `cancelado_em`
+
+Métricas calculadas:
+
+- tempo para assumir
+- tempo até sair a caminho
+- tempo até chegar
+- tempo de atendimento
+- tempo total do chamado
+
+### Chamados de Televendas
+
+O módulo de televendas foi separado do fluxo operacional comum para permitir melhor organização dos pedidos.
+
+Status suportados atualmente:
+
+- `Aberto`
+- `Em separação`
+- `Incompleto`
+- `Pronto`
+- `Finalizado`
+- `Cancelado`
+
+Recursos implementados:
+
+- formulário específico para televendas
+- estrutura por lista de itens
+- cálculo automático de faltas
+- cálculo de totais e percentual atendido
+- atualização do pedido pelo operador
+- destaque visual para pedidos incompletos
+- resumo de itens faltantes no card
+
+Estrutura de item de televendas:
+
+```ts
+{
+  produto: string
+  quantidadeSolicitada: number
+  quantidadeEncontrada: number
+  quantidadeFaltante: number
+}
+```
+
+Campos adicionais suportados no pedido:
+
+- `itens`
+- `total_solicitado`
+- `total_encontrado`
+- `percentual_atendido`
+- `motivo_incompleto`
+- `observacao_operador`
+- `atualizado_em`
+- `atualizado_por`
+
+## Experiência por Tela
+
+### Login e Conta
+
+- login responsivo para desktop e mobile
+- suporte a modo local e Firebase Auth
+- login por e-mail e senha
+- login com Google
+- criação de conta com nome, perfil e unidade
+- administrador geral pode criar conta sem unidade vinculada
+
+### Painel do Operador
+
+- painel dedicado por unidade
+- fila filtrada por supermercado
+- cards com estado visual por prioridade e status
+- conferência de itens de televendas direto no card
+- ações operacionais e de televendas sem misturar os fluxos
+
+### Dashboard
+
+- dashboard por unidade para supervisão
+- dashboard executivo consolidado para administrador geral
+- comparativo entre supermercados
+- indicadores operacionais, urgências e tempo médio
+
+### Administração
+
+- gestão de supermercados
+- gestão de usuários
+- alteração de perfil e unidade
+- bloqueio e reativação de usuários
+
+## Stack Técnica
 
 - React 19
 - TypeScript
 - Vite
 - Tailwind CSS 4
-- Firebase Firestore
 - Firebase Auth
+- Firestore
 
-## Status Atual
-
-### Já implementado
-
-- Modelo multiunidade com entidade `supermercados`
-- Chamados vinculados por `supermercado_id`
-- Chamados com rastreamento por etapa:
-  - `criado_em`, `assumido_em`, `a_caminho_em`, `cheguei_em`, `iniciado_em`, `finalizado_em`, `cancelado_em`
-- Métricas automáticas por etapa:
-  - tempo para assumir
-  - tempo até sair a caminho
-  - tempo até chegar
-  - tempo de atendimento
-  - tempo total do chamado
-- Escopo por unidade em filas, painel, dashboard e métricas
-- Perfis:
-  - `Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Televendas`, `Administrador Geral`
-- Novo tipo de serviço suportado:
-  - `Atendimento Televendas`
-- Isolamento de dados por unidade no frontend e nas regras do Firestore
-- Dashboard separado do painel do operador
-- Dashboard executivo do Administrador Geral com:
-  - visão consolidada das unidades
-  - filtro por período (`hoje`, `7 dias`, `30 dias`)
-  - resumo executivo com alertas de fila e urgência
-  - comparativo e ranking entre supermercados
-- Painel do operador dedicado à operação da unidade
-- Tela administrativa de supermercados para `Administrador Geral`
-- Seletor global de unidade para `Administrador Geral`
-- Login responsivo com:
-  - login local por perfil + nome + unidade
-  - Firebase Auth com e-mail/senha
-  - login com Google
-  - criação de conta com nome, perfil e unidade
-- Sessão persistida:
-  - localStorage no modo local
-  - Firebase Auth no modo Firebase
-- Troca de unidade disponível no perfil
-- Navegação com retorno para a tela anterior
-- UX refinada entre perfis
-- Firestore com coleções reais:
-  - `chamados`
-  - `supermercados`
-  - `usuarios`
-- Gestão administrativa de usuários:
-  - listar usuários
-  - alterar perfil/unidade
-  - bloquear/inativar e reativar usuário
-- Regras do Firestore versionadas no projeto:
-  - arquivo `firestore.rules`
-  - mapeamento em `firebase.json`
-- Regras operacionais atuais:
-  - chamados dependem de unidade correta e usuário autenticado
-  - etapa operacional não depende mais de perfil
-  - perfil `Televendas` pode abrir e acompanhar os próprios chamados da unidade
-- Suporte a custom claims administrativas (`perfil`, `supermercado_id`)
-- Tratamento defensivo de runtime:
-  - normalização de chamados/remotos
-  - sanitização de notificações salvas
-  - `ErrorBoundary` para evitar tela branca total
-- Estabilidade mobile reforçada no painel do operador:
-  - bloqueio de ações concorrentes (toque duplo) ao assumir/iniciar/finalizar
-  - proteção local da lista de chamados com `SectionErrorBoundary`
-  - mitigação de erros de renderização intermitentes no Android
-- Hidratação de sessão no refresh:
-  - tela de carregamento de autenticação antes de renderizar a experiência principal
-  - evita “flash” de tela de acesso restrito durante restauração da sessão Firebase
-- Normalização de identificação do operador no painel:
-  - comparação tolerante de nome (acento/maiúsculas/espaços)
-  - correção de contagem em “Meus Chamados”
-- Badge visual com projeto Firebase ativo no header
-- Script de diagnóstico de acesso para operador/chamado
-
-## Regras de Negócio Principais
-
-- Todo chamado pertence a um supermercado.
-- Usuários comuns operam somente na própria unidade.
-- Usuários autenticados da mesma unidade podem assumir, iniciar e finalizar chamados.
-- Supervisor visualiza dashboard/fila/relatórios da unidade dele.
-- Administrador geral pode visualizar todas as unidades.
-
-## Estrutura Relevante
+## Estrutura do Projeto
 
 ```text
 src/
@@ -109,35 +175,40 @@ firestore.rules
 firebase.json
 ```
 
-Arquivos-chave:
+Arquivos mais relevantes:
 
-- `src/App.tsx`
-- `src/components/OperadorLogin.tsx`
-- `src/components/OperadorPanel.tsx`
-- `src/components/SupermercadosAdmin.tsx`
-- `src/components/AdminExecutiveSummary.tsx`
-- `src/components/UsuariosAdmin.tsx`
-- `src/components/ProfileSettings.tsx`
-- `src/components/AppErrorBoundary.tsx`
-- `src/hooks/useChamados.ts`
-- `src/hooks/useSupermercados.ts`
-- `src/hooks/useUsuarios.ts`
-- `src/hooks/useNotifications.ts`
-- `src/config/firebase.ts`
-- `firestore.rules`
-- `firebase.json`
+- [`src/App.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/App.tsx)
+- [`src/components/ChamadoForm.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoForm.tsx)
+- [`src/components/ChamadoList.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoList.tsx)
+- [`src/components/ChamadoCard.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoCard.tsx)
+- [`src/components/OperadorPanel.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/OperadorPanel.tsx)
+- [`src/components/OperadorLogin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/OperadorLogin.tsx)
+- [`src/components/SupermercadosAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/SupermercadosAdmin.tsx)
+- [`src/components/UsuariosAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/UsuariosAdmin.tsx)
+- [`src/hooks/useChamados.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useChamados.ts)
+- [`src/hooks/useSupermercados.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useSupermercados.ts)
+- [`src/hooks/useUsuarios.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useUsuarios.ts)
+- [`src/utils/televendasItems.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/televendasItems.ts)
+- [`src/utils/chamadoStatus.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/chamadoStatus.ts)
+- [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
 
-## Como Rodar
+## Requisitos
 
-### 1. Instalar dependências
+- Node.js 20+ recomendado
+- npm
+- projeto Firebase configurado
+
+## Como Executar
+
+### 1. Instalação
 
 ```bash
 npm install
 ```
 
-### 2. Configurar `.env`
+### 2. Configuração de ambiente
 
-Use o `.env.example` como base:
+Crie um `.env` com base em `.env.example`:
 
 ```env
 VITE_FIREBASE_API_KEY=
@@ -148,19 +219,27 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
-### 3. Rodar em desenvolvimento
+### 3. Ambiente de desenvolvimento
 
 ```bash
 npm run dev
 ```
 
-### 4. Build
+### 4. Build de produção
 
 ```bash
 npm run build
 ```
 
-## Scripts Úteis
+### 5. Preview local
+
+```bash
+npm run preview
+```
+
+## Scripts Administrativos
+
+Scripts disponíveis:
 
 ```bash
 npm run auth:set-claims
@@ -169,14 +248,9 @@ npm run auth:approve-user
 npm run auth:check-access
 ```
 
-Esses scripts usam `firebase-admin` (pasta `scripts/firebase`) para operação administrativa de claims/token.
+Esses scripts usam `firebase-admin` na pasta `scripts/firebase`.
 
-Observação importante:
-
-- `--supermercado-id` é obrigatório em todos os scripts de claims/token
-- para Administrador Geral, use `--supermercado-id all`
-
-Exemplo de diagnóstico de acesso:
+Exemplo de diagnóstico:
 
 ```bash
 npm run auth:check-access -- \
@@ -185,14 +259,53 @@ npm run auth:check-access -- \
   --service-account "/caminho/serviceAccountKey.json"
 ```
 
-## Deploy de Regras do Firestore
+## Regras do Firestore
+
+As regras estão versionadas em:
+
+- [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
+
+Deploy:
 
 ```bash
-firebase deploy --only firestore:rules --project painel-772bf
+firebase deploy --only firestore:rules
 ```
 
-## Validação
+## Validação Técnica
+
+Verificação de tipos:
 
 ```bash
 npx tsc --noEmit
 ```
+
+Build:
+
+```bash
+npm run build
+```
+
+## Estado Atual do Projeto
+
+O projeto já possui base funcional para:
+
+- autenticação
+- multiunidade
+- gestão de usuários
+- gestão de supermercados
+- fila operacional
+- painel do operador
+- dashboards gerenciais
+- fluxo específico de televendas
+- pedido incompleto em televendas
+
+## Próximos Passos Recomendados
+
+- ampliar testes reais do fluxo `televendas -> operador -> incompleto -> finalizado`
+- revisar relatórios históricos com foco em televendas
+- adicionar testes automatizados para helpers e regras de fluxo
+- revisar documentação operacional para usuários finais
+
+## Licença
+
+Uso interno do projeto.
