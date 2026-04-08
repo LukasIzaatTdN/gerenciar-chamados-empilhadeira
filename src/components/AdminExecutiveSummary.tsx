@@ -1,6 +1,7 @@
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import type { Chamado } from "../types/chamado";
 import type { Supermercado } from "../types/supermercado";
+import { isPendenteStatus } from "../utils/chamadoStatus";
 
 interface AdminExecutiveSummaryProps {
   chamados: Chamado[];
@@ -39,7 +40,7 @@ export default function AdminExecutiveSummary({
   const unidadesComResumo = unidadesBase
     .map((supermercado) => {
       const chamadosUnidade = chamados.filter((chamado) => chamado.supermercado_id === supermercado.id);
-      const aguardando = chamadosUnidade.filter((chamado) => chamado.status === "Aguardando").length;
+      const aguardando = chamadosUnidade.filter((chamado) => isPendenteStatus(chamado.status)).length;
       const urgentes = chamadosUnidade.filter(
         (chamado) => chamado.prioridade === "Urgente" && chamado.status !== "Finalizado"
       ).length;

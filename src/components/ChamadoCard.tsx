@@ -48,6 +48,10 @@ function getPrioridadeTone(prioridade: Chamado["prioridade"]) {
     : "bg-amber-100 text-amber-700";
 }
 
+function getItensFaltantes(chamado: Chamado) {
+  return (chamado.itens ?? []).filter((item) => item.quantidadeFaltante > 0);
+}
+
 export default function ChamadoCard({
   chamado,
   estimate,
@@ -105,6 +109,13 @@ export default function ChamadoCard({
       label: "Em separação",
       ring: "from-cyan-500/90 via-cyan-300/80 to-transparent",
     },
+    Incompleto: {
+      bg: "bg-rose-100",
+      text: "text-rose-900",
+      dot: "bg-rose-500",
+      label: "Incompleto",
+      ring: "from-rose-500/90 via-rose-300/80 to-transparent",
+    },
     Pronto: {
       bg: "bg-blue-100",
       text: "text-blue-900",
@@ -128,6 +139,7 @@ export default function ChamadoCard({
   );
 
   const timeMetrics = getChamadoTimeMetrics(chamado);
+  const itensFaltantes = isTelevendas ? getItensFaltantes(chamado) : [];
 
   const atualizacoes = [
     {
@@ -321,6 +333,23 @@ export default function ChamadoCard({
                   <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
                     Prazo: {chamado.prazo_limite}
                   </span>
+                )}
+              </div>
+            )}
+            {isTelevendas && itensFaltantes.length > 0 && (
+              <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                <p className="text-xs font-bold text-rose-700">Faltas:</p>
+                <ul className="mt-1 space-y-1 text-xs text-rose-700">
+                  {itensFaltantes.map((item, index) => (
+                    <li key={`${item.produto}-${index}`}>
+                      {item.produto}: faltaram {item.quantidadeFaltante}
+                    </li>
+                  ))}
+                </ul>
+                {chamado.observacao_operador && (
+                  <p className="mt-2 text-xs text-rose-700">
+                    Observação do operador: {chamado.observacao_operador}
+                  </p>
                 )}
               </div>
             )}

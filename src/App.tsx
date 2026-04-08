@@ -196,6 +196,7 @@ export default function App() {
     assumirChamado,
     marcarACaminho,
     marcarChegada,
+    atualizarItensTelevendas,
     iniciarAtendimento,
     finalizarChamado,
   } = useChamados(
@@ -793,6 +794,7 @@ export default function App() {
           onAssumir={assumirChamado}
           onMarcarACaminho={marcarACaminho}
           onMarcarChegada={marcarChegada}
+          onAtualizarItensTelevendas={atualizarItensTelevendas}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
           onAccessProfile={handleAccessProfile}

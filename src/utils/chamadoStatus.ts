@@ -15,7 +15,13 @@ export function isFinalizadoStatus(status: Status) {
 }
 
 export function isPendenteStatus(status: Status) {
-  return status === "Aguardando" || status === "Aberto" || status === "Em separação" || status === "Pronto";
+  return (
+    status === "Aguardando" ||
+    status === "Aberto" ||
+    status === "Em separação" ||
+    status === "Incompleto" ||
+    status === "Pronto"
+  );
 }
 
 export function isEmAtendimentoStatus(status: Status) {

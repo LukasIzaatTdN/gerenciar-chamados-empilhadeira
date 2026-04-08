@@ -1,6 +1,7 @@
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import type { Chamado } from "../types/chamado";
 import type { Supermercado } from "../types/supermercado";
+import { isEmAtendimentoStatus, isPendenteStatus } from "../utils/chamadoStatus";
 
 interface SupermercadoComparisonProps {
   chamados: Chamado[];
@@ -35,8 +36,8 @@ export default function SupermercadoComparison({
 
     return {
       supermercado,
-      aguardando: chamadosUnidade.filter((chamado) => chamado.status === "Aguardando").length,
-      emAtendimento: chamadosUnidade.filter((chamado) => chamado.status === "Em atendimento").length,
+      aguardando: chamadosUnidade.filter((chamado) => isPendenteStatus(chamado.status)).length,
+      emAtendimento: chamadosUnidade.filter((chamado) => isEmAtendimentoStatus(chamado.status)).length,
       urgentes: chamadosUnidade.filter(
         (chamado) => chamado.prioridade === "Urgente" && chamado.status !== "Finalizado"
       ).length,

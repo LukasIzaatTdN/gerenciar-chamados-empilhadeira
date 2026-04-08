@@ -21,6 +21,7 @@ const FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Todos", value: "Todos" },
   { label: "⏳ Aguardando", value: "Aguardando" },
   { label: "🔧 Em atendimento", value: "Em atendimento" },
+  { label: "⚠️ Incompletos", value: "Incompleto" },
   { label: "✅ Finalizados", value: "Finalizado" },
 ];
 

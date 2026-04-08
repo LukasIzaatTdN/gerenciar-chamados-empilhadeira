@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import type { Chamado, Setor } from "../types/chamado";
+import type { Chamado, ItemTelevendas, Setor } from "../types/chamado";
 import type { AppNotification } from "../types/notification";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
@@ -9,6 +9,7 @@ import NotificationCenter from "./NotificationCenter";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
 import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
+import { getTotaisItensTelevendas, hasItemFaltante, normalizeItensTelevendas } from "../utils/televendasItems";
 
 export type OperadorStatus = "Disponível" | "Pausa";
 
@@ -21,6 +22,13 @@ interface OperadorPanelProps {
   onAssumir: (id: string, operadorNome: string) => void | Promise<void>;
   onMarcarACaminho: (id: string, operadorNome: string) => void | Promise<void>;
   onMarcarChegada: (id: string, operadorNome: string) => void | Promise<void>;
+  onAtualizarItensTelevendas: (inputId: string, input: {
+    itens: ItemTelevendas[];
+    operadorNome: string;
+    status: "Pronto" | "Incompleto" | "Cancelado";
+    motivoIncompleto?: string | null;
+    observacaoOperador?: string | null;
+  }) => void | Promise<void>;
   onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
   onAccessProfile: () => void;
@@ -98,6 +106,7 @@ export default function OperadorPanel({
   onAssumir,
   onMarcarACaminho,
   onMarcarChegada,
+  onAtualizarItensTelevendas,
   onIniciar,
   onFinalizar,
   onAccessProfile,
@@ -116,6 +125,16 @@ export default function OperadorPanel({
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const [televendasDrafts, setTelevendasDrafts] = useState<
+    Record<
+      string,
+      {
+        itens: ItemTelevendas[];
+        motivoIncompleto: string;
+        observacaoOperador: string;
+      }
+    >
+  >({});
   const isMountedRef = useRef(true);
   const runningActionRef = useRef<string | null>(null);
   const isDisponivel = operadorStatus === "Disponível";
@@ -254,6 +273,56 @@ export default function OperadorPanel({
     (c) => c.status === "Em atendimento" || c.status === "Em separação" || c.status === "Pronto"
   ).length;
   const chamadoRecomendado = pendentesNaoAssumidos[0] ?? pendentes[0] ?? null;
+
+  function getTelevendasDraft(chamado: Chamado) {
+    const fromState = televendasDrafts[chamado.id];
+    if (fromState) return fromState;
+
+    return {
+      itens: normalizeItensTelevendas(chamado.itens ?? []),
+      motivoIncompleto: chamado.motivo_incompleto ?? "",
+      observacaoOperador: chamado.observacao_operador ?? "",
+    };
+  }
+
+  function updateTelevendasItemQuantidade(
+    chamado: Chamado,
+    itemIndex: number,
+    quantidadeEncontrada: number
+  ) {
+    const current = getTelevendasDraft(chamado);
+    const nextItens = current.itens.map((item, index) => {
+      if (index !== itemIndex) return item;
+      const qtdEncontrada = Math.max(
+        0,
+        Math.min(Number.isFinite(quantidadeEncontrada) ? Math.floor(quantidadeEncontrada) : 0, item.quantidadeSolicitada)
+      );
+      return {
+        ...item,
+        quantidadeEncontrada: qtdEncontrada,
+        quantidadeFaltante: Math.max(0, item.quantidadeSolicitada - qtdEncontrada),
+      };
+    });
+
+    setTelevendasDrafts((prev) => ({
+      ...prev,
+      [chamado.id]: {
+        ...current,
+        itens: nextItens,
+      },
+    }));
+  }
+
+  function updateTelevendasDraftText(chamado: Chamado, key: "motivoIncompleto" | "observacaoOperador", value: string) {
+    const current = getTelevendasDraft(chamado);
+    setTelevendasDrafts((prev) => ({
+      ...prev,
+      [chamado.id]: {
+        ...current,
+        [key]: value,
+      },
+    }));
+  }
 
   return (
     <div className="min-h-screen bg-transparent">
@@ -642,6 +711,7 @@ export default function OperadorPanel({
               const isAguardandoOperacional = chamado.status === "Aguardando";
               const isAbertoTelevendas = chamado.status === "Aberto";
               const isEmSeparacaoTelevendas = chamado.status === "Em separação";
+              const isIncompletoTelevendas = chamado.status === "Incompleto";
               const isProntoTelevendas = chamado.status === "Pronto";
               const isEmAtendimentoOperacional = chamado.status === "Em atendimento";
               const isEmAtendimento = isEmAtendimentoOperacional || isEmSeparacaoTelevendas;
@@ -654,6 +724,7 @@ export default function OperadorPanel({
               let indicatorColor = "bg-amber-400";
               if (isTelevendas) indicatorColor = "bg-indigo-500";
               if (isUrgente && !isFinalizado) indicatorColor = "bg-red-500";
+              if (isIncompletoTelevendas) indicatorColor = "bg-rose-500";
               else if (isEmAtendimento) indicatorColor = "bg-emerald-500";
               else if (isFinalizado) indicatorColor = "bg-slate-400";
 
@@ -662,6 +733,9 @@ export default function OperadorPanel({
               if (isUrgente && !isFinalizado) {
                 cardBorder = "border-red-200";
                 cardBg = "bg-red-50/60";
+              } else if (isIncompletoTelevendas) {
+                cardBorder = "border-rose-200";
+                cardBg = "bg-rose-50/60";
               } else if (isTelevendas) {
                 cardBorder = "border-indigo-200";
                 cardBg = "bg-indigo-50/60";
@@ -672,6 +746,14 @@ export default function OperadorPanel({
                 cardBorder = "border-slate-200";
                 cardBg = "bg-slate-50/70";
               }
+
+              const televendasDraft = isTelevendas ? getTelevendasDraft(chamado) : null;
+              const televendasTotais = televendasDraft
+                ? getTotaisItensTelevendas(televendasDraft.itens)
+                : null;
+              const televendasComFalta = televendasDraft
+                ? hasItemFaltante(televendasDraft.itens)
+                : false;
 
               return (
                 <div
@@ -702,6 +784,8 @@ export default function OperadorPanel({
                             ? "bg-emerald-100 text-emerald-700"
                             : isFinalizado
                             ? "bg-slate-100 text-slate-500"
+                            : isIncompletoTelevendas
+                            ? "bg-rose-100 text-rose-700"
                             : isUrgente
                             ? "bg-red-100 text-red-700"
                             : "bg-amber-100 text-amber-700"
@@ -710,10 +794,12 @@ export default function OperadorPanel({
                         <span
                           className={cn(
                             "h-1.5 w-1.5 rounded-full",
-                            isEmAtendimento
+                              isEmAtendimento
                               ? "bg-emerald-500"
                               : isFinalizado
                               ? "bg-slate-400"
+                              : isIncompletoTelevendas
+                              ? "bg-rose-500"
                               : isUrgente
                               ? "bg-red-500"
                               : "bg-amber-500"
@@ -813,6 +899,98 @@ export default function OperadorPanel({
                                 {chamado.quantidade}
                               </p>
                             )}
+                          </div>
+                        )}
+
+                        {isTelevendas && televendasDraft && (
+                          <div className="mt-2 rounded-xl border border-slate-200 bg-white/90 p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">
+                              Conferência de itens
+                            </p>
+                            <div className="mt-2 space-y-2">
+                              {televendasDraft.itens.map((item, index) => (
+                                <div
+                                  key={`${chamado.id}-item-${index}`}
+                                  className={cn(
+                                    "grid grid-cols-1 gap-2 rounded-lg border px-3 py-2 sm:grid-cols-[1fr_130px_130px]",
+                                    item.quantidadeFaltante > 0
+                                      ? "border-rose-200 bg-rose-50/70"
+                                      : "border-slate-200 bg-slate-50/80"
+                                  )}
+                                >
+                                  <div className="text-xs font-semibold text-slate-800">{item.produto}</div>
+                                  <div className="text-xs text-slate-600">
+                                    Solicitado:{" "}
+                                    <span className="font-semibold text-slate-900">{item.quantidadeSolicitada}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <label className="text-slate-600">Encontrado:</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={item.quantidadeSolicitada}
+                                      value={item.quantidadeEncontrada}
+                                      onChange={(event) =>
+                                        updateTelevendasItemQuantidade(
+                                          chamado,
+                                          index,
+                                          Number(event.target.value)
+                                        )
+                                      }
+                                      className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                    />
+                                    <span
+                                      className={cn(
+                                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                        item.quantidadeFaltante > 0
+                                          ? "bg-rose-100 text-rose-700"
+                                          : "bg-emerald-100 text-emerald-700"
+                                      )}
+                                    >
+                                      Falta: {item.quantidadeFaltante}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                                Total solicitado: {televendasTotais?.totalSolicitado ?? 0}
+                              </span>
+                              <span className="rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-700">
+                                Total encontrado: {televendasTotais?.totalEncontrado ?? 0}
+                              </span>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-1 font-semibold",
+                                  televendasComFalta ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                                )}
+                              >
+                                Atendido: {televendasTotais?.percentualAtendido ?? 0}%
+                              </span>
+                            </div>
+
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <input
+                                type="text"
+                                value={televendasDraft.motivoIncompleto}
+                                onChange={(event) =>
+                                  updateTelevendasDraftText(chamado, "motivoIncompleto", event.target.value)
+                                }
+                                placeholder="Motivo do incompleto (ex.: estoque insuficiente)"
+                                className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                              />
+                              <input
+                                type="text"
+                                value={televendasDraft.observacaoOperador}
+                                onChange={(event) =>
+                                  updateTelevendasDraftText(chamado, "observacaoOperador", event.target.value)
+                                }
+                                placeholder="Observação do operador"
+                                className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                              />
+                            </div>
                           </div>
                         )}
 
@@ -916,16 +1094,83 @@ export default function OperadorPanel({
                         {(isAguardandoOperacional || isEmSeparacaoTelevendas) && Boolean(chamado.operador_nome) && (
                           <button
                             onClick={() => {
-                              void runAction(`iniciar-${chamado.id}`, () =>
-                                onIniciar(chamado.id, operadorNome)
-                              );
+                              if (isTelevendas && televendasDraft) {
+                                void runAction(`pronto-${chamado.id}`, () =>
+                                  onAtualizarItensTelevendas(chamado.id, {
+                                    itens: televendasDraft.itens,
+                                    operadorNome,
+                                    status: televendasComFalta ? "Incompleto" : "Pronto",
+                                    motivoIncompleto: televendasComFalta
+                                      ? televendasDraft.motivoIncompleto
+                                      : null,
+                                    observacaoOperador: televendasDraft.observacaoOperador,
+                                  })
+                                );
+                                return;
+                              }
+
+                              void runAction(`iniciar-${chamado.id}`, () => onIniciar(chamado.id, operadorNome));
                             }}
-                            disabled={loadingActionId === `iniciar-${chamado.id}`}
+                            disabled={
+                              loadingActionId === `iniciar-${chamado.id}` ||
+                              loadingActionId === `pronto-${chamado.id}`
+                            }
                             className="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 active:scale-95 sm:w-auto sm:text-sm"
                           >
-                            {loadingActionId === `iniciar-${chamado.id}` ? "Iniciando..." : isTelevendas ? "Marcar pronto" : "Iniciar"}
+                            {loadingActionId === `iniciar-${chamado.id}` || loadingActionId === `pronto-${chamado.id}`
+                              ? "Salvando..."
+                              : isTelevendas
+                              ? televendasComFalta
+                                ? "Salvar como incompleto"
+                                : "Marcar pronto"
+                              : "Iniciar"}
                           </button>
                         )}
+
+                        {(isEmSeparacaoTelevendas || isIncompletoTelevendas) &&
+                          Boolean(chamado.operador_nome) &&
+                          televendasDraft && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  void runAction(`incompleto-${chamado.id}`, () =>
+                                    onAtualizarItensTelevendas(chamado.id, {
+                                      itens: televendasDraft.itens,
+                                      operadorNome,
+                                      status: "Incompleto",
+                                      motivoIncompleto: televendasDraft.motivoIncompleto || "Estoque insuficiente",
+                                      observacaoOperador: televendasDraft.observacaoOperador,
+                                    })
+                                  );
+                                }}
+                                disabled={loadingActionId === `incompleto-${chamado.id}`}
+                                className="w-full rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 transition-all hover:bg-rose-100 active:scale-95 sm:w-auto sm:text-sm"
+                              >
+                                {loadingActionId === `incompleto-${chamado.id}`
+                                  ? "Salvando..."
+                                  : "Marcar incompleto"}
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  void runAction(`cancelar-${chamado.id}`, () =>
+                                    onAtualizarItensTelevendas(chamado.id, {
+                                      itens: televendasDraft.itens,
+                                      operadorNome,
+                                      status: "Cancelado",
+                                      observacaoOperador: televendasDraft.observacaoOperador,
+                                    })
+                                  );
+                                }}
+                                disabled={loadingActionId === `cancelar-${chamado.id}`}
+                                className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-slate-200 active:scale-95 sm:w-auto sm:text-sm"
+                              >
+                                {loadingActionId === `cancelar-${chamado.id}`
+                                  ? "Cancelando..."
+                                  : "Cancelar pedido"}
+                              </button>
+                            </>
+                          )}
 
                         {(isEmAtendimentoOperacional || isProntoTelevendas) && Boolean(chamado.operador_nome) && (
                           <button

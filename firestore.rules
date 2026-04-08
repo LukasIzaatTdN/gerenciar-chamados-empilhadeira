@@ -62,12 +62,27 @@ service cloud.firestore {
       return valor == null || (valor is string && valor.size() == 0);
     }
 
+    function isNumeroNaoNegativo(valor) {
+      return valor is int || valor is float
+        ? valor >= 0
+        : false;
+    }
+
+    function isNumeroOpcionalNaoNegativo(valor) {
+      return valor == null || isNumeroNaoNegativo(valor);
+    }
+
+    function isListaItensTelevendasValida(valor) {
+      return valor is list;
+    }
+
     function isStatusChamadoValido(status) {
       return status == "Aguardando"
         || status == "Em atendimento"
         || status == "Finalizado"
         || status == "Aberto"
         || status == "Em separação"
+        || status == "Incompleto"
         || status == "Pronto"
         || status == "Cancelado";
     }
@@ -100,6 +115,12 @@ service cloud.firestore {
         && (isCampoVazio(data.cliente) || isTextoNaoVazio(data.cliente))
         && (isCampoVazio(data.produto) || isTextoNaoVazio(data.produto))
         && (isCampoVazio(data.quantidade) || isTextoNaoVazio(data.quantidade))
+        && isListaItensTelevendasValida(data.itens)
+        && isNumeroOpcionalNaoNegativo(data.total_solicitado)
+        && isNumeroOpcionalNaoNegativo(data.total_encontrado)
+        && isNumeroOpcionalNaoNegativo(data.percentual_atendido)
+        && (isCampoVazio(data.motivo_incompleto) || isTextoNaoVazio(data.motivo_incompleto))
+        && (isCampoVazio(data.observacao_operador) || isTextoNaoVazio(data.observacao_operador))
         && (isCampoVazio(data.local_separacao) || isTextoNaoVazio(data.local_separacao))
         && (isCampoVazio(data.prazo_limite) || isTextoNaoVazio(data.prazo_limite))
         && isPrioridadeValida(data.prioridade)
@@ -109,6 +130,8 @@ service cloud.firestore {
         && (isCampoVazio(data.a_caminho_em) || isTextoNaoVazio(data.a_caminho_em))
         && (isCampoVazio(data.cheguei_em) || isTextoNaoVazio(data.cheguei_em))
         && (isCampoVazio(data.operador_nome) || isTextoNaoVazio(data.operador_nome))
+        && (isCampoVazio(data.atualizado_em) || isTextoNaoVazio(data.atualizado_em))
+        && (isCampoVazio(data.atualizado_por) || isTextoNaoVazio(data.atualizado_por))
         && (isCampoVazio(data.iniciado_em) || isTextoNaoVazio(data.iniciado_em))
         && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em))
         && (isCampoVazio(data.cancelado_em) || isTextoNaoVazio(data.cancelado_em));
@@ -126,7 +149,11 @@ service cloud.firestore {
         && request.resource.data.cheguei_em == null
         && request.resource.data.iniciado_em == null
         && request.resource.data.finalizado_em == null
-        && request.resource.data.cancelado_em == null;
+        && request.resource.data.cancelado_em == null
+        && request.resource.data.atualizado_em == null
+        && request.resource.data.atualizado_por == null
+        && request.resource.data.motivo_incompleto == null
+        && request.resource.data.observacao_operador == null;
     }
 
     function isAtualizacaoChamadoValida() {
@@ -139,8 +166,6 @@ service cloud.firestore {
         && request.resource.data.tipo_servico == resource.data.tipo_servico
         && request.resource.data.numero_pedido == resource.data.numero_pedido
         && request.resource.data.cliente == resource.data.cliente
-        && request.resource.data.produto == resource.data.produto
-        && request.resource.data.quantidade == resource.data.quantidade
         && request.resource.data.local_separacao == resource.data.local_separacao
         && request.resource.data.prazo_limite == resource.data.prazo_limite
         && request.resource.data.prioridade == resource.data.prioridade

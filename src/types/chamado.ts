@@ -17,8 +17,16 @@ export type Status =
   | "Finalizado"
   | "Aberto"
   | "Em separação"
+  | "Incompleto"
   | "Pronto"
   | "Cancelado";
+
+export interface ItemTelevendas {
+  produto: string;
+  quantidadeSolicitada: number;
+  quantidadeEncontrada: number;
+  quantidadeFaltante: number;
+}
 
 export interface Chamado {
   id: string;
@@ -32,6 +40,14 @@ export interface Chamado {
   cliente: string | null;
   produto: string | null;
   quantidade: string | null;
+  itens: ItemTelevendas[];
+  total_solicitado: number | null;
+  total_encontrado: number | null;
+  percentual_atendido: number | null;
+  motivo_incompleto: string | null;
+  observacao_operador: string | null;
+  atualizado_em: string | null;
+  atualizado_por: string | null;
   local_separacao: string | null;
   prazo_limite: string | null;
   prioridade: Prioridade;

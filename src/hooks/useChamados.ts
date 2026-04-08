@@ -3,12 +3,21 @@ import { v4 as uuidv4 } from "uuid";
 import type {
   CategoriaChamado,
   Chamado,
+  ItemTelevendas,
   Setor,
   TipoServico,
   Prioridade,
   Status,
 } from "../types/chamado";
 import { isTelevendasChamado } from "../utils/chamadoStatus";
+import {
+  getTotaisItensTelevendas,
+  hasItemFaltante,
+  itensToLegacyProduto,
+  itensToLegacyQuantidade,
+  normalizeItensTelevendas,
+  parseProdutoQuantidadeTextToItens,
+} from "../utils/televendasItems";
 import {
   collection,
   deleteDoc,
@@ -35,7 +44,14 @@ const TIPOS_SERVICO_VALIDOS: TipoServico[] = [
 ];
 const PRIORIDADES_VALIDAS: Prioridade[] = ["Normal", "Urgente"];
 const STATUS_VALIDOS: Status[] = ["Aguardando", "Em atendimento", "Finalizado"];
-const STATUS_VALIDOS_TELEVENDAS: Status[] = ["Aberto", "Em separação", "Pronto", "Finalizado", "Cancelado"];
+const STATUS_VALIDOS_TELEVENDAS: Status[] = [
+  "Aberto",
+  "Em separação",
+  "Incompleto",
+  "Pronto",
+  "Finalizado",
+  "Cancelado",
+];
 
 function sanitizeDateString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -61,6 +77,21 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
     data.categoria === "televendas" || data.tipo_servico === "Atendimento Televendas"
       ? "televendas"
       : "operacional";
+
+  const itensTelevendas = normalizeItensTelevendas(
+    Array.isArray((data as Partial<Chamado>).itens)
+      ? ((data as Partial<Chamado>).itens as ItemTelevendas[])
+      : categoria === "televendas"
+      ? parseProdutoQuantidadeTextToItens(
+          (data as Partial<Chamado>).produto ?? null,
+          (data as Partial<Chamado>).quantidade ?? null
+        )
+      : []
+  );
+  const totaisTelevendas = getTotaisItensTelevendas(itensTelevendas);
+  const totalSolicitadoRaw = (data as Partial<Chamado>).total_solicitado;
+  const totalEncontradoRaw = (data as Partial<Chamado>).total_encontrado;
+  const percentualAtendidoRaw = (data as Partial<Chamado>).percentual_atendido;
 
   return {
     id: typeof data.id === "string" && data.id.trim() ? data.id : fallbackId,
@@ -99,6 +130,41 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
       typeof (data as Partial<Chamado>).quantidade === "string" &&
       (data as Partial<Chamado>).quantidade!.trim()
         ? (data as Partial<Chamado>).quantidade!.trim()
+        : null,
+    itens: itensTelevendas,
+    total_solicitado:
+      typeof totalSolicitadoRaw === "number"
+        ? totalSolicitadoRaw
+        : categoria === "televendas"
+        ? totaisTelevendas.totalSolicitado
+        : null,
+    total_encontrado:
+      typeof totalEncontradoRaw === "number"
+        ? totalEncontradoRaw
+        : categoria === "televendas"
+        ? totaisTelevendas.totalEncontrado
+        : null,
+    percentual_atendido:
+      typeof percentualAtendidoRaw === "number"
+        ? percentualAtendidoRaw
+        : categoria === "televendas"
+        ? totaisTelevendas.percentualAtendido
+        : null,
+    motivo_incompleto:
+      typeof (data as Partial<Chamado>).motivo_incompleto === "string" &&
+      (data as Partial<Chamado>).motivo_incompleto!.trim()
+        ? (data as Partial<Chamado>).motivo_incompleto!.trim()
+        : null,
+    observacao_operador:
+      typeof (data as Partial<Chamado>).observacao_operador === "string" &&
+      (data as Partial<Chamado>).observacao_operador!.trim()
+        ? (data as Partial<Chamado>).observacao_operador!.trim()
+        : null,
+    atualizado_em: sanitizeDateString((data as Partial<Chamado>).atualizado_em),
+    atualizado_por:
+      typeof (data as Partial<Chamado>).atualizado_por === "string" &&
+      (data as Partial<Chamado>).atualizado_por!.trim()
+        ? (data as Partial<Chamado>).atualizado_por!.trim()
         : null,
     local_separacao:
       typeof (data as Partial<Chamado>).local_separacao === "string" &&
@@ -187,6 +253,7 @@ export interface NovoChamadoInput {
   cliente?: string | null;
   produto?: string | null;
   quantidade?: string | null;
+  itens?: ItemTelevendas[];
   local_separacao?: string | null;
   prazo_limite?: string | null;
   prioridade: Prioridade;
@@ -203,6 +270,14 @@ export interface ChamadoCallbacks {
   onAssumido?: (chamado: Chamado, operadorNome: string) => void;
   onIniciado?: (chamado: Chamado) => void;
   onFinalizado?: (chamado: Chamado) => void;
+}
+
+interface AtualizacaoItensTelevendasInput {
+  itens: ItemTelevendas[];
+  operadorNome: string;
+  status: "Pronto" | "Incompleto" | "Cancelado";
+  motivoIncompleto?: string | null;
+  observacaoOperador?: string | null;
 }
 
 interface ChamadoScope {
@@ -316,6 +391,10 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         if (input.supermercado_id !== scope.supermercadoId) return;
       }
 
+      const itensTelevendas =
+        input.categoria === "televendas" ? normalizeItensTelevendas(input.itens ?? []) : [];
+      const totaisTelevendas = getTotaisItensTelevendas(itensTelevendas);
+
       const novo: Chamado = {
         id: uuidv4(),
         categoria:
@@ -338,11 +417,25 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         cliente:
           typeof input.cliente === "string" && input.cliente.trim() ? input.cliente.trim() : null,
         produto:
-          typeof input.produto === "string" && input.produto.trim() ? input.produto.trim() : null,
+          input.categoria === "televendas"
+            ? itensToLegacyProduto(itensTelevendas)
+            : typeof input.produto === "string" && input.produto.trim()
+            ? input.produto.trim()
+            : null,
         quantidade:
-          typeof input.quantidade === "string" && input.quantidade.trim()
+          input.categoria === "televendas"
+            ? itensToLegacyQuantidade(itensTelevendas)
+            : typeof input.quantidade === "string" && input.quantidade.trim()
             ? input.quantidade.trim()
             : null,
+        itens: itensTelevendas,
+        total_solicitado: input.categoria === "televendas" ? totaisTelevendas.totalSolicitado : null,
+        total_encontrado: input.categoria === "televendas" ? totaisTelevendas.totalEncontrado : null,
+        percentual_atendido: input.categoria === "televendas" ? totaisTelevendas.percentualAtendido : null,
+        motivo_incompleto: null,
+        observacao_operador: null,
+        atualizado_em: null,
+        atualizado_por: null,
         local_separacao:
           typeof input.local_separacao === "string" && input.local_separacao.trim()
             ? input.local_separacao.trim()
@@ -471,7 +564,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             cheguei_em: chamadoAtual.cheguei_em ?? iniciado_em,
             finalizado_em: null,
             cancelado_em: null,
-            atualizado_em: new Date().toISOString(),
+            atualizado_em: iniciado_em,
+            atualizado_por: operador_nome,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -500,6 +594,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
                 a_caminho_em: c.a_caminho_em ?? iniciado_em,
                 cheguei_em: c.cheguei_em ?? iniciado_em,
                 cancelado_em: null,
+                atualizado_em: iniciado_em,
+                atualizado_por: operador_nome,
               }
             : c
         );
@@ -534,7 +630,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             finalizado_em,
             operador_nome,
             cancelado_em: null,
-            atualizado_em: new Date().toISOString(),
+            atualizado_em: finalizado_em,
+            atualizado_por: operador_nome,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -560,6 +657,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
                 finalizado_em,
                 operador_nome,
                 cancelado_em: null,
+                atualizado_em: finalizado_em,
+                atualizado_por: operador_nome,
               }
             : c
         );
@@ -680,6 +779,66 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     [chamados, scope]
   );
 
+  const atualizarItensTelevendas = useCallback(
+    async (id: string, input: AtualizacaoItensTelevendasInput) => {
+      const chamadoAtual = chamados.find((c) => c.id === id);
+      if (!chamadoAtual) {
+        throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
+      }
+      if (!canAccessChamado(chamadoAtual, scope)) {
+        throw new Error("Você não tem acesso a este chamado.");
+      }
+      if (!isTelevendasChamado(chamadoAtual)) {
+        throw new Error("Esta ação é exclusiva para pedidos de televendas.");
+      }
+
+      const itensNormalizados = normalizeItensTelevendas(input.itens);
+      const totais = getTotaisItensTelevendas(itensNormalizados);
+      const statusFinal: Status =
+        input.status === "Incompleto" && !hasItemFaltante(itensNormalizados)
+          ? "Pronto"
+          : input.status;
+      const atualizadoEm = new Date().toISOString();
+
+      const payload = {
+        itens: itensNormalizados,
+        produto: itensToLegacyProduto(itensNormalizados),
+        quantidade: itensToLegacyQuantidade(itensNormalizados),
+        total_solicitado: totais.totalSolicitado,
+        total_encontrado: totais.totalEncontrado,
+        percentual_atendido: totais.percentualAtendido,
+        status: statusFinal,
+        motivo_incompleto:
+          statusFinal === "Incompleto" && input.motivoIncompleto?.trim()
+            ? input.motivoIncompleto.trim()
+            : null,
+        observacao_operador: input.observacaoOperador?.trim() ? input.observacaoOperador.trim() : null,
+        atualizado_em: atualizadoEm,
+        atualizado_por: input.operadorNome,
+        operador_nome: input.operadorNome,
+        cancelado_em: statusFinal === "Cancelado" ? atualizadoEm : null,
+      };
+
+      if (db) {
+        try {
+          await ensureFirebaseSessionForChamado();
+          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), payload);
+        } catch (error) {
+          throw mapFirestoreWriteError(
+            error,
+            "Permissão negada ao atualizar pedido de televendas. Verifique login e unidade."
+          );
+        }
+        return;
+      }
+
+      setChamados((prev) =>
+        prev.map((chamado) => (chamado.id === id ? { ...chamado, ...payload } : chamado))
+      );
+    },
+    [chamados, scope]
+  );
+
   const chamadosEscopo = applyScope(chamados, scope);
 
   const chamadosFiltrados = sortChamados(
@@ -691,7 +850,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   const stats = {
     total: chamadosEscopo.length,
     aguardando: chamadosEscopo.filter((c) => c.status === "Aguardando" || c.status === "Aberto").length,
-    emAtendimento: chamadosEscopo.filter((c) => c.status === "Em atendimento" || c.status === "Em separação" || c.status === "Pronto").length,
+    emAtendimento: chamadosEscopo.filter(
+      (c) =>
+        c.status === "Em atendimento" ||
+        c.status === "Em separação" ||
+        c.status === "Incompleto" ||
+        c.status === "Pronto"
+    ).length,
     finalizado: chamadosEscopo.filter((c) => c.status === "Finalizado").length,
     urgentes: chamadosEscopo.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
   };
@@ -708,6 +873,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     assumirChamado,
     marcarACaminho,
     marcarChegada,
+    atualizarItensTelevendas,
     iniciarAtendimento,
     finalizarChamado,
     excluirChamado,
