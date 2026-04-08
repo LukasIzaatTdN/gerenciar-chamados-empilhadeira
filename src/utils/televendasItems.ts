@@ -16,6 +16,7 @@ export function normalizeItemTelevendas(item: Partial<ItemTelevendas>): ItemTele
   if (!produto) return null;
 
   const quantidadeSolicitada = toSafeNumber(item.quantidadeSolicitada);
+  if (quantidadeSolicitada <= 0) return null;
   const quantidadeEncontradaBruta = toSafeNumber(item.quantidadeEncontrada);
   const quantidadeEncontrada = Math.min(quantidadeEncontradaBruta, quantidadeSolicitada);
   const quantidadeFaltante = Math.max(0, quantidadeSolicitada - quantidadeEncontrada);
@@ -78,4 +79,3 @@ export function itensToLegacyQuantidade(itens: ItemTelevendas[]) {
   const total = itens.reduce((sum, item) => sum + item.quantidadeSolicitada, 0);
   return total > 0 ? String(total) : null;
 }
-

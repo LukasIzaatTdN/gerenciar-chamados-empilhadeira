@@ -47,9 +47,9 @@ export default function ChamadoForm({
 }: ChamadoFormProps) {
   const createEmptyItem = (): ItemTelevendas => ({
     produto: "",
-    quantidadeSolicitada: 1,
+    quantidadeSolicitada: 0,
     quantidadeEncontrada: 0,
-    quantidadeFaltante: 1,
+    quantidadeFaltante: 0,
   });
 
   const [nomeSolicitante, setNomeSolicitante] = useState(solicitanteNome || "");
@@ -447,9 +447,10 @@ export default function ChamadoForm({
                             type="number"
                             min={1}
                             step={1}
-                            value={item.quantidadeSolicitada}
+                            value={item.quantidadeSolicitada > 0 ? item.quantidadeSolicitada : ""}
                             onChange={(e) => {
-                              const value = Math.max(1, Number(e.target.value) || 1);
+                              const rawValue = e.target.value;
+                              const value = rawValue.trim() ? Math.max(1, Number(rawValue) || 0) : 0;
                               setItensTelevendas((prev) =>
                                 prev.map((curr, currIndex) =>
                                   currIndex === index
