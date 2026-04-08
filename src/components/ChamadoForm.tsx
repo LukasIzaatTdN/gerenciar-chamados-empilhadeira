@@ -176,7 +176,7 @@ export default function ChamadoForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="w-full max-w-xl animate-in overflow-y-auto rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
+      <div className="flex w-full max-w-xl animate-in flex-col overflow-hidden rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
           <div className="mb-3 block text-center sm:hidden">
             <span className="mx-auto block h-1.5 w-10 rounded-full bg-slate-200" />
@@ -218,7 +218,10 @@ export default function ChamadoForm({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 [-webkit-overflow-scrolling:touch] sm:px-6 sm:pb-6"
+        >
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">Nome do solicitante *</label>
             <input
