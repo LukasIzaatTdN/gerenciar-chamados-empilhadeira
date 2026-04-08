@@ -69,6 +69,24 @@ export default function ChamadoForm({
     }
   }, [isTelevendas]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverscroll = html.style.overscrollBehaviorY;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+
+    html.style.overscrollBehaviorY = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      html.style.overscrollBehaviorY = previousHtmlOverscroll;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
   const tipoIcons = useMemo<Record<TipoServico, string>>(
     () => ({
       Descarga: "📦",
@@ -175,8 +193,8 @@ export default function ChamadoForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="flex w-full max-w-xl animate-in flex-col overflow-hidden rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-none bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex w-full max-w-xl animate-in flex-col overflow-hidden overscroll-contain rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
           <div className="mb-3 block text-center sm:hidden">
             <span className="mx-auto block h-1.5 w-10 rounded-full bg-slate-200" />

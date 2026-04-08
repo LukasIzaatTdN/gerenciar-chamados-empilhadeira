@@ -61,6 +61,24 @@ export default function OperadorLogin({
     }
   }, [perfilSelecionado, supermercadoId, supermercadosAtivos, isAdminGeral]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverscroll = html.style.overscrollBehaviorY;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+
+    html.style.overscrollBehaviorY = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      html.style.overscrollBehaviorY = previousHtmlOverscroll;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -166,10 +184,10 @@ export default function OperadorLogin({
     !hasUnidadesAtivas;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-100/90 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-none bg-slate-100/90 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,61,117,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_28%)]" />
 
-      <div className="relative my-auto w-full max-w-md animate-in overflow-y-auto rounded-[28px] border border-slate-200/80 bg-white shadow-[0_30px_70px_rgba(15,23,42,0.16)] sm:rounded-[32px] max-h-[calc(100dvh-2rem)]">
+      <div className="relative my-auto flex w-full max-w-md animate-in flex-col overflow-hidden overscroll-contain rounded-[28px] border border-slate-200/80 bg-white shadow-[0_30px_70px_rgba(15,23,42,0.16)] sm:rounded-[32px] max-h-[calc(100dvh-2rem)]">
         <div className="sticky top-0 z-10 flex items-center justify-end bg-white/95 px-5 pt-5 backdrop-blur-sm">
           <button
             onClick={onCancel}
@@ -194,7 +212,10 @@ export default function OperadorLogin({
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pb-8">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 [-webkit-overflow-scrolling:touch] sm:px-8 sm:pb-8"
+        >
           {authMode === "firebase" ? (
             <>
               <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
