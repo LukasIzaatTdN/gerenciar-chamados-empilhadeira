@@ -62,6 +62,14 @@ function getDuration(start: string, end: string): string {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
+function parseListaProdutos(produto: string | null | undefined): string[] {
+  if (!produto) return [];
+  return produto
+    .split(/\r?\n|[,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 type FilterTab = "pendentes" | "meus" | "finalizados";
 
 function normalizeOperatorName(value: string | null | undefined) {
@@ -641,6 +649,7 @@ export default function OperadorPanel({
               const isAssumido = isSameOperatorName(chamado.operador_nome, operadorNome);
               const estimate = timeEstimates.estimates[chamado.id];
               const remainingMin = timeEstimates.tempoRestanteEmAtendimento[chamado.id];
+              const listaProdutosTelevendas = isTelevendas ? parseListaProdutos(chamado.produto) : [];
 
               let indicatorColor = "bg-amber-400";
               if (isTelevendas) indicatorColor = "bg-indigo-500";
@@ -756,6 +765,56 @@ export default function OperadorPanel({
                         <p className={cn("mt-1.5 text-xs", isFinalizado ? "text-slate-400" : "text-slate-500")}>
                           Solicitante: <span className="font-medium text-slate-700">{chamado.solicitante_nome}</span>
                         </p>
+
+                        {isTelevendas && (
+                          <div className="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700">
+                              Itens para separação
+                            </p>
+                            <div className="mt-2 grid gap-1.5 text-xs text-slate-700 sm:grid-cols-2">
+                              {chamado.numero_pedido && (
+                                <p>
+                                  <span className="font-semibold text-indigo-700">Pedido:</span>{" "}
+                                  {chamado.numero_pedido}
+                                </p>
+                              )}
+                              {chamado.cliente && (
+                                <p>
+                                  <span className="font-semibold text-indigo-700">Cliente:</span>{" "}
+                                  {chamado.cliente}
+                                </p>
+                              )}
+                              {chamado.local_separacao && (
+                                <p>
+                                  <span className="font-semibold text-indigo-700">Separação:</span>{" "}
+                                  {chamado.local_separacao}
+                                </p>
+                              )}
+                              {chamado.prazo_limite && (
+                                <p>
+                                  <span className="font-semibold text-indigo-700">Prazo:</span>{" "}
+                                  {chamado.prazo_limite}
+                                </p>
+                              )}
+                            </div>
+                            {listaProdutosTelevendas.length > 0 && (
+                              <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                                {listaProdutosTelevendas.map((item, index) => (
+                                  <li key={`${item}-${index}`} className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-indigo-600">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {chamado.quantidade && (
+                              <p className="mt-2 text-xs text-slate-700">
+                                <span className="font-semibold text-indigo-700">Quantidade:</span>{" "}
+                                {chamado.quantidade}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         {chamado.iniciado_em && (
                           <p className="mt-1 text-xs text-emerald-700">
