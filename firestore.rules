@@ -65,7 +65,11 @@ service cloud.firestore {
     function isStatusChamadoValido(status) {
       return status == "Aguardando"
         || status == "Em atendimento"
-        || status == "Finalizado";
+        || status == "Finalizado"
+        || status == "Aberto"
+        || status == "Em separação"
+        || status == "Pronto"
+        || status == "Cancelado";
     }
 
     function isPrioridadeValida(prioridade) {
@@ -81,12 +85,23 @@ service cloud.firestore {
         || tipo == "Atendimento Televendas";
     }
 
+    function isCategoriaValida(categoria) {
+      return categoria == "operacional" || categoria == "televendas";
+    }
+
     function isChamadoBaseValido(data) {
       return isTextoNaoVazio(data.id)
+        && isCategoriaValida(data.categoria)
         && isTextoNaoVazio(data.supermercado_id)
         && isTextoNaoVazio(data.solicitante_nome)
         && isTextoNaoVazio(data.setor)
         && isTipoServicoValido(data.tipo_servico)
+        && (isCampoVazio(data.numero_pedido) || isTextoNaoVazio(data.numero_pedido))
+        && (isCampoVazio(data.cliente) || isTextoNaoVazio(data.cliente))
+        && (isCampoVazio(data.produto) || isTextoNaoVazio(data.produto))
+        && (isCampoVazio(data.quantidade) || isTextoNaoVazio(data.quantidade))
+        && (isCampoVazio(data.local_separacao) || isTextoNaoVazio(data.local_separacao))
+        && (isCampoVazio(data.prazo_limite) || isTextoNaoVazio(data.prazo_limite))
         && isPrioridadeValida(data.prioridade)
         && isStatusChamadoValido(data.status)
         && isTextoNaoVazio(data.criado_em)
@@ -101,7 +116,10 @@ service cloud.firestore {
 
     function isCriacaoChamadoValida() {
       return isChamadoBaseValido(request.resource.data)
-        && request.resource.data.status == "Aguardando"
+        && (
+          (request.resource.data.categoria == "operacional" && request.resource.data.status == "Aguardando")
+          || (request.resource.data.categoria == "televendas" && request.resource.data.status == "Aberto")
+        )
         && request.resource.data.operador_nome == null
         && request.resource.data.assumido_em == null
         && request.resource.data.a_caminho_em == null
@@ -113,11 +131,18 @@ service cloud.firestore {
 
     function isAtualizacaoChamadoValida() {
       return isChamadoBaseValido(request.resource.data)
+        && request.resource.data.categoria == resource.data.categoria
         && request.resource.data.supermercado_id == resource.data.supermercado_id
         && request.resource.data.id == resource.data.id
         && request.resource.data.solicitante_nome == resource.data.solicitante_nome
         && request.resource.data.setor == resource.data.setor
         && request.resource.data.tipo_servico == resource.data.tipo_servico
+        && request.resource.data.numero_pedido == resource.data.numero_pedido
+        && request.resource.data.cliente == resource.data.cliente
+        && request.resource.data.produto == resource.data.produto
+        && request.resource.data.quantidade == resource.data.quantidade
+        && request.resource.data.local_separacao == resource.data.local_separacao
+        && request.resource.data.prazo_limite == resource.data.prazo_limite
         && request.resource.data.prioridade == resource.data.prioridade
         && request.resource.data.criado_em == resource.data.criado_em
         && isStatusChamadoValido(request.resource.data.status);

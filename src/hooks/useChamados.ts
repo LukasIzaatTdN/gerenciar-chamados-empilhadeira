@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { Chamado, Setor, TipoServico, Prioridade, Status } from "../types/chamado";
+import type {
+  CategoriaChamado,
+  Chamado,
+  Setor,
+  TipoServico,
+  Prioridade,
+  Status,
+} from "../types/chamado";
+import { isTelevendasChamado } from "../utils/chamadoStatus";
 import {
   collection,
   deleteDoc,
@@ -27,6 +35,7 @@ const TIPOS_SERVICO_VALIDOS: TipoServico[] = [
 ];
 const PRIORIDADES_VALIDAS: Prioridade[] = ["Normal", "Urgente"];
 const STATUS_VALIDOS: Status[] = ["Aguardando", "Em atendimento", "Finalizado"];
+const STATUS_VALIDOS_TELEVENDAS: Status[] = ["Aberto", "Em separação", "Pronto", "Finalizado", "Cancelado"];
 
 function sanitizeDateString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -40,12 +49,22 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
   const prioridade = PRIORIDADES_VALIDAS.includes(data.prioridade as Prioridade)
     ? (data.prioridade as Prioridade)
     : "Normal";
-  const status = STATUS_VALIDOS.includes(data.status as Status)
-    ? (data.status as Status)
-    : "Aguardando";
+  const statusRaw = data.status as Status;
+  const status =
+    STATUS_VALIDOS.includes(statusRaw) || STATUS_VALIDOS_TELEVENDAS.includes(statusRaw)
+      ? statusRaw
+      : data.tipo_servico === "Atendimento Televendas"
+      ? "Aberto"
+      : "Aguardando";
+
+  const categoria: CategoriaChamado =
+    data.categoria === "televendas" || data.tipo_servico === "Atendimento Televendas"
+      ? "televendas"
+      : "operacional";
 
   return {
     id: typeof data.id === "string" && data.id.trim() ? data.id : fallbackId,
+    categoria,
     supermercado_id:
       typeof data.supermercado_id === "string" && data.supermercado_id.trim()
         ? data.supermercado_id
@@ -61,6 +80,36 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
         ? (data as Partial<Chamado>).local_exato!.trim()
         : null,
     tipo_servico: tipoServico,
+    numero_pedido:
+      typeof (data as Partial<Chamado>).numero_pedido === "string" &&
+      (data as Partial<Chamado>).numero_pedido!.trim()
+        ? (data as Partial<Chamado>).numero_pedido!.trim()
+        : null,
+    cliente:
+      typeof (data as Partial<Chamado>).cliente === "string" &&
+      (data as Partial<Chamado>).cliente!.trim()
+        ? (data as Partial<Chamado>).cliente!.trim()
+        : null,
+    produto:
+      typeof (data as Partial<Chamado>).produto === "string" &&
+      (data as Partial<Chamado>).produto!.trim()
+        ? (data as Partial<Chamado>).produto!.trim()
+        : null,
+    quantidade:
+      typeof (data as Partial<Chamado>).quantidade === "string" &&
+      (data as Partial<Chamado>).quantidade!.trim()
+        ? (data as Partial<Chamado>).quantidade!.trim()
+        : null,
+    local_separacao:
+      typeof (data as Partial<Chamado>).local_separacao === "string" &&
+      (data as Partial<Chamado>).local_separacao!.trim()
+        ? (data as Partial<Chamado>).local_separacao!.trim()
+        : null,
+    prazo_limite:
+      typeof (data as Partial<Chamado>).prazo_limite === "string" &&
+      (data as Partial<Chamado>).prazo_limite!.trim()
+        ? (data as Partial<Chamado>).prazo_limite!.trim()
+        : null,
     prioridade,
     observacoes:
       typeof (data as Partial<Chamado>).observacoes === "string" &&
@@ -129,10 +178,17 @@ function sortChamados(chamados: Chamado[]): Chamado[] {
 
 export interface NovoChamadoInput {
   supermercado_id: string;
+  categoria: CategoriaChamado;
   solicitante_nome: string;
   setor: Setor;
   local_exato?: string | null;
   tipo_servico: TipoServico;
+  numero_pedido?: string | null;
+  cliente?: string | null;
+  produto?: string | null;
+  quantidade?: string | null;
+  local_separacao?: string | null;
+  prazo_limite?: string | null;
   prioridade: Prioridade;
   observacoes?: string | null;
   foto_nome?: string | null;
@@ -262,6 +318,10 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       const novo: Chamado = {
         id: uuidv4(),
+        categoria:
+          input.categoria === "televendas" || input.tipo_servico === "Atendimento Televendas"
+            ? "televendas"
+            : "operacional",
         supermercado_id: input.supermercado_id,
         solicitante_nome: input.solicitante_nome,
         setor: input.setor,
@@ -269,7 +329,28 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           typeof input.local_exato === "string" && input.local_exato.trim()
             ? input.local_exato.trim()
             : null,
-        tipo_servico: input.tipo_servico,
+        tipo_servico:
+          input.categoria === "televendas" ? "Atendimento Televendas" : input.tipo_servico,
+        numero_pedido:
+          typeof input.numero_pedido === "string" && input.numero_pedido.trim()
+            ? input.numero_pedido.trim()
+            : null,
+        cliente:
+          typeof input.cliente === "string" && input.cliente.trim() ? input.cliente.trim() : null,
+        produto:
+          typeof input.produto === "string" && input.produto.trim() ? input.produto.trim() : null,
+        quantidade:
+          typeof input.quantidade === "string" && input.quantidade.trim()
+            ? input.quantidade.trim()
+            : null,
+        local_separacao:
+          typeof input.local_separacao === "string" && input.local_separacao.trim()
+            ? input.local_separacao.trim()
+            : null,
+        prazo_limite:
+          typeof input.prazo_limite === "string" && input.prazo_limite.trim()
+            ? input.prazo_limite.trim()
+            : null,
         prioridade: input.prioridade,
         observacoes:
           typeof input.observacoes === "string" && input.observacoes.trim()
@@ -283,7 +364,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           typeof input.foto_data_url === "string" && input.foto_data_url.trim()
             ? input.foto_data_url.trim()
             : null,
-        status: "Aguardando",
+        status: input.categoria === "televendas" ? "Aberto" : "Aguardando",
         operador_nome: null,
         criado_em: new Date().toISOString(),
         assumido_em: null,
@@ -326,7 +407,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         try {
           await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
-            status: "Aguardando" as Status,
+            status: isTelevendasChamado(chamadoAtual) ? ("Em separação" as Status) : ("Aguardando" as Status),
             operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
@@ -349,6 +430,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           c.id === id
             ? {
                 ...c,
+                status: isTelevendasChamado(c) ? ("Em separação" as Status) : c.status,
                 operador_nome: operadorNome,
                 assumido_em: c.assumido_em ?? new Date().toISOString(),
               }
@@ -381,7 +463,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         try {
           await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
-            status: "Em atendimento" as Status,
+            status: isTelevendasChamado(chamadoAtual) ? ("Pronto" as Status) : ("Em atendimento" as Status),
             iniciado_em,
             operador_nome,
             assumido_em: chamadoAtual.assumido_em ?? iniciado_em,
@@ -399,7 +481,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         }
         callbacks?.onIniciado?.({
           ...chamadoAtual,
-          status: "Em atendimento",
+          status: isTelevendasChamado(chamadoAtual) ? "Pronto" : "Em atendimento",
           iniciado_em,
           operador_nome,
         });
@@ -411,7 +493,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           c.id === id
             ? {
                 ...c,
-                status: "Em atendimento" as Status,
+                status: isTelevendasChamado(c) ? ("Pronto" as Status) : ("Em atendimento" as Status),
                 iniciado_em,
                 operador_nome,
                 assumido_em: c.assumido_em ?? iniciado_em,
@@ -608,8 +690,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
   const stats = {
     total: chamadosEscopo.length,
-    aguardando: chamadosEscopo.filter((c) => c.status === "Aguardando").length,
-    emAtendimento: chamadosEscopo.filter((c) => c.status === "Em atendimento").length,
+    aguardando: chamadosEscopo.filter((c) => c.status === "Aguardando" || c.status === "Aberto").length,
+    emAtendimento: chamadosEscopo.filter((c) => c.status === "Em atendimento" || c.status === "Em separação" || c.status === "Pronto").length,
     finalizado: chamadosEscopo.filter((c) => c.status === "Finalizado").length,
     urgentes: chamadosEscopo.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
   };

@@ -8,6 +8,7 @@ import TimeEstimateBadge from "./TimeEstimateBadge";
 import NotificationCenter from "./NotificationCenter";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
+import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
 
 export type OperadorStatus = "Disponível" | "Pausa";
 
@@ -103,6 +104,7 @@ export default function OperadorPanel({
   syncError = null,
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
+  const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">("Todos");
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
@@ -163,7 +165,7 @@ export default function OperadorPanel({
   const pendentes = useMemo(
     () =>
       chamados
-        .filter((c) => c.status === "Aguardando")
+        .filter((c) => c.status === "Aguardando" || c.status === "Aberto" || c.status === "Em separação" || c.status === "Pronto")
         .sort((a, b) => {
           if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
@@ -175,7 +177,7 @@ export default function OperadorPanel({
   const pendentesNaoAssumidos = useMemo(
     () =>
       chamados
-        .filter((c) => c.status === "Aguardando" && !c.operador_nome)
+        .filter((c) => (c.status === "Aguardando" || c.status === "Aberto") && !c.operador_nome)
         .sort((a, b) => {
           if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
@@ -208,13 +210,17 @@ export default function OperadorPanel({
 
   const applySetorFilter = (list: Chamado[]) =>
     filterSetor === "Todos" ? list : list.filter((c) => c.setor === filterSetor);
+  const applyCategoriaFilter = (list: Chamado[]) =>
+    filterCategoria === "Todos"
+      ? list
+      : list.filter((c) => getCategoriaChamado(c) === filterCategoria);
 
   const currentList =
     activeTab === "pendentes"
-      ? applySetorFilter(pendentes)
+      ? applyCategoriaFilter(applySetorFilter(pendentes))
       : activeTab === "meus"
-      ? applySetorFilter(meusChamados)
-      : applySetorFilter(finalizados);
+      ? applyCategoriaFilter(applySetorFilter(meusChamados))
+      : applyCategoriaFilter(applySetorFilter(finalizados));
 
   const tipoIcons: Record<string, string> = {
     Descarga: "📦",
@@ -236,7 +242,9 @@ export default function OperadorPanel({
     return c.finalizado_em && new Date(c.finalizado_em).toDateString() === hoje;
   }).length;
 
-  const emAtendimentoAtual = meusChamados.filter((c) => c.status === "Em atendimento").length;
+  const emAtendimentoAtual = meusChamados.filter(
+    (c) => c.status === "Em atendimento" || c.status === "Em separação" || c.status === "Pronto"
+  ).length;
   const chamadoRecomendado = pendentesNaoAssumidos[0] ?? pendentes[0] ?? null;
 
   return (
@@ -531,6 +539,42 @@ export default function OperadorPanel({
         </div>
 
         <div className="mb-4">
+          <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="shrink-0 text-xs font-medium text-slate-500">Categoria:</span>
+            <button
+              onClick={() => setFilterCategoria("Todos")}
+              className={cn(
+                "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                filterCategoria === "Todos"
+                  ? "bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              )}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilterCategoria("operacional")}
+              className={cn(
+                "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                filterCategoria === "operacional"
+                  ? "bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              )}
+            >
+              Operacionais
+            </button>
+            <button
+              onClick={() => setFilterCategoria("televendas")}
+              className={cn(
+                "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                filterCategoria === "televendas"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              )}
+            >
+              Televendas
+            </button>
+          </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <span className="shrink-0 text-xs font-medium text-slate-500">Filtrar setor:</span>
             <button
@@ -586,14 +630,20 @@ export default function OperadorPanel({
             <div className="space-y-3">
               {currentList.map((chamado) => {
               const isUrgente = chamado.prioridade === "Urgente";
-              const isAguardando = chamado.status === "Aguardando";
-              const isEmAtendimento = chamado.status === "Em atendimento";
+              const isTelevendas = isTelevendasChamado(chamado);
+              const isAguardandoOperacional = chamado.status === "Aguardando";
+              const isAbertoTelevendas = chamado.status === "Aberto";
+              const isEmSeparacaoTelevendas = chamado.status === "Em separação";
+              const isProntoTelevendas = chamado.status === "Pronto";
+              const isEmAtendimentoOperacional = chamado.status === "Em atendimento";
+              const isEmAtendimento = isEmAtendimentoOperacional || isEmSeparacaoTelevendas;
               const isFinalizado = chamado.status === "Finalizado";
               const isAssumido = isSameOperatorName(chamado.operador_nome, operadorNome);
               const estimate = timeEstimates.estimates[chamado.id];
               const remainingMin = timeEstimates.tempoRestanteEmAtendimento[chamado.id];
 
               let indicatorColor = "bg-amber-400";
+              if (isTelevendas) indicatorColor = "bg-indigo-500";
               if (isUrgente && !isFinalizado) indicatorColor = "bg-red-500";
               else if (isEmAtendimento) indicatorColor = "bg-emerald-500";
               else if (isFinalizado) indicatorColor = "bg-slate-400";
@@ -603,6 +653,9 @@ export default function OperadorPanel({
               if (isUrgente && !isFinalizado) {
                 cardBorder = "border-red-200";
                 cardBg = "bg-red-50/60";
+              } else if (isTelevendas) {
+                cardBorder = "border-indigo-200";
+                cardBg = "bg-indigo-50/60";
               } else if (isEmAtendimento) {
                 cardBorder = "border-emerald-200";
                 cardBg = "bg-emerald-50/60";
@@ -669,6 +722,11 @@ export default function OperadorPanel({
                       {isAssumido && !isFinalizado && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
                           👷 Assumido
+                        </span>
+                      )}
+                      {isTelevendas && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                          📞 Televendas
                         </span>
                       )}
 
@@ -740,7 +798,7 @@ export default function OperadorPanel({
                       </div>
 
                       <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-                        {isAguardando && !chamado.operador_nome && (
+                        {(isAguardandoOperacional || isAbertoTelevendas) && !chamado.operador_nome && (
                           <button
                             onClick={() => {
                               void runAction(`assumir-${chamado.id}`, () =>
@@ -763,7 +821,7 @@ export default function OperadorPanel({
                           </button>
                         )}
 
-                        {isAguardando && Boolean(chamado.operador_nome) && (
+                        {isAguardandoOperacional && Boolean(chamado.operador_nome) && !isTelevendas && (
                           <>
                             {!chamado.a_caminho_em && (
                               <button
@@ -796,7 +854,7 @@ export default function OperadorPanel({
                           </>
                         )}
 
-                        {isAguardando && Boolean(chamado.operador_nome) && (
+                        {(isAguardandoOperacional || isEmSeparacaoTelevendas) && Boolean(chamado.operador_nome) && (
                           <button
                             onClick={() => {
                               void runAction(`iniciar-${chamado.id}`, () =>
@@ -806,11 +864,11 @@ export default function OperadorPanel({
                             disabled={loadingActionId === `iniciar-${chamado.id}`}
                             className="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-400 active:scale-95 sm:w-auto sm:text-sm"
                           >
-                            {loadingActionId === `iniciar-${chamado.id}` ? "Iniciando..." : "Iniciar"}
+                            {loadingActionId === `iniciar-${chamado.id}` ? "Iniciando..." : isTelevendas ? "Marcar pronto" : "Iniciar"}
                           </button>
                         )}
 
-                        {isEmAtendimento && Boolean(chamado.operador_nome) && (
+                        {(isEmAtendimentoOperacional || isProntoTelevendas) && Boolean(chamado.operador_nome) && (
                           <button
                             onClick={() => {
                               void runAction(`finalizar-${chamado.id}`, () =>

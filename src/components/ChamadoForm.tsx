@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Prioridade, Setor, TipoServico } from "../types/chamado";
-import { PRIORIDADES, TIPOS_SERVICO } from "../types/chamado";
+import type { CategoriaChamado, Prioridade, Setor, TipoServico } from "../types/chamado";
+import { PRIORIDADES, TIPOS_SERVICO_OPERACIONAIS } from "../types/chamado";
 import type { NovoChamadoInput } from "../hooks/useChamados";
 import type { Supermercado } from "../types/supermercado";
 
@@ -39,9 +39,16 @@ export default function ChamadoForm({
   onCancel,
 }: ChamadoFormProps) {
   const [nomeSolicitante, setNomeSolicitante] = useState(solicitanteNome || "");
+  const [categoria, setCategoria] = useState<CategoriaChamado>("operacional");
   const [setor, setSetor] = useState<Setor>("");
   const [localExato, setLocalExato] = useState("");
   const [tipoServico, setTipoServico] = useState<TipoServico>("Descarga");
+  const [numeroPedido, setNumeroPedido] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [produto, setProduto] = useState("");
+  const [quantidade, setQuantidade] = useState("");
+  const [localSeparacao, setLocalSeparacao] = useState("");
+  const [prazoLimite, setPrazoLimite] = useState("");
   const [prioridade, setPrioridade] = useState<Prioridade>("Normal");
   const [observacoes, setObservacoes] = useState("");
   const [fotoNome, setFotoNome] = useState<string | null>(null);
@@ -49,6 +56,7 @@ export default function ChamadoForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isTelevendas = solicitantePerfil === "Televendas";
+  const isModoTelevendas = categoria === "televendas";
 
   useEffect(() => {
     setNomeSolicitante((prev) => (prev.trim() ? prev : solicitanteNome || ""));
@@ -56,6 +64,7 @@ export default function ChamadoForm({
 
   useEffect(() => {
     if (isTelevendas) {
+      setCategoria("televendas");
       setTipoServico("Atendimento Televendas");
     }
   }, [isTelevendas]);
@@ -107,8 +116,23 @@ export default function ChamadoForm({
     if (!setor.trim()) {
       newErrors.setor = "Informe o setor.";
     }
-    if (!localExato.trim()) {
+    if (!isModoTelevendas && !localExato.trim()) {
       newErrors.local = "Informe o local exato.";
+    }
+    if (isModoTelevendas && !numeroPedido.trim()) {
+      newErrors.numeroPedido = "Informe o número do pedido.";
+    }
+    if (isModoTelevendas && !cliente.trim()) {
+      newErrors.cliente = "Informe o cliente.";
+    }
+    if (isModoTelevendas && !produto.trim()) {
+      newErrors.produto = "Informe o produto.";
+    }
+    if (isModoTelevendas && !localSeparacao.trim()) {
+      newErrors.localSeparacao = "Informe o local de separação.";
+    }
+    if (isModoTelevendas && !prazoLimite.trim()) {
+      newErrors.prazoLimite = "Informe o prazo/horário limite.";
     }
     if (isAdminGeral && !supermercadoSelecionadoId) {
       newErrors.supermercado = "Selecione o supermercado.";
@@ -123,10 +147,17 @@ export default function ChamadoForm({
       setIsSubmitting(true);
       setErrors({});
       await onSubmit({
+        categoria,
         solicitante_nome: nomeSolicitante.trim(),
         setor: setor.trim(),
-        local_exato: localExato.trim(),
-        tipo_servico: tipoServico,
+        local_exato: isModoTelevendas ? localSeparacao.trim() : localExato.trim(),
+        tipo_servico: isModoTelevendas ? "Atendimento Televendas" : tipoServico,
+        numero_pedido: isModoTelevendas ? numeroPedido.trim() : null,
+        cliente: isModoTelevendas ? cliente.trim() : null,
+        produto: isModoTelevendas ? produto.trim() : null,
+        quantidade: isModoTelevendas ? quantidade.trim() : null,
+        local_separacao: isModoTelevendas ? localSeparacao.trim() : null,
+        prazo_limite: isModoTelevendas ? prazoLimite.trim() : null,
         prioridade,
         observacoes: observacoes.trim() ? observacoes.trim() : null,
         foto_nome: fotoNome,
@@ -208,6 +239,36 @@ export default function ChamadoForm({
             )}
           </div>
 
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Categoria do chamado</label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(["operacional", "televendas"] as CategoriaChamado[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  disabled={isTelevendas}
+                  onClick={() => {
+                    setCategoria(item);
+                    if (item === "televendas") {
+                      setTipoServico("Atendimento Televendas");
+                    } else {
+                      setTipoServico("Descarga");
+                    }
+                  }}
+                  className={`touch-target rounded-2xl border px-4 py-3 text-sm font-bold transition-all ${
+                    categoria === item
+                      ? item === "televendas"
+                        ? "border-indigo-300 bg-indigo-50 text-indigo-700 ring-4 ring-indigo-100"
+                        : "border-[#0f3d75] bg-blue-50 text-[#0f3d75] ring-4 ring-blue-100"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                  } ${isTelevendas ? "cursor-not-allowed opacity-80" : ""}`}
+                >
+                  {item === "televendas" ? "📞 Televendas" : "🏗️ Operacional"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {isAdminGeral && (
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700">Supermercado *</label>
@@ -236,61 +297,180 @@ export default function ChamadoForm({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">Setor *</label>
-              <input
-                type="text"
-                value={setor}
-                onChange={(e) => {
-                  setSetor(e.target.value);
-                  setErrors((prev) => ({ ...prev, setor: "" }));
-                }}
-                placeholder="Ex.: Doca 2"
-                className={`touch-target w-full rounded-2xl border ${
-                  errors.setor ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-                } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-              />
-              {errors.setor && <p className="mt-1 text-xs text-red-500">{errors.setor}</p>}
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">Local exato *</label>
-              <input
-                type="text"
-                value={localExato}
-                onChange={(e) => {
-                  setLocalExato(e.target.value);
-                  setErrors((prev) => ({ ...prev, local: "" }));
-                }}
-                placeholder="Ex.: Corredor 5, perto da rampa"
-                className={`touch-target w-full rounded-2xl border ${
-                  errors.local ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-                } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-              />
-              {errors.local && <p className="mt-1 text-xs text-red-500">{errors.local}</p>}
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Identificação</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Setor *</label>
+                <input
+                  type="text"
+                  value={setor}
+                  onChange={(e) => {
+                    setSetor(e.target.value);
+                    setErrors((prev) => ({ ...prev, setor: "" }));
+                  }}
+                  placeholder={isModoTelevendas ? "Ex.: Televendas" : "Ex.: Doca 2"}
+                  className={`touch-target w-full rounded-2xl border ${
+                    errors.setor ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                  } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                />
+                {errors.setor && <p className="mt-1 text-xs text-red-500">{errors.setor}</p>}
+              </div>
+              {!isModoTelevendas && (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Local exato *</label>
+                  <input
+                    type="text"
+                    value={localExato}
+                    onChange={(e) => {
+                      setLocalExato(e.target.value);
+                      setErrors((prev) => ({ ...prev, local: "" }));
+                    }}
+                    placeholder="Ex.: Corredor 5, perto da rampa"
+                    className={`touch-target w-full rounded-2xl border ${
+                      errors.local ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                    } px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-[#0f3d75] focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                  />
+                  {errors.local && <p className="mt-1 text-xs text-red-500">{errors.local}</p>}
+                </div>
+              )}
             </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">Tipo de serviço</label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {TIPOS_SERVICO.map((tipo) => (
-                <button
-                  key={tipo}
-                  type="button"
-                  onClick={() => setTipoServico(tipo)}
-                  className={`touch-target flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
-                    tipoServico === tipo
-                      ? "border-[#0f3d75] bg-blue-50 text-[#0f3d75] ring-4 ring-blue-100"
-                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-                  }`}
-                >
-                  <span>{tipoIcons[tipo]}</span>
-                  {tipo}
-                </button>
-              ))}
+          {isModoTelevendas ? (
+            <>
+              <div className="space-y-3 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">Dados do pedido</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Número do pedido *</label>
+                    <input
+                      type="text"
+                      value={numeroPedido}
+                      onChange={(e) => {
+                        setNumeroPedido(e.target.value);
+                        setErrors((prev) => ({ ...prev, numeroPedido: "" }));
+                      }}
+                      placeholder="Ex.: PED-2026-1042"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.numeroPedido ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.numeroPedido && <p className="mt-1 text-xs text-red-500">{errors.numeroPedido}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Cliente *</label>
+                    <input
+                      type="text"
+                      value={cliente}
+                      onChange={(e) => {
+                        setCliente(e.target.value);
+                        setErrors((prev) => ({ ...prev, cliente: "" }));
+                      }}
+                      placeholder="Ex.: João Martins"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.cliente ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.cliente && <p className="mt-1 text-xs text-red-500">{errors.cliente}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Produto *</label>
+                    <input
+                      type="text"
+                      value={produto}
+                      onChange={(e) => {
+                        setProduto(e.target.value);
+                        setErrors((prev) => ({ ...prev, produto: "" }));
+                      }}
+                      placeholder="Ex.: Leite Integral 1L"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.produto ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.produto && <p className="mt-1 text-xs text-red-500">{errors.produto}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Quantidade</label>
+                    <input
+                      type="text"
+                      value={quantidade}
+                      onChange={(e) => {
+                        setQuantidade(e.target.value);
+                        setErrors((prev) => ({ ...prev, quantidade: "" }));
+                      }}
+                      placeholder="Ex.: 12 caixas"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.quantidade ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.quantidade && <p className="mt-1 text-xs text-red-500">{errors.quantidade}</p>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">Execução</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Local de separação *</label>
+                    <input
+                      type="text"
+                      value={localSeparacao}
+                      onChange={(e) => {
+                        setLocalSeparacao(e.target.value);
+                        setErrors((prev) => ({ ...prev, localSeparacao: "" }));
+                      }}
+                      placeholder="Ex.: Corredor 12 - Ponta A"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.localSeparacao ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.localSeparacao && (
+                      <p className="mt-1 text-xs text-red-500">{errors.localSeparacao}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Prazo / horário limite *</label>
+                    <input
+                      type="text"
+                      value={prazoLimite}
+                      onChange={(e) => {
+                        setPrazoLimite(e.target.value);
+                        setErrors((prev) => ({ ...prev, prazoLimite: "" }));
+                      }}
+                      placeholder="Ex.: Hoje 16:30"
+                      className={`touch-target w-full rounded-2xl border ${
+                        errors.prazoLimite ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+                      } px-4 py-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100`}
+                    />
+                    {errors.prazoLimite && <p className="mt-1 text-xs text-red-500">{errors.prazoLimite}</p>}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-gray-700">Tipo de serviço</label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {TIPOS_SERVICO_OPERACIONAIS.map((tipo) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => setTipoServico(tipo)}
+                    className={`touch-target flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
+                      tipoServico === tipo
+                        ? "border-[#0f3d75] bg-blue-50 text-[#0f3d75] ring-4 ring-blue-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{tipoIcons[tipo]}</span>
+                    {tipo}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">Prioridade</label>
@@ -320,8 +500,8 @@ export default function ChamadoForm({
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
               placeholder={
-                isTelevendas
-                  ? "Detalhes do pedido de televendas (produto, quantidade, prazo e observações do cliente)."
+                isModoTelevendas
+                  ? "Informe detalhes do pedido: produto, quantidade, cliente, prazo e observações importantes."
                   : "Informações adicionais para agilizar o atendimento (opcional)."
               }
               rows={3}

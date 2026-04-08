@@ -14,6 +14,7 @@ import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
 import OperadorLogin from "./components/OperadorLogin";
 import NotificationToast from "./components/NotificationToast";
 import ProfileSettings from "./components/ProfileSettings";
+import { isEmAtendimentoStatus, isPendenteStatus } from "./utils/chamadoStatus";
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
@@ -226,8 +227,8 @@ export default function App() {
   const dashboardTimeEstimates = useTimeEstimates(dashboardChamados);
   const dashboardStats = useMemo(
     () => ({
-      aguardando: dashboardChamados.filter((c) => c.status === "Aguardando").length,
-      emAtendimento: dashboardChamados.filter((c) => c.status === "Em atendimento").length,
+      aguardando: dashboardChamados.filter((c) => isPendenteStatus(c.status)).length,
+      emAtendimento: dashboardChamados.filter((c) => isEmAtendimentoStatus(c.status)).length,
       finalizadosHoje: dashboardChamados.filter((c) => c.status === "Finalizado").length,
       urgentes: dashboardChamados.filter((c) => c.prioridade === "Urgente" && c.status !== "Finalizado").length,
       setorMaisAcionado: (() => {

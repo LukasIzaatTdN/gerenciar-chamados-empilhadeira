@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Chamado, TipoServico } from "../types/chamado";
 import { TIPOS_SERVICO } from "../types/chamado";
+import { getCategoriaChamado } from "../utils/chamadoStatus";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
 
@@ -279,6 +280,7 @@ function polarToCartesian(centerX: number, centerY: number, radius: number, angl
 
 export default function DashboardProdutividade({ chamados }: DashboardProdutividadeProps) {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("Hoje");
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<"Todos" | "operacional" | "televendas">("Todos");
   const [tipoSelecionado, setTipoSelecionado] = useState<"Todos" | TipoServico>("Todos");
 
   const {
@@ -301,10 +303,16 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
         : isWithinDays(iso, now, 30);
 
     const chamadosFiltradosPorPeriodo = chamados.filter((chamado) => inPeriod(chamado.criado_em));
+    const chamadosFiltradosPorCategoria =
+      categoriaSelecionada === "Todos"
+        ? chamadosFiltradosPorPeriodo
+        : chamadosFiltradosPorPeriodo.filter(
+            (chamado) => getCategoriaChamado(chamado) === categoriaSelecionada
+          );
     const chamadosFiltrados =
       tipoSelecionado === "Todos"
-        ? chamadosFiltradosPorPeriodo
-        : chamadosFiltradosPorPeriodo.filter((chamado) => chamado.tipo_servico === tipoSelecionado);
+        ? chamadosFiltradosPorCategoria
+        : chamadosFiltradosPorCategoria.filter((chamado) => chamado.tipo_servico === tipoSelecionado);
     const urgentesFiltrados = chamadosFiltrados.filter((chamado) => chamado.prioridade === "Urgente");
     const setorMaisAcionado = getTopSetor(chamadosFiltrados);
     const setorData = buildSectorData(chamadosFiltrados);
@@ -358,7 +366,7 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
       ultimosAtendimentos,
       mediaMinPeriodo,
     };
-  }, [chamados, periodo, tipoSelecionado]);
+  }, [chamados, periodo, categoriaSelecionada, tipoSelecionado]);
 
   const cards = [
     {
@@ -416,6 +424,44 @@ export default function DashboardProdutividade({ chamados }: DashboardProdutivid
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoriaSelecionada("Todos")}
+            className={cn(
+              "rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+              categoriaSelecionada === "Todos"
+                ? "bg-slate-900 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            Todas categorias
+          </button>
+          <button
+            type="button"
+            onClick={() => setCategoriaSelecionada("operacional")}
+            className={cn(
+              "rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+              categoriaSelecionada === "operacional"
+                ? "bg-slate-900 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            Operacionais
+          </button>
+          <button
+            type="button"
+            onClick={() => setCategoriaSelecionada("televendas")}
+            className={cn(
+              "rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+              categoriaSelecionada === "televendas"
+                ? "bg-indigo-600 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            Televendas
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setTipoSelecionado("Todos")}

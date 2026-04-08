@@ -3,6 +3,7 @@ import { getSupermercadoById } from "../data/supermercados";
 import type { Supermercado } from "../types/supermercado";
 import type { TimeEstimate } from "../hooks/useTimeEstimates";
 import { formatMinutesLabel, getChamadoTimeMetrics } from "../utils/chamadoMetrics";
+import { isTelevendasChamado } from "../utils/chamadoStatus";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 
 interface ChamadoCardProps {
@@ -57,6 +58,7 @@ export default function ChamadoCard({
   const isUrgente = chamado.prioridade === "Urgente";
   const isEmAtendimento = chamado.status === "Em atendimento";
   const isFinalizado = chamado.status === "Finalizado";
+  const isTelevendas = isTelevendasChamado(chamado);
 
   const tipoIcons: Record<string, string> = {
     Descarga: "📦",
@@ -88,6 +90,34 @@ export default function ChamadoCard({
       dot: "bg-emerald-500",
       label: "Finalizado",
       ring: "from-emerald-500/90 via-emerald-300/80 to-transparent",
+    },
+    Aberto: {
+      bg: "bg-indigo-100",
+      text: "text-indigo-900",
+      dot: "bg-indigo-500",
+      label: "Aberto",
+      ring: "from-indigo-500/90 via-indigo-300/80 to-transparent",
+    },
+    "Em separação": {
+      bg: "bg-cyan-100",
+      text: "text-cyan-900",
+      dot: "bg-cyan-500",
+      label: "Em separação",
+      ring: "from-cyan-500/90 via-cyan-300/80 to-transparent",
+    },
+    Pronto: {
+      bg: "bg-blue-100",
+      text: "text-blue-900",
+      dot: "bg-blue-500",
+      label: "Pronto",
+      ring: "from-blue-500/90 via-blue-300/80 to-transparent",
+    },
+    Cancelado: {
+      bg: "bg-slate-200",
+      text: "text-slate-700",
+      dot: "bg-slate-500",
+      label: "Cancelado",
+      ring: "from-slate-500/90 via-slate-300/80 to-transparent",
     },
   };
 
@@ -176,6 +206,8 @@ export default function ChamadoCard({
       className={`group fade-up relative overflow-hidden rounded-[28px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_36px_rgba(15,23,42,0.09)] ${
         isFinalizado
           ? "border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(255,255,255,0.96))] opacity-90"
+          : isTelevendas
+          ? "border-indigo-200 bg-[linear-gradient(145deg,rgba(238,242,255,0.9),rgba(255,255,255,0.98))] shadow-[0_16px_30px_rgba(79,70,229,0.08)]"
           : isUrgente
           ? "border-red-200 bg-[linear-gradient(145deg,rgba(254,242,242,0.96),rgba(255,255,255,0.98))] shadow-[0_16px_30px_rgba(239,68,68,0.08)]"
           : "border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_16px_30px_rgba(15,23,42,0.08)]"
@@ -202,6 +234,11 @@ export default function ChamadoCard({
           {isUrgente && !isFinalizado && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700 shadow-sm">
               🚨 URGENTE
+            </span>
+          )}
+          {isTelevendas && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-sm">
+              📞 Televendas
             </span>
           )}
 
@@ -252,6 +289,40 @@ export default function ChamadoCard({
               <p className={`mt-1 text-sm ${isFinalizado ? "text-slate-400" : "text-slate-600"}`}>
                 Observações: <span className="font-medium">{chamado.observacoes}</span>
               </p>
+            )}
+            {isTelevendas && (
+              <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                {chamado.numero_pedido && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Pedido: {chamado.numero_pedido}
+                  </span>
+                )}
+                {chamado.cliente && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Cliente: {chamado.cliente}
+                  </span>
+                )}
+                {chamado.produto && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Produto: {chamado.produto}
+                  </span>
+                )}
+                {chamado.quantidade && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Qtd: {chamado.quantidade}
+                  </span>
+                )}
+                {chamado.local_separacao && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Separação: {chamado.local_separacao}
+                  </span>
+                )}
+                {chamado.prazo_limite && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700">
+                    Prazo: {chamado.prazo_limite}
+                  </span>
+                )}
+              </div>
             )}
             {chamado.foto_nome && (
               <p className={`mt-1 text-xs ${isFinalizado ? "text-slate-400" : "text-slate-500"}`}>

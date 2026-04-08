@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Chamado } from "../types/chamado";
 import type { TipoServico } from "../types/chamado";
 import { TIPOS_SERVICO } from "../types/chamado";
+import { getCategoriaChamado } from "../utils/chamadoStatus";
 import type { FilterStatus } from "../hooks/useChamados";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import type { Supermercado } from "../types/supermercado";
@@ -31,13 +32,21 @@ export default function ChamadoList({
   showSupermercado,
   supermercados = [],
 }: ChamadoListProps) {
+  const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">("Todos");
   const [filterTipo, setFilterTipo] = useState<"Todos" | TipoServico>("Todos");
+  const chamadosFiltradosPorCategoria = useMemo(
+    () =>
+      filterCategoria === "Todos"
+        ? chamados
+        : chamados.filter((chamado) => getCategoriaChamado(chamado) === filterCategoria),
+    [chamados, filterCategoria]
+  );
   const chamadosFiltradosPorTipo = useMemo(
     () =>
       filterTipo === "Todos"
-        ? chamados
-        : chamados.filter((chamado) => chamado.tipo_servico === filterTipo),
-    [chamados, filterTipo]
+        ? chamadosFiltradosPorCategoria
+        : chamadosFiltradosPorCategoria.filter((chamado) => chamado.tipo_servico === filterTipo),
+    [chamadosFiltradosPorCategoria, filterTipo]
   );
 
   return (
@@ -62,6 +71,38 @@ export default function ChamadoList({
       </div>
 
       <div className="overflow-x-auto pb-1">
+        <div className="mb-2 inline-flex min-w-full gap-2 rounded-[20px] border border-slate-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:min-w-0">
+          <button
+            onClick={() => setFilterCategoria("Todos")}
+            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              filterCategoria === "Todos"
+                ? "bg-slate-900 text-white"
+                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            onClick={() => setFilterCategoria("operacional")}
+            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              filterCategoria === "operacional"
+                ? "bg-slate-900 text-white"
+                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            Operacionais
+          </button>
+          <button
+            onClick={() => setFilterCategoria("televendas")}
+            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              filterCategoria === "televendas"
+                ? "bg-indigo-600 text-white"
+                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            Televendas
+          </button>
+        </div>
         <div className="inline-flex min-w-full gap-2 rounded-[20px] border border-slate-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:min-w-0">
           <button
             onClick={() => setFilterTipo("Todos")}
