@@ -31,7 +31,6 @@ interface OperadorPanelProps {
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
-  onSimulateProximo: () => void;
   syncError?: string | null;
 }
 
@@ -101,7 +100,6 @@ export default function OperadorPanel({
   onMarkAsRead,
   onMarkAllAsRead,
   onClearAll,
-  onSimulateProximo,
   syncError = null,
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
@@ -359,16 +357,6 @@ export default function OperadorPanel({
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="mb-4">
-          <button
-            onClick={onSimulateProximo}
-            className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-400/12 px-4 py-3 text-sm font-semibold text-amber-100 transition-all hover:bg-amber-400/18"
-          >
-            <span>📍</span>
-            <span>Sinalizar Próximo</span>
-          </button>
         </div>
 
         {actionError && (

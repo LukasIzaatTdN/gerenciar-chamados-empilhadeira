@@ -147,12 +147,13 @@ export default function Header({
               <button
                 onClick={onOpenLogin}
                 className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 lg:px-5"
+                hidden={perfilAcesso === "Administrador Geral"}
               >
                 <span>🔐</span>
                 <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>
               </button>
 
-              {showOperatorAction && (
+              {showOperatorAction && perfilAcesso !== "Administrador Geral" && (
                 <button
                   onClick={onOperadorPanel}
                   className={getActionClassName(perfilAcesso === "Operador")}
@@ -233,12 +234,13 @@ export default function Header({
                 <button
                   onClick={onOpenLogin}
                   className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
+                  hidden={perfilAcesso === "Administrador Geral"}
                 >
                   <span>🔐</span>
                   <span>{perfilAcesso ? "Trocar Usuário" : "Entrar"}</span>
                 </button>
 
-                {showOperatorAction && (
+                {showOperatorAction && perfilAcesso !== "Administrador Geral" && (
                   <button
                     onClick={onOperadorPanel}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${

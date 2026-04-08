@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getSupermercadoById } from "./data/supermercados";
 import Header from "./components/Header";
 import AdminScopeSelector from "./components/AdminScopeSelector";
@@ -712,10 +712,6 @@ export default function App() {
     openLoginModal();
   }
 
-  function handleOpenChamadosManager() {
-    navigateTo("geral");
-  }
-
   async function handleOperadorSupermercadoChange(nextSupermercadoId: string) {
     if (!usuarioAtual) return;
     if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
@@ -763,34 +759,6 @@ export default function App() {
     notify("perfil_atualizado", "Status atualizado", "Status do usuário alterado com sucesso.");
   }
 
-  // Simulate "operator nearby" notification
-  const handleSimulateProximo = useCallback(() => {
-    // Find the first pending chamado that this operator has assumed or any pending
-    const meusChamados = allChamados.filter(
-      (c) =>
-        c.operador_nome === operadorNome &&
-        (c.status === "Aguardando" || c.status === "Em atendimento")
-    );
-
-    const target = meusChamados[0];
-    if (target) {
-      notify(
-        "operador_proximo",
-        "Operador Próximo!",
-        `${operadorNome} está se dirigindo ao setor ${target.setor} para ${target.tipo_servico}`,
-        target.id
-      );
-    } else {
-      // General broadcast
-      notify(
-        "operador_proximo",
-        "Operador Disponível",
-        `${operadorNome} está disponível e próximo para atender chamados`,
-        undefined
-      );
-    }
-  }, [allChamados, operadorNome, notify]);
-
   if (hasFirebaseConfig && !authHydrated) {
     return (
       <div className="app-page min-h-screen bg-transparent">
@@ -835,7 +803,6 @@ export default function App() {
           onMarkAsRead={markAsRead}
           onMarkAllAsRead={markAllAsRead}
           onClearAll={clearAll}
-          onSimulateProximo={handleSimulateProximo}
           syncError={syncError}
         />
         {renderGlobalOverlays()}
@@ -965,24 +932,6 @@ export default function App() {
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-700">{dashboardPeriodHint}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={goBackToPreviousView}
-                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-                >
-                  <span>📋</span>
-                  <span>Ir para Fila</span>
-                </button>
-                {canViewAllUnits && (
-                  <button
-                    type="button"
-                    onClick={handleOpenChamadosManager}
-                    className="touch-target inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 shadow-[0_10px_24px_rgba(59,130,246,0.12)] transition-all hover:bg-blue-100"
-                  >
-                    <span>🗂️</span>
-                    <span>Gerenciar chamados</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -1235,15 +1184,6 @@ export default function App() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/92 px-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:hidden">
         <div className="app-main overflow-x-auto pb-0.5">
           <div className="flex min-w-max items-center gap-2">
-          {isAuthenticated && (
-            <button
-              onClick={handleAccessProfile}
-              className="touch-target flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
-              aria-label="Abrir perfil e configurações"
-            >
-              ⚙️
-            </button>
-          )}
           {(permissions.canViewUnitDashboard || permissions.canViewAllUnits) && (
             <button
               onClick={handleDashboardAccess}
