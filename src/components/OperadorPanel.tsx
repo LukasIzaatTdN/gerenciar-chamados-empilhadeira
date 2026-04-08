@@ -22,9 +22,8 @@ interface OperadorPanelProps {
   onMarcarChegada: (id: string, operadorNome: string) => void | Promise<void>;
   onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
-  onVoltar: () => void;
-  backLabel?: string;
   onAccessProfile: () => void;
+  onTrocarUsuario: () => void;
   onLogout: () => void;
   timeEstimates: TimeEstimatesResult;
   notifications: AppNotification[];
@@ -93,9 +92,8 @@ export default function OperadorPanel({
   onMarcarChegada,
   onIniciar,
   onFinalizar,
-  onVoltar,
-  backLabel = "Voltar",
   onAccessProfile,
+  onTrocarUsuario,
   onLogout,
   timeEstimates,
   notifications,
@@ -279,15 +277,8 @@ export default function OperadorPanel({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <button
-                onClick={onSimulateProximo}
-                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-400/12 px-4 py-3 text-xs font-medium text-amber-100 transition-all hover:bg-amber-400/18 sm:w-auto sm:text-sm"
-              >
-                <span>📍</span>
-                <span>Sinalizar Próximo</span>
-              </button>
-
+            <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto">
+              <div className="flex min-w-max items-center gap-2 lg:justify-end">
               <NotificationCenter
                 notifications={notifications}
                 unreadCount={unreadCount}
@@ -298,28 +289,29 @@ export default function OperadorPanel({
               />
 
               <button
-                onClick={onVoltar}
-                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/85 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
+                onClick={onAccessProfile}
+                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 sm:text-sm"
               >
-                <span>←</span>
-                <span>{backLabel}</span>
+                <span>⚙️</span>
+                <span>Perfil</span>
               </button>
 
               <button
-                onClick={onAccessProfile}
-                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-xs font-medium text-white/85 transition-all hover:bg-white/14 hover:text-white sm:w-auto sm:text-sm"
+                onClick={onTrocarUsuario}
+                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 sm:text-sm"
               >
-                <span>⚙️</span>
-                <span>Configurações</span>
+                <span>🔐</span>
+                <span>Trocar usuário</span>
               </button>
 
               <button
                 onClick={onLogout}
-                className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-red-300/25 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-100 transition-all hover:bg-red-500/16 sm:w-auto sm:text-sm"
+                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-red-300/25 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-100 transition-all hover:bg-red-500/16 active:scale-95 sm:text-sm"
               >
                 <span>⎋</span>
                 <span>Sair</span>
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -367,6 +359,16 @@ export default function OperadorPanel({
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <button
+            onClick={onSimulateProximo}
+            className="touch-target flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-400/12 px-4 py-3 text-sm font-semibold text-amber-100 transition-all hover:bg-amber-400/18"
+          >
+            <span>📍</span>
+            <span>Sinalizar Próximo</span>
+          </button>
         </div>
 
         {actionError && (

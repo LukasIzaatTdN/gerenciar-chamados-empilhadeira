@@ -826,9 +826,8 @@ export default function App() {
           onMarcarChegada={marcarChegada}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
-          onVoltar={goBackToPreviousView}
-          backLabel="Voltar"
           onAccessProfile={handleAccessProfile}
+          onTrocarUsuario={openLoginModal}
           onLogout={handleLogoutToLogin}
           timeEstimates={timeEstimates}
           notifications={notifications}
