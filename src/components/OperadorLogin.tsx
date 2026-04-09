@@ -42,6 +42,7 @@ export default function OperadorLogin({
   const [supermercadoId, setSupermercadoId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const supermercadosAtivos = useMemo(
     () => supermercados.filter((item) => item.status === "Ativo"),
@@ -273,19 +274,29 @@ export default function OperadorLogin({
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Senha
                 </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  placeholder="••••••••"
-                  required
-                  className={`w-full rounded-xl border ${
-                    error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
-                  } touch-target px-4 py-3.5 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="••••••••"
+                    required
+                    className={`w-full rounded-xl border ${
+                      error ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"
+                    } touch-target px-4 py-3.5 pr-14 text-base text-slate-900 transition-colors focus:border-blue-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-2 my-auto inline-flex h-10 items-center justify-center rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? "Ocultar" : "Mostrar"}
+                  </button>
+                </div>
               </div>
 
               {authTab === "login" && onFirebaseGoogleLogin && (

@@ -1075,6 +1075,112 @@ export default function App() {
       />
 
       <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
+        {!isAuthenticated && (
+          <section className="mb-6 overflow-hidden rounded-[34px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(241,245,249,0.96))] shadow-[0_22px_54px_rgba(15,23,42,0.08)]">
+            <div className="grid gap-0 lg:grid-cols-[1.18fr_0.82fr]">
+              <div className="relative overflow-hidden p-6 sm:p-8">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,61,117,0.1),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.08),transparent_30%)]" />
+                <div className="relative">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                    Sessão encerrada com segurança
+                  </div>
+
+                  <h2 className="mt-4 max-w-3xl text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                    Retome a operação em poucos segundos
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                    Entre novamente para abrir chamados, acompanhar pedidos de televendas,
+                    operar a fila da unidade e acessar a gestão conforme o seu perfil.
+                  </p>
+
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={openLoginModal}
+                      className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_32px_rgba(15,23,42,0.22)] transition hover:brightness-110"
+                    >
+                      <span>🔐</span>
+                      Entrar no sistema
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openLoginModal}
+                      className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.05)] transition hover:bg-slate-50"
+                    >
+                      <span>👤</span>
+                      Criar conta ou trocar usuário
+                    </button>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    {[
+                      { label: "Fluxo operacional", value: "Fila por unidade" },
+                      { label: "Televendas", value: "Pedidos com itens e faltas" },
+                      { label: "Gestão", value: "Dashboard e administração" },
+                    ].map((card) => (
+                      <div
+                        key={card.label}
+                        className="rounded-[24px] border border-white/70 bg-white/82 px-4 py-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-sm"
+                      >
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                          {card.label}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">{card.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-[linear-gradient(180deg,rgba(15,61,117,0.06),rgba(249,250,251,0.78))] p-6 sm:p-8 lg:border-l lg:border-t-0">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Perfis e acessos
+                </p>
+                <div className="mt-4 grid gap-3">
+                  {[
+                    {
+                      icon: "📝",
+                      title: "Promotor e Funcionário",
+                      description: "Abertura e acompanhamento das próprias solicitações da unidade.",
+                    },
+                    {
+                      icon: "📞",
+                      title: "Televendas",
+                      description: "Pedidos com itens, separação parcial, faltas e acompanhamento dedicado.",
+                    },
+                    {
+                      icon: "👷",
+                      title: "Operador",
+                      description: "Fila operacional, execução do atendimento e conferência de itens.",
+                    },
+                    {
+                      icon: "📈",
+                      title: "Supervisor e Administrador",
+                      description: "Visão gerencial, dashboards, usuários e supermercados.",
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-[24px] border border-white/70 bg-white/88 px-4 py-4 shadow-[0_10px_22px_rgba(15,23,42,0.05)]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#1e3a5f)] text-lg text-white shadow-[0_10px_20px_rgba(15,23,42,0.16)]">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{item.title}</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {canViewAllUnits && (
           <AdminScopeSelector
             value={adminSupermercadoFiltro}
@@ -1158,7 +1264,8 @@ export default function App() {
           </>
         )}
 
-        {!permissions.canCreateChamado &&
+        {isAuthenticated &&
+          !permissions.canCreateChamado &&
           !permissions.canAccessOperatorPanel &&
           !permissions.canViewUnitDashboard &&
           !permissions.canTrackOwnChamados && (
