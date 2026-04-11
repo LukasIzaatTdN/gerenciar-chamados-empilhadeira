@@ -302,6 +302,11 @@ export default function ChamadoCard({
                 Observações: <span className="font-medium">{chamado.observacoes}</span>
               </p>
             )}
+            {chamado.empilhadeira_identificacao && (
+              <p className={`mt-1 text-sm ${isFinalizado ? "text-slate-400" : "text-slate-600"}`}>
+                Empilhadeira: <span className="font-medium">{chamado.empilhadeira_identificacao}</span>
+              </p>
+            )}
             {isTelevendas && (
               <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
                 {chamado.numero_pedido && (

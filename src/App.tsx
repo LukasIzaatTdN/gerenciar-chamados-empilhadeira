@@ -8,6 +8,8 @@ import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
 import SupermercadosAdmin from "./components/SupermercadosAdmin";
 import UsuariosAdmin from "./components/UsuariosAdmin";
+import EmpilhadeirasAdmin from "./components/EmpilhadeirasAdmin";
+import ManutencoesAdmin from "./components/ManutencoesAdmin";
 import ChamadoForm from "./components/ChamadoForm";
 import ChamadoList from "./components/ChamadoList";
 import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
@@ -20,6 +22,9 @@ import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
 import { useSupermercados } from "./hooks/useSupermercados";
 import { useUsuarios } from "./hooks/useUsuarios";
+import { useEmpilhadeiras } from "./hooks/useEmpilhadeiras";
+import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
+import { useManutencoes } from "./hooks/useManutencoes";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -31,11 +36,26 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import type { Chamado } from "./types/chamado";
+import type { EmpilhadeiraStatus } from "./types/empilhadeira";
+import type {
+  ManutencaoPrioridade,
+  ManutencaoStatus,
+  ManutencaoTipo,
+  NovaManutencaoInput,
+} from "./types/manutencao";
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
 
-type View = "geral" | "operador" | "perfil" | "dashboard" | "supermercados" | "usuarios";
+type View =
+  | "geral"
+  | "operador"
+  | "perfil"
+  | "dashboard"
+  | "supermercados"
+  | "usuarios"
+  | "empilhadeiras"
+  | "manutencoes";
 type ThemeMode = "light" | "dark";
 type DashboardPeriod = "hoje" | "7d" | "30d";
 
@@ -113,6 +133,7 @@ export default function App() {
     updateUsuarioAdmin,
     toggleUsuarioStatus,
   } = useUsuarios();
+  const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
@@ -127,6 +148,23 @@ export default function App() {
     canViewAllUnits && adminSupermercadoFiltro === "todos"
       ? "Todas as unidades"
       : getSupermercadoById(supermercadoSelecionadoId, supermercados)?.nome ?? supermercadoNome ?? "Unidade não definida";
+  const {
+    empilhadeiras,
+    createEmpilhadeira,
+    updateEmpilhadeira,
+    updateEmpilhadeiraStatus,
+  } = useEmpilhadeiras({
+    supermercadoId: supermercadoSelecionadoId,
+    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+  });
+  const { checklists, createChecklist } = useChecklistsEmpilhadeira({
+    supermercadoId: supermercadoSelecionadoId,
+    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+  });
+  const { manutencoes, createManutencao, updateManutencao } = useManutencoes({
+    supermercadoId: supermercadoSelecionadoId,
+    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+  });
 
   // Notification system
   const {
@@ -693,6 +731,128 @@ export default function App() {
     await toggleSupermercadoStatus(id);
   }
 
+  async function handleCreateEmpilhadeira(input: {
+    empresa_id: string;
+    supermercado_id: string;
+    identificacao: string;
+    modelo: string;
+    numero_interno: string;
+    status: EmpilhadeiraStatus;
+    observacoes: string;
+  }) {
+    await createEmpilhadeira(input);
+  }
+
+  async function handleUpdateEmpilhadeira(
+    id: string,
+    input: {
+      empresa_id: string;
+      supermercado_id: string;
+      identificacao: string;
+      modelo: string;
+      numero_interno: string;
+      status: EmpilhadeiraStatus;
+      observacoes: string;
+    }
+  ) {
+    await updateEmpilhadeira(id, input);
+  }
+
+  async function handleUpdateEmpilhadeiraStatus(
+    id: string,
+    status: EmpilhadeiraStatus
+  ) {
+    await updateEmpilhadeiraStatus(id, status);
+  }
+
+  async function handleCreateChecklistEmpilhadeira(input: {
+    supermercado_id: string;
+    empilhadeira_id: string;
+    operador_id: string;
+    operador_nome: string;
+    data: string;
+    bateria_ok: boolean;
+    garfo_ok: boolean;
+    pneus_ok: boolean;
+    freio_ok: boolean;
+    sem_avaria: boolean;
+    observacoes?: string | null;
+  }) {
+    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+    if (!empilhadeira) {
+      throw new Error("Empilhadeira não encontrada para registrar o checklist.");
+    }
+
+    await createChecklist(input, empilhadeira);
+  }
+
+  async function handleReportarProblemaEmpilhadeira(input: {
+    empilhadeira_id: string;
+    descricao: string;
+    prioridade: ManutencaoPrioridade;
+    statusEmpilhadeira: "Necessita atenção" | "Em manutenção";
+  }) {
+    if (!usuarioAtual) {
+      throw new Error("Faça login novamente para reportar o problema.");
+    }
+
+    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+    if (!empilhadeira) {
+      throw new Error("Empilhadeira não encontrada.");
+    }
+
+    if (!canViewAllUnits && supermercadoId !== empilhadeira.supermercado_id) {
+      throw new Error("Você só pode reportar problemas da sua própria unidade.");
+    }
+
+    await createManutencao(
+      {
+        supermercado_id: empilhadeira.supermercado_id,
+        empilhadeira_id: empilhadeira.id,
+        tipo: "Corretiva",
+        descricao: input.descricao,
+        prioridade: input.prioridade,
+        status: "Aberta",
+        responsavel: null,
+        data_abertura: new Date().toISOString(),
+        criado_por: usuarioAtual.nome,
+        observacoes: `Ocorrência aberta via painel do operador. Status sugerido: ${input.statusEmpilhadeira}.`,
+      },
+      empilhadeira
+    );
+
+    await updateEmpilhadeiraStatus(empilhadeira.id, input.statusEmpilhadeira);
+  }
+
+  async function handleCreateManutencao(input: {
+    supermercado_id: string;
+    empilhadeira_id: string;
+    tipo: ManutencaoTipo;
+    descricao: string;
+    prioridade: ManutencaoPrioridade;
+    status: ManutencaoStatus;
+    responsavel?: string | null;
+    data_abertura: string;
+    data_prevista?: string | null;
+    data_conclusao?: string | null;
+    criado_por: string;
+    observacoes?: string | null;
+  }) {
+    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+    if (!empilhadeira) {
+      throw new Error("Empilhadeira não encontrada para abrir a manutenção.");
+    }
+
+    await createManutencao(input, empilhadeira);
+  }
+
+  async function handleUpdateManutencao(
+    id: string,
+    input: Partial<NovaManutencaoInput>
+  ) {
+    await updateManutencao(id, input);
+  }
+
   function handleOpenSupermercadosAdmin() {
     if (permissions.canViewAllUnits) {
       navigateTo("supermercados");
@@ -702,6 +862,18 @@ export default function App() {
   function handleOpenUsuariosAdmin() {
     if (permissions.canViewAllUnits) {
       navigateTo("usuarios");
+    }
+  }
+
+  function handleOpenEmpilhadeirasAdmin() {
+    if (isAuthenticated && permissions.canAccessOperatorPanel) {
+      navigateTo("empilhadeiras");
+    }
+  }
+
+  function handleOpenManutencoes() {
+    if (isAuthenticated && permissions.canAccessOperatorPanel) {
+      navigateTo("manutencoes");
     }
   }
 
@@ -787,7 +959,12 @@ export default function App() {
       <>
         <OperadorPanel
           chamados={allChamados}
+          empilhadeiras={empilhadeiras}
+          checklists={checklists}
+          manutencoes={manutencoes}
+          operadorId={operadorId ?? ""}
           operadorNome={operadorNome}
+          supermercadoId={supermercadoId}
           supermercadoNome={supermercadoNome}
           operadorStatus={operadorStatus}
           onStatusChange={setOperadorStatus}
@@ -797,6 +974,8 @@ export default function App() {
           onAtualizarItensTelevendas={atualizarItensTelevendas}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
+          onCreateChecklist={handleCreateChecklistEmpilhadeira}
+          onReportarProblema={handleReportarProblemaEmpilhadeira}
           onAccessProfile={handleAccessProfile}
           onTrocarUsuario={openLoginModal}
           onLogout={handleLogoutToLogin}
@@ -851,6 +1030,8 @@ export default function App() {
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
           onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -866,6 +1047,8 @@ export default function App() {
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showSupermercadosAction={canViewAllUnits}
+          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+          showManutencoesAction={permissions.canAccessOperatorPanel}
         />
 
           <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
@@ -984,6 +1167,8 @@ export default function App() {
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
           onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -999,6 +1184,8 @@ export default function App() {
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showSupermercadosAction={canViewAllUnits}
+          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+          showManutencoesAction={permissions.canAccessOperatorPanel}
         />
         <SupermercadosAdmin
           supermercados={supermercados}
@@ -1020,6 +1207,8 @@ export default function App() {
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
           onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
           onOpenLogin={openLoginModal}
           notifications={notifications}
@@ -1035,6 +1224,8 @@ export default function App() {
           showOperatorAction={permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showSupermercadosAction={canViewAllUnits}
+          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+          showManutencoesAction={permissions.canAccessOperatorPanel}
         />
         <UsuariosAdmin
           usuarios={usuarios}
@@ -1042,6 +1233,120 @@ export default function App() {
           currentAdminId={usuarioAtual?.id ?? null}
           onUpdate={handleUpdateUsuarioAdmin}
           onToggleStatus={handleToggleUsuarioStatus}
+          onVoltar={goBackToPreviousView}
+        />
+        {renderGlobalOverlays()}
+      </>
+    );
+  }
+
+  if (view === "empilhadeiras" && isAuthenticated && permissions.canAccessOperatorPanel) {
+    return (
+      <>
+        <Header
+          onNovoChamado={handleNovoChamadoAccess}
+          onOperadorPanel={handleOperadorAccess}
+          onDashboard={handleDashboardAccess}
+          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
+          onAccessProfile={handleAccessProfile}
+          onOpenLogin={openLoginModal}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClearAll={clearAll}
+          syncMode={hasFirebaseConfig ? "firebase" : "local"}
+          perfilAcesso={perfilAcesso}
+          usuarioNome={operadorNome}
+          supermercadoNome={supermercadoNome}
+          showCreateAction={permissions.canCreateChamado}
+          showOperatorAction={permissions.canAccessOperatorPanel}
+          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showSupermercadosAction={canViewAllUnits}
+          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+          showManutencoesAction={permissions.canAccessOperatorPanel}
+        />
+        {canViewAllUnits && (
+          <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
+            <AdminScopeSelector
+              value={adminSupermercadoFiltro}
+              onChange={setAdminSupermercadoFiltro}
+              supermercados={supermercados}
+            />
+          </div>
+        )}
+        <EmpilhadeirasAdmin
+          empilhadeiras={empilhadeiras}
+          chamados={allChamados}
+          checklists={checklists}
+          manutencoes={manutencoes}
+          supermercados={supermercados}
+          isAdminGeral={canViewAllUnits}
+          canManage={canViewAllUnits}
+          canManageStatus={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          currentSupermercadoId={supermercadoSelecionadoId}
+          currentSupermercadoNome={unidadeAtualNome}
+          onCreate={handleCreateEmpilhadeira}
+          onUpdate={handleUpdateEmpilhadeira}
+          onUpdateStatus={handleUpdateEmpilhadeiraStatus}
+          onVoltar={goBackToPreviousView}
+        />
+        {renderGlobalOverlays()}
+      </>
+    );
+  }
+
+  if (view === "manutencoes" && isAuthenticated && permissions.canAccessOperatorPanel) {
+    return (
+      <>
+        <Header
+          onNovoChamado={handleNovoChamadoAccess}
+          onOperadorPanel={handleOperadorAccess}
+          onDashboard={handleDashboardAccess}
+          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
+          onAccessProfile={handleAccessProfile}
+          onOpenLogin={openLoginModal}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClearAll={clearAll}
+          syncMode={hasFirebaseConfig ? "firebase" : "local"}
+          perfilAcesso={perfilAcesso}
+          usuarioNome={operadorNome}
+          supermercadoNome={supermercadoNome}
+          showCreateAction={permissions.canCreateChamado}
+          showOperatorAction={permissions.canAccessOperatorPanel}
+          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showSupermercadosAction={canViewAllUnits}
+          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+          showManutencoesAction={permissions.canAccessOperatorPanel}
+        />
+        {canViewAllUnits && (
+          <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
+            <AdminScopeSelector
+              value={adminSupermercadoFiltro}
+              onChange={setAdminSupermercadoFiltro}
+              supermercados={supermercados}
+            />
+          </div>
+        )}
+        <ManutencoesAdmin
+          manutencoes={manutencoes}
+          empilhadeiras={empilhadeiras}
+          supermercados={supermercados}
+          isAdminGeral={canViewAllUnits}
+          canCreate={permissions.canAccessOperatorPanel}
+          canEdit={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          currentSupermercadoId={supermercadoSelecionadoId}
+          currentSupermercadoNome={unidadeAtualNome}
+          createdByName={operadorNome ?? "Sistema"}
+          onCreate={handleCreateManutencao}
+          onUpdate={handleUpdateManutencao}
           onVoltar={goBackToPreviousView}
         />
         {renderGlobalOverlays()}
@@ -1057,6 +1362,8 @@ export default function App() {
         onOperadorPanel={handleOperadorAccess}
         onDashboard={handleDashboardAccess}
         onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+        onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+        onOpenManutencoes={handleOpenManutencoes}
         onAccessProfile={handleAccessProfile}
         onOpenLogin={openLoginModal}
         notifications={notifications}
@@ -1072,6 +1379,8 @@ export default function App() {
         showOperatorAction={permissions.canAccessOperatorPanel}
         showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
         showSupermercadosAction={canViewAllUnits}
+        showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
+        showManutencoesAction={permissions.canAccessOperatorPanel}
       />
 
       <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
@@ -1207,6 +1516,22 @@ export default function App() {
               >
                 <span>👥</span>
                 <span>Gerenciar Usuários</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenEmpilhadeirasAdmin}
+                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+              >
+                <span>🚜</span>
+                <span>Empilhadeiras</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenManutencoes}
+                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+              >
+                <span>🛠️</span>
+                <span>Manutenções</span>
               </button>
             </div>
           </div>

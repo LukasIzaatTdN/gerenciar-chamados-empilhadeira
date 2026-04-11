@@ -7,6 +7,8 @@ interface HeaderProps {
   onOperadorPanel: () => void;
   onDashboard: () => void;
   onOpenSupermercadosAdmin?: () => void;
+  onOpenEmpilhadeiras?: () => void;
+  onOpenManutencoes?: () => void;
   onAccessProfile: () => void;
   onOpenLogin: () => void;
   notifications: AppNotification[];
@@ -22,6 +24,8 @@ interface HeaderProps {
   showOperatorAction: boolean;
   showDashboardAction: boolean;
   showSupermercadosAction?: boolean;
+  showEmpilhadeirasAction?: boolean;
+  showManutencoesAction?: boolean;
 }
 
 export default function Header({
@@ -29,6 +33,8 @@ export default function Header({
   onOperadorPanel,
   onDashboard,
   onOpenSupermercadosAdmin,
+  onOpenEmpilhadeiras,
+  onOpenManutencoes,
   onAccessProfile,
   onOpenLogin,
   notifications,
@@ -44,6 +50,8 @@ export default function Header({
   showOperatorAction,
   showDashboardAction,
   showSupermercadosAction = false,
+  showEmpilhadeirasAction = false,
+  showManutencoesAction = false,
 }: HeaderProps) {
   const firebaseProjectId =
     typeof import.meta.env.VITE_FIREBASE_PROJECT_ID === "string"
@@ -52,8 +60,8 @@ export default function Header({
   const syncLabel =
     syncMode === "firebase"
       ? firebaseProjectId
-        ? `Firebase ativo · ${firebaseProjectId}`
-        : "Firebase ativo"
+        ? `Sincronização ativa · ${firebaseProjectId}`
+        : "Sincronização ativa"
       : "Modo local";
 
   const syncBadgeClassName =
@@ -173,6 +181,18 @@ export default function Header({
                   <span>{dashboardActionLabel}</span>
                 </button>
               )}
+              {showEmpilhadeirasAction && onOpenEmpilhadeiras && (
+                <button onClick={onOpenEmpilhadeiras} className={getActionClassName(false)}>
+                  <span>🚜</span>
+                  <span>Empilhadeiras</span>
+                </button>
+              )}
+              {showManutencoesAction && onOpenManutencoes && (
+                <button onClick={onOpenManutencoes} className={getActionClassName(false)}>
+                  <span>🛠️</span>
+                  <span>Manutenções</span>
+                </button>
+              )}
               {showSupermercadosAction && onOpenSupermercadosAdmin && (
                 <button
                   onClick={onOpenSupermercadosAdmin}
@@ -265,6 +285,25 @@ export default function Header({
                   >
                     <span>📈</span>
                     <span>{dashboardActionLabel}</span>
+                  </button>
+                )}
+
+                {showEmpilhadeirasAction && onOpenEmpilhadeiras && (
+                  <button
+                    onClick={onOpenEmpilhadeiras}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
+                  >
+                    <span>🚜</span>
+                    <span>Empilhadeiras</span>
+                  </button>
+                )}
+                {showManutencoesAction && onOpenManutencoes && (
+                  <button
+                    onClick={onOpenManutencoes}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
+                  >
+                    <span>🛠️</span>
+                    <span>Manutenções</span>
                   </button>
                 )}
 

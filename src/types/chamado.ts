@@ -54,6 +54,8 @@ export interface Chamado {
   observacoes: string | null;
   foto_nome: string | null;
   foto_data_url: string | null;
+  empilhadeira_id: string | null;
+  empilhadeira_identificacao: string | null;
   status: Status;
   operador_nome: string | null;
   criado_em: string;

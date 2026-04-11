@@ -1,5 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { Chamado, ItemTelevendas, Setor } from "../types/chamado";
+import type { ChecklistEmpilhadeira } from "../types/checklistEmpilhadeira";
+import type { Empilhadeira } from "../types/empilhadeira";
+import type { Manutencao, ManutencaoPrioridade } from "../types/manutencao";
+import { isEmpilhadeiraSelecionavelParaChamado } from "../types/empilhadeira";
 import type { AppNotification } from "../types/notification";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
@@ -9,17 +13,33 @@ import NotificationCenter from "./NotificationCenter";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
 import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
+import { getEmpilhadeiraStatusEfetivo } from "../utils/empilhadeiraStatus";
+import { isChecklistEmpilhadeiraAprovado } from "../utils/checklistEmpilhadeira";
 import { getTotaisItensTelevendas, hasItemFaltante, normalizeItensTelevendas } from "../utils/televendasItems";
 
 export type OperadorStatus = "Disponível" | "Pausa";
 
 interface OperadorPanelProps {
   chamados: Chamado[];
+  empilhadeiras: Empilhadeira[];
+  checklists: ChecklistEmpilhadeira[];
+  manutencoes: Manutencao[];
+  operadorId: string;
   operadorNome: string;
+  supermercadoId: string | null;
   supermercadoNome: string | null;
   operadorStatus: OperadorStatus;
   onStatusChange: (status: OperadorStatus) => void;
-  onAssumir: (id: string, operadorNome: string) => void | Promise<void>;
+  onAssumir: (
+    id: string,
+    operadorNome: string,
+    equipamento?: {
+      id: string;
+      identificacao: string;
+      supermercado_id: string;
+      status: Empilhadeira["status"];
+    } | null
+  ) => void | Promise<void>;
   onMarcarACaminho: (id: string, operadorNome: string) => void | Promise<void>;
   onMarcarChegada: (id: string, operadorNome: string) => void | Promise<void>;
   onAtualizarItensTelevendas: (inputId: string, input: {
@@ -29,8 +49,36 @@ interface OperadorPanelProps {
     motivoIncompleto?: string | null;
     observacaoOperador?: string | null;
   }) => void | Promise<void>;
-  onIniciar: (id: string, operadorNome: string) => void | Promise<void>;
+  onIniciar: (
+    id: string,
+    operadorNome: string,
+    equipamento?: {
+      id: string;
+      identificacao: string;
+      supermercado_id: string;
+      status: Empilhadeira["status"];
+    } | null
+  ) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
+  onCreateChecklist: (input: {
+    supermercado_id: string;
+    empilhadeira_id: string;
+    operador_id: string;
+    operador_nome: string;
+    data: string;
+    bateria_ok: boolean;
+    garfo_ok: boolean;
+    pneus_ok: boolean;
+    freio_ok: boolean;
+    sem_avaria: boolean;
+    observacoes?: string | null;
+  }) => void | Promise<void>;
+  onReportarProblema: (input: {
+    empilhadeira_id: string;
+    descricao: string;
+    prioridade: ManutencaoPrioridade;
+    statusEmpilhadeira: "Necessita atenção" | "Em manutenção";
+  }) => void | Promise<void>;
   onAccessProfile: () => void;
   onTrocarUsuario: () => void;
   onLogout: () => void;
@@ -79,6 +127,7 @@ function parseListaProdutos(produto: string | null | undefined): string[] {
 }
 
 type FilterTab = "pendentes" | "meus" | "finalizados";
+type TechnicalTab = "checklist" | "problema";
 
 function normalizeOperatorName(value: string | null | undefined) {
   if (!value) return "";
@@ -99,7 +148,12 @@ function isSameOperatorName(a: string | null | undefined, b: string | null | und
 
 export default function OperadorPanel({
   chamados,
+  empilhadeiras,
+  checklists,
+  manutencoes,
+  operadorId,
   operadorNome,
+  supermercadoId,
   supermercadoNome,
   operadorStatus,
   onStatusChange,
@@ -109,6 +163,8 @@ export default function OperadorPanel({
   onAtualizarItensTelevendas,
   onIniciar,
   onFinalizar,
+  onCreateChecklist,
+  onReportarProblema,
   onAccessProfile,
   onTrocarUsuario,
   onLogout,
@@ -123,8 +179,25 @@ export default function OperadorPanel({
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
   const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">("Todos");
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
+  const [activeTechnicalTab, setActiveTechnicalTab] = useState<TechnicalTab>("checklist");
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const [selectedEmpilhadeiras, setSelectedEmpilhadeiras] = useState<Record<string, string>>({});
+  const [checklistForm, setChecklistForm] = useState({
+    empilhadeira_id: "",
+    bateria_ok: true,
+    garfo_ok: true,
+    pneus_ok: true,
+    freio_ok: true,
+    sem_avaria: true,
+    observacoes: "",
+  });
+  const [problemaForm, setProblemaForm] = useState({
+    empilhadeira_id: "",
+    descricao: "",
+    prioridade: "Media" as ManutencaoPrioridade,
+    statusEmpilhadeira: "Necessita atenção" as "Necessita atenção" | "Em manutenção",
+  });
   const [televendasDrafts, setTelevendasDrafts] = useState<
     Record<
       string,
@@ -273,6 +346,73 @@ export default function OperadorPanel({
     (c) => c.status === "Em atendimento" || c.status === "Em separação" || c.status === "Pronto"
   ).length;
   const chamadoRecomendado = pendentesNaoAssumidos[0] ?? pendentes[0] ?? null;
+  const empilhadeirasChecklist = useMemo(
+    () =>
+      empilhadeiras.filter(
+        (item) => !supermercadoId || item.supermercado_id === supermercadoId
+      ),
+    [empilhadeiras, supermercadoId]
+  );
+  const checklistsHojeOperador = useMemo(() => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    return checklists.filter(
+      (item) => item.operador_id === operadorId && item.data === hoje
+    );
+  }, [checklists, operadorId]);
+
+  async function handleChecklistSubmit() {
+    const empilhadeira = empilhadeiras.find((item) => item.id === checklistForm.empilhadeira_id);
+    if (!empilhadeira) {
+      throw new Error("Selecione uma empilhadeira da sua unidade para registrar o checklist.");
+    }
+
+    await onCreateChecklist({
+      supermercado_id: empilhadeira.supermercado_id,
+      empilhadeira_id: empilhadeira.id,
+      operador_id: operadorId,
+      operador_nome: operadorNome,
+      data: new Date().toISOString().slice(0, 10),
+      bateria_ok: checklistForm.bateria_ok,
+      garfo_ok: checklistForm.garfo_ok,
+      pneus_ok: checklistForm.pneus_ok,
+      freio_ok: checklistForm.freio_ok,
+      sem_avaria: checklistForm.sem_avaria,
+      observacoes: checklistForm.observacoes,
+    });
+
+    setChecklistForm({
+      empilhadeira_id: "",
+      bateria_ok: true,
+      garfo_ok: true,
+      pneus_ok: true,
+      freio_ok: true,
+      sem_avaria: true,
+      observacoes: "",
+    });
+  }
+
+  async function handleProblemaSubmit() {
+    if (!problemaForm.empilhadeira_id) {
+      throw new Error("Selecione a empilhadeira da sua unidade.");
+    }
+    if (!problemaForm.descricao.trim()) {
+      throw new Error("Descreva o problema encontrado na empilhadeira.");
+    }
+
+    await onReportarProblema({
+      empilhadeira_id: problemaForm.empilhadeira_id,
+      descricao: problemaForm.descricao.trim(),
+      prioridade: problemaForm.prioridade,
+      statusEmpilhadeira: problemaForm.statusEmpilhadeira,
+    });
+
+    setProblemaForm({
+      empilhadeira_id: "",
+      descricao: "",
+      prioridade: "Media",
+      statusEmpilhadeira: "Necessita atenção",
+    });
+  }
 
   function getTelevendasDraft(chamado: Chamado) {
     const fromState = televendasDrafts[chamado.id];
@@ -322,6 +462,24 @@ export default function OperadorPanel({
         [key]: value,
       },
     }));
+  }
+
+  function getEmpilhadeiraSelecionada(chamado: Chamado) {
+    const selectedId = selectedEmpilhadeiras[chamado.id] ?? chamado.empilhadeira_id ?? "";
+    if (!selectedId) return null;
+    return (
+      empilhadeiras.find(
+        (item) =>
+          item.id === selectedId &&
+          item.supermercado_id === chamado.supermercado_id &&
+          (
+            isEmpilhadeiraSelecionavelParaChamado(
+              getEmpilhadeiraStatusEfetivo(item, chamados, checklists, manutencoes)
+            ) ||
+            item.id === chamado.empilhadeira_id
+          )
+      ) ?? null
+    );
   }
 
   return (
@@ -573,6 +731,264 @@ export default function OperadorPanel({
           ))}
         </div>
 
+        <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+                Rotina técnica da unidade
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Separe a inspeção antes do turno da abertura de falhas para ganhar agilidade no dia a dia.
+              </p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                type="button"
+                onClick={() => setActiveTechnicalTab("checklist")}
+                className={cn(
+                  "touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-semibold transition-all sm:text-sm",
+                  activeTechnicalTab === "checklist"
+                    ? "bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white shadow-[0_12px_24px_rgba(15,23,42,0.18)]"
+                    : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <span>📝</span>
+                <span>Checklist antes do turno</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTechnicalTab("problema")}
+                className={cn(
+                  "touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-semibold transition-all sm:text-sm",
+                  activeTechnicalTab === "problema"
+                    ? "bg-[linear-gradient(135deg,#7f1d1d,#dc2626)] text-white shadow-[0_12px_24px_rgba(127,29,29,0.18)]"
+                    : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <span>🛠️</span>
+                <span>Reportar problema</span>
+              </button>
+            </div>
+          </div>
+
+          {activeTechnicalTab === "checklist" ? (
+            <div className="mt-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-2xl">
+                  <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Checklist antes do turno
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Registre a inspeção básica diária da empilhadeira da sua unidade antes do uso operacional.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                  Checklists de hoje: <span className="font-bold text-slate-900">{checklistsHojeOperador.length}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
+                <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+                  <select
+                    value={checklistForm.empilhadeira_id}
+                    onChange={(event) =>
+                      setChecklistForm((prev) => ({ ...prev, empilhadeira_id: event.target.value }))
+                    }
+                    className="touch-target rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 focus:border-[#0f3d75] focus:outline-none focus:ring-4 focus:ring-blue-100"
+                  >
+                    <option value="">Selecione a empilhadeira da unidade</option>
+                    {empilhadeirasChecklist.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.identificacao} · {item.modelo}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {[
+                      ["bateria_ok", "Bateria OK"],
+                      ["garfo_ok", "Garfo OK"],
+                      ["pneus_ok", "Pneus OK"],
+                      ["freio_ok", "Freio OK"],
+                      ["sem_avaria", "Sem avaria"],
+                    ].map(([key, label]) => (
+                      <label
+                        key={key}
+                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                      >
+                        <span>{label}</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(checklistForm[key as keyof typeof checklistForm])}
+                          onChange={(event) =>
+                            setChecklistForm((prev) => ({
+                              ...prev,
+                              [key]: event.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-300 text-[#0f3d75] focus:ring-[#0f3d75]"
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <textarea
+                    value={checklistForm.observacoes}
+                    onChange={(event) =>
+                      setChecklistForm((prev) => ({ ...prev, observacoes: event.target.value }))
+                    }
+                    rows={3}
+                    placeholder="Observações do checklist, avarias, ruídos ou alertas identificados."
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-[#0f3d75] focus:outline-none focus:ring-4 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void runAction("checklist-turno", handleChecklistSubmit);
+                    }}
+                    disabled={loadingActionId === "checklist-turno"}
+                    className="touch-target rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.2)]"
+                  >
+                    {loadingActionId === "checklist-turno" ? "Registrando..." : "Registrar checklist"}
+                  </button>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+                  <p className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Últimos checklists do dia
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {checklistsHojeOperador.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                        Nenhum checklist registrado hoje.
+                      </p>
+                    ) : (
+                      checklistsHojeOperador.slice(0, 4).map((checklist) => {
+                        const equipamento = empilhadeiras.find((item) => item.id === checklist.empilhadeira_id);
+                        const aprovado = isChecklistEmpilhadeiraAprovado(checklist);
+
+                        return (
+                          <div
+                            key={checklist.id}
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {equipamento?.identificacao ?? "Empilhadeira"}
+                                </p>
+                                <p className="text-xs text-slate-500">{checklist.data}</p>
+                              </div>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2.5 py-1 text-xs font-semibold",
+                                  aprovado
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-rose-100 text-rose-700"
+                                )}
+                              >
+                                {aprovado ? "Aprovado" : "Necessita atenção"}
+                              </span>
+                            </div>
+                            {checklist.observacoes && (
+                              <p className="mt-2 text-xs text-slate-600">{checklist.observacoes}</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-2xl">
+                  <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-rose-500">
+                    Reportar problema
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Abra rapidamente uma ocorrência corretiva para a empilhadeira da sua unidade e sinalize o status operacional da máquina.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                  Falhas abertas ficam vinculadas à unidade atual.
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <select
+                  value={problemaForm.empilhadeira_id}
+                  onChange={(event) =>
+                    setProblemaForm((prev) => ({ ...prev, empilhadeira_id: event.target.value }))
+                  }
+                  className="touch-target rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 focus:border-rose-500 focus:outline-none focus:ring-4 focus:ring-rose-100"
+                >
+                  <option value="">Selecione a empilhadeira da unidade</option>
+                  {empilhadeirasChecklist.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.identificacao} · {item.modelo}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={problemaForm.prioridade}
+                  onChange={(event) =>
+                    setProblemaForm((prev) => ({
+                      ...prev,
+                      prioridade: event.target.value as ManutencaoPrioridade,
+                    }))
+                  }
+                  className="touch-target rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 focus:border-rose-500 focus:outline-none focus:ring-4 focus:ring-rose-100"
+                >
+                  <option value="Baixa">Baixa</option>
+                  <option value="Media">Media</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Critica">Critica</option>
+                </select>
+
+                <textarea
+                  value={problemaForm.descricao}
+                  onChange={(event) =>
+                    setProblemaForm((prev) => ({ ...prev, descricao: event.target.value }))
+                  }
+                  rows={3}
+                  placeholder="Descreva a falha encontrada, sintomas, risco e impacto na operação."
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-rose-500 focus:outline-none focus:ring-4 focus:ring-rose-100 md:col-span-2"
+                />
+
+                <select
+                  value={problemaForm.statusEmpilhadeira}
+                  onChange={(event) =>
+                    setProblemaForm((prev) => ({
+                      ...prev,
+                      statusEmpilhadeira: event.target.value as "Necessita atenção" | "Em manutenção",
+                    }))
+                  }
+                  className="touch-target rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 focus:border-rose-500 focus:outline-none focus:ring-4 focus:ring-rose-100"
+                >
+                  <option value="Necessita atenção">Sinalizar como Necessita atenção</option>
+                  <option value="Em manutenção">Sinalizar como Em manutenção</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void runAction("reportar-problema", handleProblemaSubmit);
+                  }}
+                  disabled={loadingActionId === "reportar-problema"}
+                  className="touch-target rounded-2xl bg-[linear-gradient(135deg,#dc2626,#7f1d1d)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(127,29,29,0.28)]"
+                >
+                  {loadingActionId === "reportar-problema" ? "Registrando..." : "Abrir ocorrência corretiva"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)]">
           <span className="text-xs font-medium text-slate-500">Indicadores:</span>
           <div className="flex items-center gap-1.5">
@@ -748,6 +1164,20 @@ export default function OperadorPanel({
               }
 
               const televendasDraft = isTelevendas ? getTelevendasDraft(chamado) : null;
+              const empilhadeirasDaUnidade = empilhadeiras.filter(
+                (item) => {
+                  if (item.supermercado_id !== chamado.supermercado_id) return false;
+
+                  const statusEfetivo = getEmpilhadeiraStatusEfetivo(item, chamados, checklists, manutencoes);
+                  const isEmpilhadeiraJaVinculada = item.id === chamado.empilhadeira_id;
+
+                  return (
+                    isEmpilhadeiraSelecionavelParaChamado(statusEfetivo) ||
+                    isEmpilhadeiraJaVinculada
+                  );
+                }
+              );
+              const empilhadeiraSelecionada = getEmpilhadeiraSelecionada(chamado);
               const televendasTotais = televendasDraft
                 ? getTotaisItensTelevendas(televendasDraft.itens)
                 : null;
@@ -1006,6 +1436,12 @@ export default function OperadorPanel({
                           </p>
                         )}
 
+                        {chamado.empilhadeira_identificacao && (
+                          <p className="mt-1 text-xs text-sky-700">
+                            🚜 Empilhadeira: {chamado.empilhadeira_identificacao}
+                          </p>
+                        )}
+
                         {chamado.a_caminho_em && (
                           <p className="mt-1 text-xs text-blue-700">
                             🚚 A caminho: {formatDateTime(chamado.a_caminho_em)}
@@ -1035,11 +1471,50 @@ export default function OperadorPanel({
                       </div>
 
                       <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                        {!isFinalizado && (
+                          <div className="w-full sm:w-[220px]">
+                            {empilhadeirasDaUnidade.length > 0 ? (
+                              <select
+                                value={selectedEmpilhadeiras[chamado.id] ?? chamado.empilhadeira_id ?? ""}
+                                onChange={(event) =>
+                                  setSelectedEmpilhadeiras((prev) => ({
+                                    ...prev,
+                                    [chamado.id]: event.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-[#0f3d75] focus:outline-none focus:ring-2 focus:ring-blue-100 sm:text-sm"
+                              >
+                                <option value="">Selecionar empilhadeira</option>
+                                {empilhadeirasDaUnidade.map((empilhadeira) => (
+                                <option key={empilhadeira.id} value={empilhadeira.id}>
+                                    {empilhadeira.identificacao} · {getEmpilhadeiraStatusEfetivo(empilhadeira, chamados, checklists, manutencoes)}
+                                </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 sm:text-xs">
+                                Nenhuma empilhadeira disponível nesta unidade.
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {(isAguardandoOperacional || isAbertoTelevendas) && !chamado.operador_nome && (
                           <button
                             onClick={() => {
                               void runAction(`assumir-${chamado.id}`, () =>
-                                onAssumir(chamado.id, operadorNome)
+                                onAssumir(
+                                  chamado.id,
+                                  operadorNome,
+                                  empilhadeiraSelecionada
+                                    ? {
+                                        id: empilhadeiraSelecionada.id,
+                                        identificacao: empilhadeiraSelecionada.identificacao,
+                                        supermercado_id: empilhadeiraSelecionada.supermercado_id,
+                                        status: empilhadeiraSelecionada.status,
+                                      }
+                                    : null
+                                )
                               );
                             }}
                             disabled={!isDisponivel || loadingActionId === `assumir-${chamado.id}`}
@@ -1109,7 +1584,20 @@ export default function OperadorPanel({
                                 return;
                               }
 
-                              void runAction(`iniciar-${chamado.id}`, () => onIniciar(chamado.id, operadorNome));
+                              void runAction(`iniciar-${chamado.id}`, () =>
+                                onIniciar(
+                                  chamado.id,
+                                  operadorNome,
+                                  empilhadeiraSelecionada
+                                    ? {
+                                        id: empilhadeiraSelecionada.id,
+                                        identificacao: empilhadeiraSelecionada.identificacao,
+                                        supermercado_id: empilhadeiraSelecionada.supermercado_id,
+                                        status: empilhadeiraSelecionada.status,
+                                      }
+                                    : null
+                                )
+                              );
                             }}
                             disabled={
                               loadingActionId === `iniciar-${chamado.id}` ||
@@ -1122,7 +1610,7 @@ export default function OperadorPanel({
                               : isTelevendas
                               ? televendasComFalta
                                 ? "Salvar como incompleto"
-                                : "Marcar pronto"
+                              : "Marcar pronto"
                               : "Iniciar"}
                           </button>
                         )}

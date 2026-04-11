@@ -25,6 +25,41 @@ service cloud.firestore {
       return isAdminGeral() || isAdminGeralByUserDoc();
     }
 
+    function currentUserSupermercadoId() {
+      return isSignedIn()
+        ? (
+            request.auth.token.supermercado_id != null
+            ? request.auth.token.supermercado_id
+            : (
+                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+                : null
+              )
+          )
+        : null;
+    }
+
+    function currentUserPerfil() {
+      return isSignedIn()
+        ? (
+            request.auth.token.perfil != null
+            ? request.auth.token.perfil
+            : (
+                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+                : null
+              )
+          )
+        : null;
+    }
+
+    function isSupervisorDaUnidade(supermercadoId) {
+      return isSignedIn()
+        && currentUserPerfil() == "Supervisor"
+        && currentUserSupermercadoId() != null
+        && currentUserSupermercadoId() == supermercadoId;
+    }
+
     function isPerfilValido(perfilInput) {
       return perfilInput == "Promotor"
         || perfilInput == "Funcionário"
@@ -104,6 +139,120 @@ service cloud.firestore {
       return categoria == "operacional" || categoria == "televendas";
     }
 
+    function isStatusEmpilhadeiraValido(status) {
+      return status == "Disponível"
+        || status == "Em uso"
+        || status == "Em manutenção"
+        || status == "Inativa"
+        || status == "Necessita atenção"
+        || status == "Reserva";
+    }
+
+    function isStatusEmpilhadeiraCompativelComChamado(status) {
+      return status == "Disponível"
+        || status == "Em uso"
+        || status == "Reserva";
+    }
+
+    function isEmpilhadeiraValida(data, id) {
+      return data.id == id
+        && isTextoNaoVazio(data.empresa_id)
+        && isSupermercadoAtivo(data.supermercado_id)
+        && isTextoNaoVazio(data.identificacao)
+        && isTextoNaoVazio(data.modelo)
+        && isTextoNaoVazio(data.numero_interno)
+        && isStatusEmpilhadeiraValido(data.status)
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes))
+        && isTextoNaoVazio(data.criado_em)
+        && isTextoNaoVazio(data.atualizado_em);
+    }
+
+    function isChecklistEmpilhadeiraValido(data, id) {
+      return data.id == id
+        && isSupermercadoAtivo(data.supermercado_id)
+        && isTextoNaoVazio(data.empilhadeira_id)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isTextoNaoVazio(data.operador_id)
+        && isTextoNaoVazio(data.operador_nome)
+        && isTextoNaoVazio(data.data)
+        && data.bateria_ok is bool
+        && data.garfo_ok is bool
+        && data.pneus_ok is bool
+        && data.freio_ok is bool
+        && data.sem_avaria is bool
+        && data.reprovado is bool
+        && data.itens_reprovados is list
+        && (isCampoVazio(data.ocorrencia_tecnica) || isTextoNaoVazio(data.ocorrencia_tecnica))
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes))
+        && (isCampoVazio(data.tratado_em) || isTextoNaoVazio(data.tratado_em))
+        && (isCampoVazio(data.tratado_por) || isTextoNaoVazio(data.tratado_por))
+        && isTextoNaoVazio(data.criado_em);
+    }
+
+    function canCreateChecklistEmpilhadeira(data) {
+      return hasAdminManagementAccess()
+        || (
+          isSignedIn()
+          && currentUserSupermercadoId() != null
+          && currentUserSupermercadoId() == data.supermercado_id
+        );
+    }
+
+    function isTipoManutencaoValido(tipo) {
+      return tipo == "Preventiva"
+        || tipo == "Corretiva"
+        || tipo == "Inspecao"
+        || tipo == "Revisao"
+        || tipo == "Bateria";
+    }
+
+    function isPrioridadeManutencaoValida(prioridade) {
+      return prioridade == "Baixa"
+        || prioridade == "Media"
+        || prioridade == "Alta"
+        || prioridade == "Critica";
+    }
+
+    function isStatusManutencaoValido(status) {
+      return status == "Aberta"
+        || status == "Em andamento"
+        || status == "Concluida"
+        || status == "Cancelada";
+    }
+
+    function isManutencaoValida(data, id) {
+      return data.id == id
+        && isSupermercadoAtivo(data.supermercado_id)
+        && isTextoNaoVazio(data.empilhadeira_id)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isTipoManutencaoValido(data.tipo)
+        && isTextoNaoVazio(data.descricao)
+        && isPrioridadeManutencaoValida(data.prioridade)
+        && isStatusManutencaoValido(data.status)
+        && (isCampoVazio(data.responsavel) || isTextoNaoVazio(data.responsavel))
+        && isTextoNaoVazio(data.data_abertura)
+        && (isCampoVazio(data.data_prevista) || isTextoNaoVazio(data.data_prevista))
+        && (isCampoVazio(data.data_conclusao) || isTextoNaoVazio(data.data_conclusao))
+        && isTextoNaoVazio(data.criado_por)
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes));
+    }
+
+    function canCreateManutencao(data) {
+      return hasAdminManagementAccess()
+        || isSupervisorDaUnidade(data.supermercado_id)
+        || (
+          isSignedIn()
+          && currentUserSupermercadoId() != null
+          && currentUserSupermercadoId() == data.supermercado_id
+        );
+    }
+
+    function canUpdateManutencao(data) {
+      return hasAdminManagementAccess() || isSupervisorDaUnidade(data.supermercado_id);
+    }
+
     function isChamadoBaseValido(data) {
       return isTextoNaoVazio(data.id)
         && isCategoriaValida(data.categoria)
@@ -123,6 +272,8 @@ service cloud.firestore {
         && (isCampoVazio(data.observacao_operador) || isTextoNaoVazio(data.observacao_operador))
         && (isCampoVazio(data.local_separacao) || isTextoNaoVazio(data.local_separacao))
         && (isCampoVazio(data.prazo_limite) || isTextoNaoVazio(data.prazo_limite))
+        && (isCampoVazio(data.empilhadeira_id) || isTextoNaoVazio(data.empilhadeira_id))
+        && (isCampoVazio(data.empilhadeira_identificacao) || isTextoNaoVazio(data.empilhadeira_identificacao))
         && isPrioridadeValida(data.prioridade)
         && isStatusChamadoValido(data.status)
         && isTextoNaoVazio(data.criado_em)
@@ -134,7 +285,23 @@ service cloud.firestore {
         && (isCampoVazio(data.atualizado_por) || isTextoNaoVazio(data.atualizado_por))
         && (isCampoVazio(data.iniciado_em) || isTextoNaoVazio(data.iniciado_em))
         && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em))
-        && (isCampoVazio(data.cancelado_em) || isTextoNaoVazio(data.cancelado_em));
+        && (isCampoVazio(data.cancelado_em) || isTextoNaoVazio(data.cancelado_em))
+        && isEmpilhadeiraCompativelComChamado(data);
+    }
+
+    function isEmpilhadeiraCompativelComChamado(data) {
+      return (
+        isCampoVazio(data.empilhadeira_id)
+        && isCampoVazio(data.empilhadeira_identificacao)
+      ) || (
+        isTextoNaoVazio(data.empilhadeira_id)
+        && isTextoNaoVazio(data.empilhadeira_identificacao)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isStatusEmpilhadeiraCompativelComChamado(
+          get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.status
+        )
+      );
     }
 
     function isCriacaoChamadoValida() {
@@ -190,6 +357,51 @@ service cloud.firestore {
     match /supermercados/{id} {
       allow read: if true;
       allow write: if hasAdminManagementAccess();
+    }
+
+    match /empilhadeiras/{id} {
+      allow read: if isSignedIn();
+      allow create: if hasAdminManagementAccess()
+        && isEmpilhadeiraValida(request.resource.data, id);
+      allow update: if (
+          hasAdminManagementAccess()
+          || isSupervisorDaUnidade(resource.data.supermercado_id)
+        )
+        && isEmpilhadeiraValida(request.resource.data, id)
+        && request.resource.data.criado_em == resource.data.criado_em
+        && (
+          hasAdminManagementAccess()
+          || (
+            request.resource.data.empresa_id == resource.data.empresa_id
+            && request.resource.data.supermercado_id == resource.data.supermercado_id
+            && request.resource.data.identificacao == resource.data.identificacao
+            && request.resource.data.modelo == resource.data.modelo
+            && request.resource.data.numero_interno == resource.data.numero_interno
+          )
+        );
+      allow delete: if hasAdminManagementAccess();
+    }
+
+    match /checklists_empilhadeira/{id} {
+      allow read: if isSignedIn();
+      allow create: if isChecklistEmpilhadeiraValido(request.resource.data, id)
+        && canCreateChecklistEmpilhadeira(request.resource.data);
+      allow update: if hasAdminManagementAccess()
+        || isSupervisorDaUnidade(resource.data.supermercado_id);
+      allow delete: if hasAdminManagementAccess();
+    }
+
+    match /manutencoes/{id} {
+      allow read: if isSignedIn();
+      allow create: if isManutencaoValida(request.resource.data, id)
+        && canCreateManutencao(request.resource.data);
+      allow update: if isManutencaoValida(request.resource.data, id)
+        && canUpdateManutencao(resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.empilhadeira_id == resource.data.empilhadeira_id
+        && request.resource.data.criado_por == resource.data.criado_por;
+      allow delete: if hasAdminManagementAccess();
     }
 
     match /usuarios/{id} {

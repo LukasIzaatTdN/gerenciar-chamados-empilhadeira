@@ -30,6 +30,10 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
+import {
+  isEmpilhadeiraCompativelComChamado,
+  type EmpilhadeiraStatus,
+} from "../types/empilhadeira";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -192,6 +196,16 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
       (data as Partial<Chamado>).foto_data_url!.trim()
         ? (data as Partial<Chamado>).foto_data_url!.trim()
         : null,
+    empilhadeira_id:
+      typeof (data as Partial<Chamado>).empilhadeira_id === "string" &&
+      (data as Partial<Chamado>).empilhadeira_id!.trim()
+        ? (data as Partial<Chamado>).empilhadeira_id!.trim()
+        : null,
+    empilhadeira_identificacao:
+      typeof (data as Partial<Chamado>).empilhadeira_identificacao === "string" &&
+      (data as Partial<Chamado>).empilhadeira_identificacao!.trim()
+        ? (data as Partial<Chamado>).empilhadeira_identificacao!.trim()
+        : null,
     status,
     operador_nome:
       typeof data.operador_nome === "string" && data.operador_nome.trim()
@@ -280,6 +294,13 @@ interface AtualizacaoItensTelevendasInput {
   observacaoOperador?: string | null;
 }
 
+interface EquipamentoChamadoInput {
+  id: string;
+  identificacao: string;
+  supermercado_id: string;
+  status: EmpilhadeiraStatus;
+}
+
 interface ChamadoScope {
   supermercadoId: string | null;
   canViewAll: boolean;
@@ -304,6 +325,38 @@ async function ensureFirebaseSessionForChamado() {
   if (!currentUser) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
+}
+
+function getEquipamentoPayload(
+  chamado: Chamado,
+  equipamento?: EquipamentoChamadoInput | null
+) {
+  if (equipamento === undefined) {
+    return {
+      empilhadeira_id: chamado.empilhadeira_id ?? null,
+      empilhadeira_identificacao: chamado.empilhadeira_identificacao ?? null,
+    };
+  }
+
+  if (equipamento === null) {
+    return {
+      empilhadeira_id: null,
+      empilhadeira_identificacao: null,
+    };
+  }
+
+  if (equipamento.supermercado_id !== chamado.supermercado_id) {
+    throw new Error("Selecione uma empilhadeira da mesma unidade do chamado.");
+  }
+
+  if (!isEmpilhadeiraCompativelComChamado(equipamento.status)) {
+    throw new Error("A empilhadeira selecionada não está disponível para este chamado.");
+  }
+
+  return {
+    empilhadeira_id: equipamento.id,
+    empilhadeira_identificacao: equipamento.identificacao,
+  };
 }
 
 export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
@@ -457,6 +510,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           typeof input.foto_data_url === "string" && input.foto_data_url.trim()
             ? input.foto_data_url.trim()
             : null,
+        empilhadeira_id: null,
+        empilhadeira_identificacao: null,
         status: input.categoria === "televendas" ? "Aberto" : "Aguardando",
         operador_nome: null,
         criado_em: new Date().toISOString(),
@@ -487,7 +542,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   );
 
   const assumirChamado = useCallback(
-    async (id: string, operadorNome: string) => {
+    async (
+      id: string,
+      operadorNome: string,
+      equipamento?: EquipamentoChamadoInput | null
+    ) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
       if (!chamadoAtual) {
         throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
@@ -495,6 +554,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (!canAccessChamado(chamadoAtual, scope)) {
         throw new Error("Você não tem acesso a este chamado.");
       }
+      const equipamentoPayload = getEquipamentoPayload(chamadoAtual, equipamento);
 
       if (db) {
         try {
@@ -504,6 +564,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
+            ...equipamentoPayload,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -526,6 +587,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
                 status: isTelevendasChamado(c) ? ("Em separação" as Status) : c.status,
                 operador_nome: operadorNome,
                 assumido_em: c.assumido_em ?? new Date().toISOString(),
+                ...equipamentoPayload,
               }
             : c
         );
@@ -540,7 +602,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   );
 
   const iniciarAtendimento = useCallback(
-    async (id: string, operadorNome: string) => {
+    async (
+      id: string,
+      operadorNome: string,
+      equipamento?: EquipamentoChamadoInput | null
+    ) => {
       const chamadoAtual = chamados.find((c) => c.id === id);
       if (!chamadoAtual) {
         throw new Error("Chamado não encontrado. Atualize a tela e tente novamente.");
@@ -548,6 +614,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (!canAccessChamado(chamadoAtual, scope)) {
         throw new Error("Você não tem acesso a este chamado.");
       }
+      const equipamentoPayload = getEquipamentoPayload(chamadoAtual, equipamento);
 
       const iniciado_em = new Date().toISOString();
       const operador_nome = operadorNome;
@@ -566,6 +633,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             cancelado_em: null,
             atualizado_em: iniciado_em,
             atualizado_por: operador_nome,
+            ...equipamentoPayload,
           });
         } catch (error) {
           throw mapFirestoreWriteError(
@@ -596,6 +664,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
                 cancelado_em: null,
                 atualizado_em: iniciado_em,
                 atualizado_por: operador_nome,
+                ...equipamentoPayload,
               }
             : c
         );

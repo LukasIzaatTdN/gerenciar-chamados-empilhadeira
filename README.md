@@ -1,32 +1,43 @@
 # Painel Empilhadeira
 
-Aplicação web para gerenciamento de chamados de empilhadeira em operação multiunidade, com controle por perfil, sincronização com Firebase e suporte a fluxos operacionais e de televendas.
+Plataforma web para gestão de chamados operacionais, televendas, empilhadeiras e manutenção em ambiente multiunidade.
 
-O projeto foi desenhado para atender supermercados ou centros de distribuição que precisam organizar solicitações internas com visibilidade por loja, painel operacional para operadores, dashboard gerencial e rastreabilidade completa do atendimento.
+O sistema foi estruturado para operações com múltiplos supermercados ou centros de distribuição, mantendo isolamento por unidade, controle por perfil e rastreabilidade entre solicitante, operador, equipamento e atendimento.
 
 ## Visão Geral
 
-O sistema permite:
+O projeto atende dois eixos principais:
 
-- abrir chamados operacionais por unidade
-- acompanhar a fila de atendimento em tempo real
-- operar chamados em painel dedicado para operador
-- separar visualmente chamados de televendas e chamados operacionais
-- consolidar indicadores por supermercado
-- gerenciar usuários e supermercados em ambiente administrativo
-- manter isolamento de dados por unidade
+- operação de chamados internos por unidade
+- controle técnico das empilhadeiras usadas em cada unidade
 
-## Principais Funcionalidades
+Na prática, a aplicação permite:
 
-### Multiunidade
+- abrir chamados operacionais e pedidos de televendas
+- acompanhar fila e execução em tempo real
+- operar chamados com vínculo de empilhadeira
+- registrar checklist diário da máquina
+- reportar falhas operacionais
+- abrir e acompanhar manutenções
+- visualizar dashboards por unidade ou de forma consolidada
+
+## Arquitetura Funcional
+
+### 1. Multiunidade
+
+O sistema usa `supermercado_id` como eixo principal de separação operacional.
+
+Implementado:
 
 - entidade `supermercados`
-- vínculo de usuários por `supermercado_id`
-- vínculo de chamados por `supermercado_id`
-- leitura segmentada por unidade em filas, dashboards e operação
+- vínculo de `usuarios` por `supermercado_id`
+- vínculo de `chamados` por `supermercado_id`
+- vínculo de `empilhadeiras` por `supermercado_id`
+- vínculo de `checklists_empilhadeira` por `supermercado_id`
+- vínculo de `manutencoes` por `supermercado_id`
 - visão consolidada apenas para `Administrador Geral`
 
-### Perfis de Acesso
+### 2. Perfis de Acesso
 
 Perfis atualmente suportados:
 
@@ -37,15 +48,17 @@ Perfis atualmente suportados:
 - `Televendas`
 - `Administrador Geral`
 
-Resumo do comportamento por perfil:
+Resumo por perfil:
 
-- `Promotor` e `Funcionário`: abrem chamados e acompanham os próprios chamados da unidade
-- `Operador`: atua no painel operacional da unidade e executa o fluxo do atendimento
-- `Supervisor`: acompanha dashboard e operação da unidade
-- `Televendas`: abre pedidos internos com estrutura própria de itens
-- `Administrador Geral`: visualiza todas as unidades e acessa a gestão administrativa
+- `Promotor` e `Funcionário`: abrem chamados e acompanham apenas as próprias solicitações da unidade
+- `Televendas`: abre pedidos internos com estrutura de itens e acompanhamento específico
+- `Operador`: atua na fila operacional da unidade, assume chamados, registra checklist e reporta falhas
+- `Supervisor`: acompanha operação, dashboards, empilhadeiras e manutenções da própria unidade
+- `Administrador Geral`: visualiza todas as unidades, usa filtros globais e acessa módulos administrativos
 
-### Chamados Operacionais
+## Módulos Implementados
+
+## Chamados Operacionais
 
 Fluxo principal:
 
@@ -53,7 +66,7 @@ Fluxo principal:
 - `Em atendimento`
 - `Finalizado`
 
-Campos rastreados:
+Rastreabilidade disponível:
 
 - `criado_em`
 - `assumido_em`
@@ -62,8 +75,10 @@ Campos rastreados:
 - `iniciado_em`
 - `finalizado_em`
 - `cancelado_em`
+- `empilhadeira_id`
+- `empilhadeira_identificacao`
 
-Métricas calculadas:
+Métricas de tempo já suportadas:
 
 - tempo para assumir
 - tempo até sair a caminho
@@ -71,11 +86,11 @@ Métricas calculadas:
 - tempo de atendimento
 - tempo total do chamado
 
-### Chamados de Televendas
+## Televendas
 
-O módulo de televendas foi separado do fluxo operacional comum para permitir melhor organização dos pedidos.
+O fluxo de televendas foi separado do fluxo operacional comum.
 
-Status suportados atualmente:
+Status suportados:
 
 - `Aberto`
 - `Em separação`
@@ -87,25 +102,25 @@ Status suportados atualmente:
 Recursos implementados:
 
 - formulário específico para televendas
-- estrutura por lista de itens
-- cálculo automático de faltas
+- lista estruturada de itens
+- cálculo automático de quantidade faltante
 - cálculo de totais e percentual atendido
-- atualização do pedido pelo operador
-- destaque visual para pedidos incompletos
-- resumo de itens faltantes no card
+- marcação de pedido incompleto
+- observação do operador
+- visualização de faltas no painel
 
-Estrutura de item de televendas:
+Estrutura de item:
 
 ```ts
 {
-  produto: string
-  quantidadeSolicitada: number
-  quantidadeEncontrada: number
-  quantidadeFaltante: number
+  produto: string;
+  quantidadeSolicitada: number;
+  quantidadeEncontrada: number;
+  quantidadeFaltante: number;
 }
 ```
 
-Campos adicionais suportados no pedido:
+Campos adicionais já suportados no documento:
 
 - `itens`
 - `total_solicitado`
@@ -116,47 +131,218 @@ Campos adicionais suportados no pedido:
 - `atualizado_em`
 - `atualizado_por`
 
-## Experiência por Tela
+## Empilhadeiras
 
-### Login e Conta
+O módulo de empilhadeiras já está adaptado ao modelo multiunidade.
 
-- login responsivo para desktop e mobile
-- suporte a modo local e Firebase Auth
+Entidade `empilhadeiras`:
+
+- `id`
+- `empresa_id`
+- `supermercado_id`
+- `identificacao`
+- `modelo`
+- `numero_interno`
+- `status`
+- `observacoes`
+- `criado_em`
+- `atualizado_em`
+
+Status operacionais suportados:
+
+- `Disponível`
+- `Em uso`
+- `Em manutenção`
+- `Inativa`
+- `Necessita atenção`
+- `Reserva`
+
+Recursos implementados:
+
+- cadastro de empilhadeiras
+- edição de dados
+- alteração de status
+- filtro automático por unidade
+- vínculo opcional ao chamado
+- bloqueio de uso fora da unidade correta
+- histórico técnico por máquina
+- painel técnico com indicadores por unidade
+
+## Checklist Diário de Empilhadeira
+
+Entidade `checklists_empilhadeira`:
+
+- `id`
+- `supermercado_id`
+- `empilhadeira_id`
+- `operador_id`
+- `operador_nome`
+- `data`
+- `bateria_ok`
+- `garfo_ok`
+- `pneus_ok`
+- `freio_ok`
+- `sem_avaria`
+- `observacoes`
+- `criado_em`
+
+Campos técnicos adicionais do fluxo:
+
+- `reprovado`
+- `itens_reprovados`
+- `ocorrencia_tecnica`
+- `tratado_em`
+- `tratado_por`
+
+Comportamento atual:
+
+- checklist é preenchido antes do turno
+- operador só pode registrar checklist da própria unidade
+- checklist reprovado sinaliza a máquina como `Necessita atenção`
+- o resultado aparece no histórico técnico da empilhadeira
+
+## Falhas e Manutenções
+
+Entidade `manutencoes`:
+
+- `id`
+- `supermercado_id`
+- `empilhadeira_id`
+- `tipo`
+- `descricao`
+- `prioridade`
+- `status`
+- `responsavel`
+- `data_abertura`
+- `data_prevista`
+- `data_conclusao`
+- `criado_por`
+- `observacoes`
+
+Tipos suportados:
+
+- `Preventiva`
+- `Corretiva`
+- `Inspecao`
+- `Revisao`
+- `Bateria`
+
+Prioridades suportadas:
+
+- `Baixa`
+- `Media`
+- `Alta`
+- `Critica`
+
+Status suportados:
+
+- `Aberta`
+- `Em andamento`
+- `Concluida`
+- `Cancelada`
+
+Recursos implementados:
+
+- abertura manual de manutenção
+- edição de manutenção
+- alteração rápida de status
+- filtro por unidade, empilhadeira, tipo, prioridade e status
+- ação rápida de `Reportar problema` no painel do operador
+- criação automática de manutenção corretiva a partir da operação
+- histórico técnico vinculado à máquina
+
+## Status Automático das Empilhadeiras
+
+O status efetivo da máquina já considera múltiplas fontes:
+
+- status manual base da empilhadeira
+- uso operacional em chamado ativo
+- checklist reprovado
+- manutenção em andamento
+
+Regras já aplicadas:
+
+- empilhadeira em chamado ativo pode aparecer como `Em uso`
+- checklist reprovado força `Necessita atenção`
+- manutenção em andamento força `Em manutenção`
+- empilhadeiras indisponíveis não podem ser selecionadas em chamados
+
+## Telas Principais
+
+### Login e Cadastro
+
 - login por e-mail e senha
 - login com Google
 - criação de conta com nome, perfil e unidade
-- administrador geral pode criar conta sem unidade vinculada
+- administrador geral pode se cadastrar sem unidade
+- modal e landing harmonizados visualmente
+- mostrar/ocultar senha no login e cadastro
 
 ### Painel do Operador
 
-- painel dedicado por unidade
-- fila filtrada por supermercado
-- cards com estado visual por prioridade e status
-- conferência de itens de televendas direto no card
-- ações operacionais e de televendas sem misturar os fluxos
+- fila por unidade
+- ações de assumir, iniciar, finalizar e fluxo televendas
+- seleção de empilhadeira da mesma unidade
+- checklist antes do turno
+- ação rápida para reportar problema técnico
 
 ### Dashboard
 
-- dashboard por unidade para supervisão
-- dashboard executivo consolidado para administrador geral
+- dashboard da unidade para supervisão
+- dashboard consolidado para administrador geral
 - comparativo entre supermercados
-- indicadores operacionais, urgências e tempo médio
+- indicadores operacionais
+- métricas de tempo por etapa
 
-### Administração
+### Supermercados
 
-- gestão de supermercados
-- gestão de usuários
-- alteração de perfil e unidade
-- bloqueio e reativação de usuários
+- cadastro de unidades
+- edição de dados
+- ativação e inativação
 
-## Stack Técnica
+### Usuários
+
+- alteração de perfil
+- alteração de unidade
+- inativação e reativação
+
+### Empilhadeiras
+
+- cadastro e edição
+- controle de status
+- checklist recente
+- manutenção recente
+- histórico técnico por máquina
+- indicadores por unidade
+
+### Manutenções
+
+- listagem completa
+- nova manutenção
+- edição
+- alteração de status
+- filtros técnicos por recorte
+
+## Controle de Acesso e Isolamento
+
+O projeto foi desenhado para não misturar operação entre supermercados.
+
+Regras já aplicadas no app e refletidas nas coleções:
+
+- usuários comuns, operadores e supervisores atuam apenas na própria unidade
+- administrador geral pode visualizar todas as unidades com filtro
+- nenhum chamado deve usar empilhadeira de unidade diferente
+- checklist, manutenção, histórico e uso operacional respeitam `supermercado_id`
+- relatórios e dashboards usam o mesmo recorte da unidade ativa
+
+## Tecnologias
 
 - React 19
 - TypeScript
 - Vite
 - Tailwind CSS 4
 - Firebase Auth
-- Firestore
+- Cloud Firestore
 
 ## Estrutura do Projeto
 
@@ -166,7 +352,6 @@ src/
   config/
   data/
   hooks/
-  services/
   types/
   utils/
 scripts/
@@ -175,21 +360,19 @@ firestore.rules
 firebase.json
 ```
 
-Arquivos mais relevantes:
+Arquivos centrais:
 
 - [`src/App.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/App.tsx)
-- [`src/components/ChamadoForm.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoForm.tsx)
-- [`src/components/ChamadoList.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoList.tsx)
-- [`src/components/ChamadoCard.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoCard.tsx)
 - [`src/components/OperadorPanel.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/OperadorPanel.tsx)
-- [`src/components/OperadorLogin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/OperadorLogin.tsx)
-- [`src/components/SupermercadosAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/SupermercadosAdmin.tsx)
-- [`src/components/UsuariosAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/UsuariosAdmin.tsx)
+- [`src/components/ChamadoForm.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoForm.tsx)
+- [`src/components/EmpilhadeirasAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/EmpilhadeirasAdmin.tsx)
+- [`src/components/ManutencoesAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ManutencoesAdmin.tsx)
 - [`src/hooks/useChamados.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useChamados.ts)
-- [`src/hooks/useSupermercados.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useSupermercados.ts)
-- [`src/hooks/useUsuarios.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useUsuarios.ts)
+- [`src/hooks/useEmpilhadeiras.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useEmpilhadeiras.ts)
+- [`src/hooks/useChecklistsEmpilhadeira.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useChecklistsEmpilhadeira.ts)
+- [`src/hooks/useManutencoes.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useManutencoes.ts)
+- [`src/utils/empilhadeiraStatus.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/empilhadeiraStatus.ts)
 - [`src/utils/televendasItems.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/televendasItems.ts)
-- [`src/utils/chamadoStatus.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/chamadoStatus.ts)
 - [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
 
 ## Requisitos
@@ -198,15 +381,15 @@ Arquivos mais relevantes:
 - npm
 - projeto Firebase configurado
 
-## Como Executar
+## Execução Local
 
-### 1. Instalação
+### Instalação
 
 ```bash
 npm install
 ```
 
-### 2. Configuração de ambiente
+### Variáveis de ambiente
 
 Crie um `.env` com base em `.env.example`:
 
@@ -219,25 +402,25 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
-### 3. Ambiente de desenvolvimento
+### Desenvolvimento
 
 ```bash
 npm run dev
 ```
 
-### 4. Build de produção
+### Build
 
 ```bash
 npm run build
 ```
 
-### 5. Preview local
+### Preview local
 
 ```bash
 npm run preview
 ```
 
-## Scripts Administrativos
+## Scripts Firebase
 
 Scripts disponíveis:
 
@@ -248,9 +431,7 @@ npm run auth:approve-user
 npm run auth:check-access
 ```
 
-Esses scripts usam `firebase-admin` na pasta `scripts/firebase`.
-
-Exemplo de diagnóstico:
+Exemplo de diagnóstico de acesso:
 
 ```bash
 npm run auth:check-access -- \
@@ -259,9 +440,9 @@ npm run auth:check-access -- \
   --service-account "/caminho/serviceAccountKey.json"
 ```
 
-## Regras do Firestore
+## Firestore Rules
 
-As regras estão versionadas em:
+As regras ficam em:
 
 - [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
 
@@ -285,26 +466,30 @@ Build:
 npm run build
 ```
 
-## Estado Atual do Projeto
+## Estado Atual
 
-O projeto já possui base funcional para:
+Base já funcional para:
 
 - autenticação
 - multiunidade
-- gestão de usuários
 - gestão de supermercados
-- fila operacional
+- gestão de usuários
+- chamados operacionais
+- televendas com itens e pedido incompleto
 - painel do operador
 - dashboards gerenciais
-- fluxo específico de televendas
-- pedido incompleto em televendas
+- empilhadeiras multiunidade
+- checklist diário
+- falhas operacionais
+- manutenções
+- histórico técnico por máquina
 
 ## Próximos Passos Recomendados
 
-- ampliar testes reais do fluxo `televendas -> operador -> incompleto -> finalizado`
-- revisar relatórios históricos com foco em televendas
-- adicionar testes automatizados para helpers e regras de fluxo
-- revisar documentação operacional para usuários finais
+- adicionar relatórios técnicos exportáveis por empilhadeira e unidade
+- consolidar indicadores de manutenção e checklist no dashboard executivo
+- revisar documentação de operação para usuários finais
+- adicionar testes automatizados para helpers críticos de fluxo
 
 ## Licença
 
