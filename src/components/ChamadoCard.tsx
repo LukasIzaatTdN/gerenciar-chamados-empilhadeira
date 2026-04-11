@@ -4,6 +4,7 @@ import type { Supermercado } from "../types/supermercado";
 import type { TimeEstimate } from "../hooks/useTimeEstimates";
 import { formatMinutesLabel, getChamadoTimeMetrics } from "../utils/chamadoMetrics";
 import { isTelevendasChamado } from "../utils/chamadoStatus";
+import { formatQuantidadeComUnidade } from "../utils/televendasItems";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 
 interface ChamadoCardProps {
@@ -347,7 +348,8 @@ export default function ChamadoCard({
                 <ul className="mt-1 space-y-1 text-xs text-rose-700">
                   {itensFaltantes.map((item, index) => (
                     <li key={`${item.produto}-${index}`}>
-                      {item.produto}: faltaram {item.quantidadeFaltante}
+                      {item.produto}: faltaram{" "}
+                      {formatQuantidadeComUnidade(item.quantidadeFaltante, item.unidadeMedida)}
                     </li>
                   ))}
                 </ul>

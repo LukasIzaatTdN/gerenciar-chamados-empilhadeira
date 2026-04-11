@@ -15,7 +15,12 @@ import { recordAppActivity } from "../utils/appActivity";
 import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
 import { getEmpilhadeiraStatusEfetivo } from "../utils/empilhadeiraStatus";
 import { isChecklistEmpilhadeiraAprovado } from "../utils/checklistEmpilhadeira";
-import { getTotaisItensTelevendas, hasItemFaltante, normalizeItensTelevendas } from "../utils/televendasItems";
+import {
+  formatQuantidadeComUnidade,
+  getTotaisItensTelevendas,
+  hasItemFaltante,
+  normalizeItensTelevendas,
+} from "../utils/televendasItems";
 
 export type OperadorStatus = "Disponível" | "Pausa";
 
@@ -1351,7 +1356,12 @@ export default function OperadorPanel({
                                   <div className="text-xs font-semibold text-slate-800">{item.produto}</div>
                                   <div className="text-xs text-slate-600">
                                     Solicitado:{" "}
-                                    <span className="font-semibold text-slate-900">{item.quantidadeSolicitada}</span>
+                                    <span className="font-semibold text-slate-900">
+                                      {formatQuantidadeComUnidade(
+                                        item.quantidadeSolicitada,
+                                        item.unidadeMedida
+                                      )}
+                                    </span>
                                   </div>
                                   <div className="flex items-center gap-2 text-xs">
                                     <label className="text-slate-600">Encontrado:</label>
@@ -1377,7 +1387,11 @@ export default function OperadorPanel({
                                           : "bg-emerald-100 text-emerald-700"
                                       )}
                                     >
-                                      Falta: {item.quantidadeFaltante}
+                                      Falta:{" "}
+                                      {formatQuantidadeComUnidade(
+                                        item.quantidadeFaltante,
+                                        item.unidadeMedida
+                                      )}
                                     </span>
                                   </div>
                                 </div>

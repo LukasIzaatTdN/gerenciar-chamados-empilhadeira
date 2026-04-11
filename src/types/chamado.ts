@@ -10,6 +10,7 @@ export type TipoServico =
   | "Atendimento Televendas";
 
 export type Prioridade = "Normal" | "Urgente";
+export type UnidadeMedidaTelevendas = "Unidade" | "Caixa" | "Palete" | "Fardo";
 
 export type Status =
   | "Aguardando"
@@ -23,6 +24,7 @@ export type Status =
 
 export interface ItemTelevendas {
   produto: string;
+  unidadeMedida: UnidadeMedidaTelevendas;
   quantidadeSolicitada: number;
   quantidadeEncontrada: number;
   quantidadeFaltante: number;
@@ -85,3 +87,9 @@ export const TIPOS_SERVICO_OPERACIONAIS: TipoServico[] = [
 ];
 
 export const PRIORIDADES: Prioridade[] = ["Normal", "Urgente"];
+export const UNIDADES_MEDIDA_TELEVENDAS: UnidadeMedidaTelevendas[] = [
+  "Unidade",
+  "Caixa",
+  "Palete",
+  "Fardo",
+];

@@ -6,7 +6,11 @@ import type {
   Setor,
   TipoServico,
 } from "../types/chamado";
-import { PRIORIDADES, TIPOS_SERVICO_OPERACIONAIS } from "../types/chamado";
+import {
+  PRIORIDADES,
+  TIPOS_SERVICO_OPERACIONAIS,
+  UNIDADES_MEDIDA_TELEVENDAS,
+} from "../types/chamado";
 import type { NovoChamadoInput } from "../hooks/useChamados";
 import type { Supermercado } from "../types/supermercado";
 import { normalizeItemTelevendas } from "../utils/televendasItems";
@@ -47,6 +51,7 @@ export default function ChamadoForm({
 }: ChamadoFormProps) {
   const createEmptyItem = (): ItemTelevendas => ({
     produto: "",
+    unidadeMedida: "Unidade",
     quantidadeSolicitada: 0,
     quantidadeEncontrada: 0,
     quantidadeFaltante: 0,
@@ -162,6 +167,7 @@ export default function ChamadoForm({
             normalizeItemTelevendas({
               produto: item.produto,
               quantidadeSolicitada: item.quantidadeSolicitada,
+              unidadeMedida: item.unidadeMedida,
               quantidadeEncontrada: 0,
             })
           )
@@ -427,7 +433,10 @@ export default function ChamadoForm({
                     </label>
                     <div className="space-y-2 rounded-2xl border border-indigo-100 bg-white/90 p-3">
                       {itensTelevendas.map((item, index) => (
-                        <div key={`item-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto]">
+                        <div
+                          key={`item-${index}`}
+                          className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_150px_150px_auto]"
+                        >
                           <input
                             type="text"
                             value={item.produto}
@@ -443,6 +452,25 @@ export default function ChamadoForm({
                             placeholder="Produto"
                             className="touch-target w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                           />
+                          <select
+                            value={item.unidadeMedida}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setItensTelevendas((prev) =>
+                                prev.map((curr, currIndex) =>
+                                  currIndex === index ? { ...curr, unidadeMedida: value as ItemTelevendas["unidadeMedida"] } : curr
+                                )
+                              );
+                              setErrors((prev) => ({ ...prev, itens: "" }));
+                            }}
+                            className="touch-target w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                          >
+                            {UNIDADES_MEDIDA_TELEVENDAS.map((unidade) => (
+                              <option key={unidade} value={unidade}>
+                                {unidade}
+                              </option>
+                            ))}
+                          </select>
                           <input
                             type="number"
                             min={1}

@@ -1,4 +1,11 @@
-import type { ItemTelevendas } from "../types/chamado";
+import type { ItemTelevendas, UnidadeMedidaTelevendas } from "../types/chamado";
+
+const UNIDADES_MEDIDA_VALIDAS = new Set<UnidadeMedidaTelevendas>([
+  "Unidade",
+  "Caixa",
+  "Palete",
+  "Fardo",
+]);
 
 function toSafeNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -14,6 +21,10 @@ function toSafeNumber(value: unknown) {
 export function normalizeItemTelevendas(item: Partial<ItemTelevendas>): ItemTelevendas | null {
   const produto = typeof item.produto === "string" ? item.produto.trim() : "";
   if (!produto) return null;
+  const unidadeMedida =
+    typeof item.unidadeMedida === "string" && UNIDADES_MEDIDA_VALIDAS.has(item.unidadeMedida as UnidadeMedidaTelevendas)
+      ? (item.unidadeMedida as UnidadeMedidaTelevendas)
+      : "Unidade";
 
   const quantidadeSolicitada = toSafeNumber(item.quantidadeSolicitada);
   if (quantidadeSolicitada <= 0) return null;
@@ -23,6 +34,7 @@ export function normalizeItemTelevendas(item: Partial<ItemTelevendas>): ItemTele
 
   return {
     produto,
+    unidadeMedida,
     quantidadeSolicitada,
     quantidadeEncontrada,
     quantidadeFaltante,
@@ -78,4 +90,30 @@ export function itensToLegacyProduto(itens: ItemTelevendas[]) {
 export function itensToLegacyQuantidade(itens: ItemTelevendas[]) {
   const total = itens.reduce((sum, item) => sum + item.quantidadeSolicitada, 0);
   return total > 0 ? String(total) : null;
+}
+
+export function formatQuantidadeComUnidade(
+  quantidade: number,
+  unidadeMedida: UnidadeMedidaTelevendas
+) {
+  const qtd = toSafeNumber(quantidade);
+
+  const label =
+    unidadeMedida === "Unidade"
+      ? qtd === 1
+        ? "unidade"
+        : "unidades"
+      : unidadeMedida === "Caixa"
+      ? qtd === 1
+        ? "caixa"
+        : "caixas"
+      : unidadeMedida === "Palete"
+      ? qtd === 1
+        ? "palete"
+        : "paletes"
+      : qtd === 1
+      ? "fardo"
+      : "fardos";
+
+  return `${qtd} ${label}`;
 }
