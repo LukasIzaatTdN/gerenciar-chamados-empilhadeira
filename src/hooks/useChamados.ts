@@ -34,6 +34,7 @@ import {
   isEmpilhadeiraCompativelComChamado,
   type EmpilhadeiraStatus,
 } from "../types/empilhadeira";
+import { LEGACY_EMPRESA_ID, resolveEmpresaId } from "../utils/tenant";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -100,6 +101,7 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
   return {
     id: typeof data.id === "string" && data.id.trim() ? data.id : fallbackId,
     categoria,
+    empresa_id: resolveEmpresaId(data.empresa_id, LEGACY_EMPRESA_ID),
     supermercado_id:
       typeof data.supermercado_id === "string" && data.supermercado_id.trim()
         ? data.supermercado_id
@@ -257,6 +259,7 @@ function sortChamados(chamados: Chamado[]): Chamado[] {
 }
 
 export interface NovoChamadoInput {
+  empresa_id: string;
   supermercado_id: string;
   categoria: CategoriaChamado;
   solicitante_nome: string;
@@ -297,25 +300,34 @@ interface AtualizacaoItensTelevendasInput {
 interface EquipamentoChamadoInput {
   id: string;
   identificacao: string;
+  empresa_id: string;
   supermercado_id: string;
   status: EmpilhadeiraStatus;
 }
 
 interface ChamadoScope {
+  empresaId: string | null;
   supermercadoId: string | null;
-  canViewAll: boolean;
+  canViewAllUnits: boolean;
+  canViewAllCompanies: boolean;
 }
 
 function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
-  if (scope.canViewAll) return true;
+  if (scope.canViewAllCompanies) return true;
+  if (!scope.empresaId) return false;
+  if (chamado.empresa_id !== scope.empresaId) return false;
+  if (scope.canViewAllUnits) return true;
   if (!scope.supermercadoId) return false;
   return chamado.supermercado_id === scope.supermercadoId;
 }
 
 function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
-  if (scope.canViewAll) return chamados;
+  if (scope.canViewAllCompanies) return chamados;
+  if (!scope.empresaId) return [];
+  const chamadosEmpresa = chamados.filter((c) => c.empresa_id === scope.empresaId);
+  if (scope.canViewAllUnits) return chamadosEmpresa;
   if (!scope.supermercadoId) return [];
-  return chamados.filter((c) => c.supermercado_id === scope.supermercadoId);
+  return chamadosEmpresa.filter((c) => c.supermercado_id === scope.supermercadoId);
 }
 
 async function ensureFirebaseSessionForChamado() {
@@ -348,6 +360,9 @@ function getEquipamentoPayload(
   if (equipamento.supermercado_id !== chamado.supermercado_id) {
     throw new Error("Selecione uma empilhadeira da mesma unidade do chamado.");
   }
+  if (equipamento.empresa_id !== chamado.empresa_id) {
+    throw new Error("Selecione uma empilhadeira da mesma empresa do chamado.");
+  }
 
   if (!isEmpilhadeiraCompativelComChamado(equipamento.status)) {
     throw new Error("A empilhadeira selecionada não está disponível para este chamado.");
@@ -374,17 +389,14 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   useEffect(() => {
     if (isRemoteSyncEnabled && db) {
       setSyncError(null);
-      if (!scope.canViewAll && !scope.supermercadoId) {
+      if (!scope.canViewAllCompanies && !scope.empresaId) {
         setChamados([]);
         return;
       }
 
-      const chamadosQuery = scope.canViewAll
+      const chamadosQuery = scope.canViewAllCompanies
         ? query(collection(db, CHAMADOS_COLLECTION))
-        : query(
-            collection(db, CHAMADOS_COLLECTION),
-            where("supermercado_id", "==", scope.supermercadoId)
-          );
+        : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
 
       return onSnapshot(
         chamadosQuery,
@@ -419,7 +431,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [isRemoteSyncEnabled, scope.canViewAll, scope.supermercadoId]);
+  }, [isRemoteSyncEnabled, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId]);
 
   useEffect(() => {
     if (isRemoteSyncEnabled) return;
@@ -439,7 +451,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
   const criarChamado = useCallback(
     async (input: NovoChamadoInput) => {
-      if (!scope.canViewAll) {
+      if (!scope.canViewAllCompanies) {
+        if (!scope.empresaId) return;
+        if (input.empresa_id !== scope.empresaId) return;
+      }
+      if (!scope.canViewAllUnits) {
         if (!scope.supermercadoId) return;
         if (input.supermercado_id !== scope.supermercadoId) return;
       }
@@ -454,6 +470,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           input.categoria === "televendas" || input.tipo_servico === "Atendimento Televendas"
             ? "televendas"
             : "operacional",
+        empresa_id: resolveEmpresaId(input.empresa_id, LEGACY_EMPRESA_ID),
         supermercado_id: input.supermercado_id,
         solicitante_nome: input.solicitante_nome,
         setor: input.setor,
@@ -538,7 +555,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       callbacks?.onCriado?.(novo);
     },
-    [callbacks, scope.canViewAll, scope.supermercadoId]
+    [callbacks, scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
 
   const assumirChamado = useCallback(

@@ -12,8 +12,10 @@ import type { Empilhadeira, EmpilhadeiraStatus } from "../types/empilhadeira";
 const EMPILHADEIRAS_COLLECTION = "empilhadeiras";
 
 interface EmpilhadeiraScope {
+  empresaId: string | null;
   supermercadoId: string | null;
-  canViewAll: boolean;
+  canViewAllUnits: boolean;
+  canViewAllCompanies: boolean;
 }
 
 function normalizeEmpilhadeira(
@@ -55,17 +57,13 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       return;
     }
 
-    if (!scope.canViewAll && !scope.supermercadoId) {
+    if (!scope.canViewAllCompanies && !scope.empresaId) {
       setEmpilhadeiras([]);
       return;
     }
 
-    const empilhadeirasQuery = scope.canViewAll
-      ? collection(firestore, EMPILHADEIRAS_COLLECTION)
-      : collection(firestore, EMPILHADEIRAS_COLLECTION);
-
     return onSnapshot(
-      empilhadeirasQuery,
+      collection(firestore, EMPILHADEIRAS_COLLECTION),
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>
@@ -74,7 +72,8 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
               snapshotDoc.id
             )
           )
-          .filter((item) => scope.canViewAll || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
+          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
           .sort(
             (a, b) =>
               new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime()
@@ -86,7 +85,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
         setEmpilhadeiras([]);
       }
     );
-  }, [scope.canViewAll, scope.supermercadoId]);
+  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
 
   const createEmpilhadeira = useCallback(
     async (input: {
@@ -104,7 +103,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       const nova: Empilhadeira = {
         id,
         empresa_id: input.empresa_id.trim(),
-        supermercado_id: scope.canViewAll ? input.supermercado_id : scope.supermercadoId ?? input.supermercado_id,
+        supermercado_id: scope.canViewAllUnits ? input.supermercado_id : scope.supermercadoId ?? input.supermercado_id,
         identificacao: input.identificacao.trim(),
         modelo: input.modelo.trim(),
         numero_interno: input.numero_interno.trim(),
@@ -125,7 +124,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
       setEmpilhadeiras((prev) => [nova, ...prev]);
     },
-    [scope.canViewAll, scope.supermercadoId]
+    [scope.canViewAllUnits, scope.supermercadoId]
   );
 
   const updateEmpilhadeira = useCallback(
@@ -143,7 +142,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
     ) => {
       const payload = {
         empresa_id: input.empresa_id.trim(),
-        supermercado_id: scope.canViewAll ? input.supermercado_id : scope.supermercadoId ?? input.supermercado_id,
+        supermercado_id: scope.canViewAllUnits ? input.supermercado_id : scope.supermercadoId ?? input.supermercado_id,
         identificacao: input.identificacao.trim(),
         modelo: input.modelo.trim(),
         numero_interno: input.numero_interno.trim(),
@@ -172,7 +171,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
         )
       );
     },
-    [scope.canViewAll, scope.supermercadoId]
+    [scope.canViewAllUnits, scope.supermercadoId]
   );
 
   const updateEmpilhadeiraStatus = useCallback(

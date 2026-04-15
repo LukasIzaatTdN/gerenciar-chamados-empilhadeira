@@ -3,17 +3,21 @@ import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firesto
 import { db } from "../config/firebase";
 import type { Manutencao, NovaManutencaoInput } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
+import { resolveEmpresaId } from "../utils/tenant";
 
 const MANUTENCOES_COLLECTION = "manutencoes";
 
 interface ManutencaoScope {
+  empresaId: string | null;
   supermercadoId: string | null;
-  canViewAll: boolean;
+  canViewAllUnits: boolean;
+  canViewAllCompanies: boolean;
 }
 
 function normalizeManutencao(data: Partial<Manutencao>, fallbackId: string): Manutencao {
   return {
     id: data.id ?? fallbackId,
+    empresa_id: resolveEmpresaId(data.empresa_id),
     supermercado_id: data.supermercado_id ?? "",
     empilhadeira_id: data.empilhadeira_id ?? "",
     tipo: data.tipo ?? "Corretiva",
@@ -46,7 +50,7 @@ export function useManutencoes(scope: ManutencaoScope) {
       return;
     }
 
-    if (!scope.canViewAll && !scope.supermercadoId) {
+    if (!scope.canViewAllCompanies && !scope.empresaId) {
       setManutencoes([]);
       return;
     }
@@ -58,7 +62,8 @@ export function useManutencoes(scope: ManutencaoScope) {
           .map((snapshotDoc) =>
             normalizeManutencao(snapshotDoc.data() as Partial<Manutencao>, snapshotDoc.id)
           )
-          .filter((item) => scope.canViewAll || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
+          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
           .sort(
             (a, b) =>
               new Date(b.data_abertura).getTime() - new Date(a.data_abertura).getTime()
@@ -68,15 +73,22 @@ export function useManutencoes(scope: ManutencaoScope) {
       },
       () => setManutencoes([])
     );
-  }, [scope.canViewAll, scope.supermercadoId]);
+  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
 
   const createManutencao = useCallback(
     async (input: NovaManutencaoInput, empilhadeira: Empilhadeira) => {
+      if (empilhadeira.empresa_id !== input.empresa_id) {
+        throw new Error("A empilhadeira selecionada não pertence à empresa informada.");
+      }
       if (empilhadeira.supermercado_id !== input.supermercado_id) {
         throw new Error("A empilhadeira selecionada não pertence à unidade informada.");
       }
 
-      if (!scope.canViewAll && scope.supermercadoId !== input.supermercado_id) {
+      if (!scope.canViewAllCompanies && scope.empresaId !== input.empresa_id) {
+        throw new Error("Você só pode registrar manutenções da sua própria empresa.");
+      }
+
+      if (!scope.canViewAllUnits && scope.supermercadoId !== input.supermercado_id) {
         throw new Error("Você só pode registrar manutenções da sua própria unidade.");
       }
 
@@ -90,7 +102,7 @@ export function useManutencoes(scope: ManutencaoScope) {
 
       setManutencoes((prev) => [nova, ...prev]);
     },
-    [scope.canViewAll, scope.supermercadoId]
+    [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
 
   const updateManutencao = useCallback(

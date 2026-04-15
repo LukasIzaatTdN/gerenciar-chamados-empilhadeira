@@ -21,8 +21,8 @@ interface ProfileSettingsProps {
   onTemaChange: (theme: ThemeMode) => void;
   onVoltar: () => void;
   backLabel?: string;
-  showManageSupermercadosAction?: boolean;
-  onManageSupermercados?: () => void;
+  showManageUnidadesAction?: boolean;
+  onManageUnidades?: () => void;
   onLogout: () => void;
 }
 
@@ -96,8 +96,8 @@ export default function ProfileSettings({
   onTemaChange,
   onVoltar,
   backLabel = "Voltar",
-  showManageSupermercadosAction = false,
-  onManageSupermercados,
+  showManageUnidadesAction = false,
+  onManageUnidades,
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
@@ -147,10 +147,10 @@ export default function ProfileSettings({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {showManageSupermercadosAction && onManageSupermercados && (
+            {showManageUnidadesAction && onManageUnidades && (
               <button
                 type="button"
-                onClick={onManageSupermercados}
+                onClick={onManageUnidades}
                 className={cn(
                   "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
                   isDark
@@ -159,7 +159,7 @@ export default function ProfileSettings({
                 )}
               >
                 <span>🏬</span>
-                Gerenciar supermercados
+                Gerenciar unidades
               </button>
             )}
 

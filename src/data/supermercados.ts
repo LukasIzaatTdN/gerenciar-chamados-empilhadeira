@@ -1,8 +1,10 @@
 import type { Supermercado } from "../types/supermercado";
+import { LEGACY_EMPRESA_ID } from "../utils/tenant";
 
 export const SUPERMERCADOS: Supermercado[] = [
   {
     id: "sm-centro",
+    empresa_id: LEGACY_EMPRESA_ID,
     nome: "Supermercado Centro",
     codigo: "CTR",
     endereco: "Av. Principal, 1000 - Centro",

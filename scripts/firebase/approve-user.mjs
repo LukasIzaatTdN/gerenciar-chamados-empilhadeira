@@ -19,7 +19,8 @@ function requireArg(name) {
 
 const uid = requireArg("uid");
 const perfil = requireArg("perfil");
-const supermercadoId = requireArg("supermercado-id");
+const empresaId = readArg("empresa-id");
+const supermercadoId = readArg("supermercado-id");
 const nome = readArg("nome");
 const serviceAccountPath = requireArg("service-account");
 
@@ -37,7 +38,8 @@ const firestore = admin.firestore();
 
 const claims = {
   perfil,
-  supermercado_id: supermercadoId,
+  empresa_id: empresaId ?? undefined,
+  supermercado_id: supermercadoId ?? undefined,
   nome: nome ?? undefined,
 };
 
@@ -47,7 +49,9 @@ await firestore.collection("usuarios").doc(uid).set(
   {
     id: uid,
     perfil,
-    supermercado_id: supermercadoId,
+    empresa_id: empresaId ?? null,
+    supermercado_id: supermercadoId ?? null,
+    supermercado_ids: supermercadoId ? [supermercadoId] : [],
     status: "Ativo",
     aprovado_em: new Date().toISOString(),
     nome: nome ?? undefined,
@@ -56,4 +60,4 @@ await firestore.collection("usuarios").doc(uid).set(
 );
 
 console.log("Usuário aprovado com sucesso.");
-console.log(JSON.stringify({ uid, perfil, supermercado_id: supermercadoId }, null, 2));
+console.log(JSON.stringify({ uid, perfil, empresa_id: empresaId, supermercado_id: supermercadoId }, null, 2));

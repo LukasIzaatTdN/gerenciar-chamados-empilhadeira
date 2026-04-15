@@ -41,6 +41,7 @@ interface OperadorPanelProps {
     equipamento?: {
       id: string;
       identificacao: string;
+      empresa_id: string;
       supermercado_id: string;
       status: Empilhadeira["status"];
     } | null
@@ -60,12 +61,14 @@ interface OperadorPanelProps {
     equipamento?: {
       id: string;
       identificacao: string;
+      empresa_id: string;
       supermercado_id: string;
       status: Empilhadeira["status"];
     } | null
   ) => void | Promise<void>;
   onFinalizar: (id: string, operadorNome: string) => void | Promise<void>;
   onCreateChecklist: (input: {
+    empresa_id: string;
     supermercado_id: string;
     empilhadeira_id: string;
     operador_id: string;
@@ -372,6 +375,7 @@ export default function OperadorPanel({
     }
 
     await onCreateChecklist({
+      empresa_id: empilhadeira.empresa_id,
       supermercado_id: empilhadeira.supermercado_id,
       empilhadeira_id: empilhadeira.id,
       operador_id: operadorId,
@@ -1524,6 +1528,7 @@ export default function OperadorPanel({
                                     ? {
                                         id: empilhadeiraSelecionada.id,
                                         identificacao: empilhadeiraSelecionada.identificacao,
+                                        empresa_id: empilhadeiraSelecionada.empresa_id,
                                         supermercado_id: empilhadeiraSelecionada.supermercado_id,
                                         status: empilhadeiraSelecionada.status,
                                       }
@@ -1606,6 +1611,7 @@ export default function OperadorPanel({
                                     ? {
                                         id: empilhadeiraSelecionada.id,
                                         identificacao: empilhadeiraSelecionada.identificacao,
+                                        empresa_id: empilhadeiraSelecionada.empresa_id,
                                         supermercado_id: empilhadeiraSelecionada.supermercado_id,
                                         status: empilhadeiraSelecionada.status,
                                       }

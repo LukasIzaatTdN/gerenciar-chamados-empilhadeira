@@ -6,6 +6,8 @@ interface HeaderProps {
   onNovoChamado: () => void;
   onOperadorPanel: () => void;
   onDashboard: () => void;
+  onOpenEmpresasAdmin?: () => void;
+  onOpenUnidadesAdmin?: () => void;
   onOpenSupermercadosAdmin?: () => void;
   onOpenEmpilhadeiras?: () => void;
   onOpenManutencoes?: () => void;
@@ -23,6 +25,8 @@ interface HeaderProps {
   showCreateAction: boolean;
   showOperatorAction: boolean;
   showDashboardAction: boolean;
+  showEmpresasAction?: boolean;
+  showUnidadesAction?: boolean;
   showSupermercadosAction?: boolean;
   showEmpilhadeirasAction?: boolean;
   showManutencoesAction?: boolean;
@@ -32,6 +36,8 @@ export default function Header({
   onNovoChamado,
   onOperadorPanel,
   onDashboard,
+  onOpenEmpresasAdmin,
+  onOpenUnidadesAdmin,
   onOpenSupermercadosAdmin,
   onOpenEmpilhadeiras,
   onOpenManutencoes,
@@ -49,10 +55,14 @@ export default function Header({
   showCreateAction,
   showOperatorAction,
   showDashboardAction,
+  showEmpresasAction = false,
+  showUnidadesAction = false,
   showSupermercadosAction = false,
   showEmpilhadeirasAction = false,
   showManutencoesAction = false,
 }: HeaderProps) {
+  const unidadesActionVisible = showUnidadesAction || showSupermercadosAction;
+  const openUnidadesAdmin = onOpenUnidadesAdmin ?? onOpenSupermercadosAdmin;
   const firebaseProjectId =
     typeof import.meta.env.VITE_FIREBASE_PROJECT_ID === "string"
       ? import.meta.env.VITE_FIREBASE_PROJECT_ID
@@ -76,16 +86,24 @@ export default function Header({
       ? "Fluxo ativo: central operacional da unidade"
       : perfilAcesso === "Supervisor"
       ? "Fluxo ativo: supervisão da unidade"
+      : perfilAcesso === "Administrador da Empresa"
+      ? "Fluxo ativo: gestão consolidada da empresa"
       : perfilAcesso === "Administrador Geral"
-      ? "Fluxo ativo: gestão consolidada das unidades"
+      ? "Fluxo ativo: gestão consolidada da plataforma"
       : "Fluxo ativo: acesso ao sistema";
 
   const createActionLabel =
-    perfilAcesso === "Administrador Geral" ? "Abrir chamado" : "Solicitar Empilhadeira";
+    perfilAcesso === "Administrador Geral" || perfilAcesso === "Administrador da Empresa"
+      ? "Abrir chamado"
+      : "Solicitar Empilhadeira";
   const operatorActionLabel =
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
   const dashboardActionLabel =
-    perfilAcesso === "Administrador Geral" ? "Gestão Geral" : "Dashboard";
+    perfilAcesso === "Administrador Geral"
+      ? "Gestão Plataforma"
+      : perfilAcesso === "Administrador da Empresa"
+      ? "Gestão Empresa"
+      : "Dashboard";
 
   const getActionClassName = (isPrimary: boolean) =>
     isPrimary
@@ -174,7 +192,9 @@ export default function Header({
                 <button
                   onClick={onDashboard}
                   className={getActionClassName(
-                    perfilAcesso === "Supervisor" || perfilAcesso === "Administrador Geral"
+                    perfilAcesso === "Supervisor" ||
+                      perfilAcesso === "Administrador da Empresa" ||
+                      perfilAcesso === "Administrador Geral"
                   )}
                 >
                   <span>📈</span>
@@ -193,13 +213,22 @@ export default function Header({
                   <span>Manutenções</span>
                 </button>
               )}
-              {showSupermercadosAction && onOpenSupermercadosAdmin && (
+              {showEmpresasAction && onOpenEmpresasAdmin && (
                 <button
-                  onClick={onOpenSupermercadosAdmin}
+                  onClick={onOpenEmpresasAdmin}
+                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                >
+                  <span>🏢</span>
+                  <span>Empresas</span>
+                </button>
+              )}
+              {unidadesActionVisible && openUnidadesAdmin && (
+                <button
+                  onClick={openUnidadesAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
                 >
                   <span>🏬</span>
-                  <span>Supermercados</span>
+                  <span>Unidades</span>
                 </button>
               )}
               {showCreateAction && (
@@ -307,9 +336,23 @@ export default function Header({
                   </button>
                 )}
 
-                {showSupermercadosAction && onOpenSupermercadosAdmin && (
+                {showEmpresasAction && onOpenEmpresasAdmin && (
                   <button
-                    onClick={onOpenSupermercadosAdmin}
+                    onClick={onOpenEmpresasAdmin}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
+                      perfilAcesso === "Administrador Geral"
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>🏢</span>
+                    <span>Empresas</span>
+                  </button>
+                )}
+
+                {unidadesActionVisible && openUnidadesAdmin && (
+                  <button
+                    onClick={openUnidadesAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
                       perfilAcesso === "Administrador Geral"
                         ? "bg-amber-500 text-slate-950"
@@ -317,7 +360,7 @@ export default function Header({
                     }`}
                   >
                     <span>🏬</span>
-                    <span>Supermercados</span>
+                    <span>Unidades</span>
                   </button>
                 )}
 

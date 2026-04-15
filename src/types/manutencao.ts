@@ -11,6 +11,7 @@ export type ManutencaoStatus = "Aberta" | "Em andamento" | "Concluida" | "Cancel
 
 export interface Manutencao {
   id: string;
+  empresa_id: string;
   supermercado_id: string;
   empilhadeira_id: string;
   tipo: ManutencaoTipo;
@@ -26,6 +27,7 @@ export interface Manutencao {
 }
 
 export interface NovaManutencaoInput {
+  empresa_id: string;
   supermercado_id: string;
   empilhadeira_id: string;
   tipo: ManutencaoTipo;

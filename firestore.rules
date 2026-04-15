@@ -21,8 +21,37 @@ service cloud.firestore {
         );
     }
 
+    function isAdminEmpresa() {
+      return isSignedIn()
+        && request.auth.token.perfil == "Administrador da Empresa";
+    }
+
+    function isAdminEmpresaByUserDoc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador da Empresa"
+        && (
+          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
+          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+        );
+    }
+
     function hasAdminManagementAccess() {
-      return isAdminGeral() || isAdminGeralByUserDoc();
+      return isAdminGeral() || isAdminGeralByUserDoc() || isAdminEmpresa() || isAdminEmpresaByUserDoc();
+    }
+
+    function currentUserEmpresaId() {
+      return isSignedIn()
+        ? (
+            request.auth.token.empresa_id != null
+            ? request.auth.token.empresa_id
+            : (
+                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
+                : null
+              )
+          )
+        : null;
     }
 
     function currentUserSupermercadoId() {
@@ -60,13 +89,28 @@ service cloud.firestore {
         && currentUserSupermercadoId() == supermercadoId;
     }
 
+    function isAdminEmpresaDaEmpresa(empresaId) {
+      return isSignedIn()
+        && currentUserPerfil() == "Administrador da Empresa"
+        && currentUserEmpresaId() != null
+        && currentUserEmpresaId() == empresaId;
+    }
+
     function isPerfilValido(perfilInput) {
       return perfilInput == "Promotor"
         || perfilInput == "Funcionário"
         || perfilInput == "Operador"
         || perfilInput == "Supervisor"
         || perfilInput == "Televendas"
+        || perfilInput == "Administrador da Empresa"
         || perfilInput == "Administrador Geral";
+    }
+
+    function isEmpresaAtiva(empresaId) {
+      return empresaId is string
+        && empresaId.size() > 0
+        && exists(/databases/$(database)/documents/empresas/$(empresaId))
+        && get(/databases/$(database)/documents/empresas/$(empresaId)).data.status == "Ativa";
     }
 
     function isSupermercadoAtivo(supermercadoId) {
@@ -76,16 +120,60 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo";
     }
 
-    function isSupermercadoVinculoValido(perfilInput, supermercadoId) {
+    function isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId) {
+      return isEmpresaAtiva(empresaId)
+        && isSupermercadoAtivo(supermercadoId)
+        && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.empresa_id == empresaId;
+    }
+
+    function isEmpresaVinculoValido(perfilInput, empresaId) {
+      return (
+        perfilInput == "Administrador Geral" && empresaId == null
+      ) || (
+        perfilInput != "Administrador Geral" && isEmpresaAtiva(empresaId)
+      );
+    }
+
+    function isSupermercadoVinculoValido(perfilInput, empresaId, supermercadoId) {
       return (
         perfilInput == "Administrador Geral"
         && (
           supermercadoId == null
-          || isSupermercadoAtivo(supermercadoId)
+          || isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId)
         )
       ) || (
+        perfilInput == "Administrador da Empresa"
+        && supermercadoId == null
+        && isEmpresaAtiva(empresaId)
+      ) || (
         perfilInput != "Administrador Geral"
-        && isSupermercadoAtivo(supermercadoId)
+        && perfilInput != "Administrador da Empresa"
+        && isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId)
+      );
+    }
+
+    function canAccessEmpresa(empresaId) {
+      return isAdminGeral()
+        || isAdminGeralByUserDoc()
+        || isAdminEmpresaDaEmpresa(empresaId)
+        || (currentUserEmpresaId() != null && currentUserEmpresaId() == empresaId);
+    }
+
+    function canAccessSupermercado(supermercadoId) {
+      return isAdminGeral()
+        || isAdminGeralByUserDoc()
+        || (
+          isTextoNaoVazio(supermercadoId)
+          && exists(/databases/$(database)/documents/supermercados/$(supermercadoId))
+          && canAccessEmpresa(
+            get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.empresa_id
+          )
+          && (
+            currentUserPerfil() == "Administrador da Empresa"
+            || currentUserSupermercadoId() == null
+            || currentUserSupermercadoId() == supermercadoId
+          )
+        )
       );
     }
 
@@ -157,7 +245,7 @@ service cloud.firestore {
     function isEmpilhadeiraValida(data, id) {
       return data.id == id
         && isTextoNaoVazio(data.empresa_id)
-        && isSupermercadoAtivo(data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
         && isTextoNaoVazio(data.identificacao)
         && isTextoNaoVazio(data.modelo)
         && isTextoNaoVazio(data.numero_interno)
@@ -169,9 +257,10 @@ service cloud.firestore {
 
     function isChecklistEmpilhadeiraValido(data, id) {
       return data.id == id
-        && isSupermercadoAtivo(data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
         && isTextoNaoVazio(data.empilhadeira_id)
         && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
         && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
         && isTextoNaoVazio(data.operador_id)
         && isTextoNaoVazio(data.operador_nome)
@@ -223,9 +312,10 @@ service cloud.firestore {
 
     function isManutencaoValida(data, id) {
       return data.id == id
-        && isSupermercadoAtivo(data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
         && isTextoNaoVazio(data.empilhadeira_id)
         && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
         && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
         && isTipoManutencaoValido(data.tipo)
         && isTextoNaoVazio(data.descricao)
@@ -256,6 +346,8 @@ service cloud.firestore {
     function isChamadoBaseValido(data) {
       return isTextoNaoVazio(data.id)
         && isCategoriaValida(data.categoria)
+        && isTextoNaoVazio(data.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
         && isTextoNaoVazio(data.supermercado_id)
         && isTextoNaoVazio(data.solicitante_nome)
         && isTextoNaoVazio(data.setor)
@@ -297,6 +389,7 @@ service cloud.firestore {
         isTextoNaoVazio(data.empilhadeira_id)
         && isTextoNaoVazio(data.empilhadeira_identificacao)
         && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
         && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
         && isStatusEmpilhadeiraCompativelComChamado(
           get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.status
@@ -326,6 +419,7 @@ service cloud.firestore {
     function isAtualizacaoChamadoValida() {
       return isChamadoBaseValido(request.resource.data)
         && request.resource.data.categoria == resource.data.categoria
+        && request.resource.data.empresa_id == resource.data.empresa_id
         && request.resource.data.supermercado_id == resource.data.supermercado_id
         && request.resource.data.id == resource.data.id
         && request.resource.data.solicitante_nome == resource.data.solicitante_nome
@@ -341,26 +435,32 @@ service cloud.firestore {
     }
 
     match /chamados/{id} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
 
       allow create: if isSignedIn()
         && request.resource.data.id == id
         && isCriacaoChamadoValida()
-        && (isAdminGeral() || isSupermercadoAtivo(request.resource.data.supermercado_id));
+        && canAccessEmpresa(request.resource.data.empresa_id);
 
       allow update: if isSignedIn()
-        && isAtualizacaoChamadoValida();
+        && isAtualizacaoChamadoValida()
+        && canAccessEmpresa(resource.data.empresa_id);
 
-      allow delete: if isAdminGeral();
+      allow delete: if isAdminGeral() || isAdminGeralByUserDoc();
+    }
+
+    match /empresas/{id} {
+      allow read: if canAccessEmpresa(id);
+      allow write: if isAdminGeral() || isAdminGeralByUserDoc();
     }
 
     match /supermercados/{id} {
-      allow read: if true;
+      allow read: if canAccessEmpresa(resource.data.empresa_id);
       allow write: if hasAdminManagementAccess();
     }
 
     match /empilhadeiras/{id} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
       allow create: if hasAdminManagementAccess()
         && isEmpilhadeiraValida(request.resource.data, id);
       allow update: if (
@@ -383,7 +483,7 @@ service cloud.firestore {
     }
 
     match /checklists_empilhadeira/{id} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
       allow create: if isChecklistEmpilhadeiraValido(request.resource.data, id)
         && canCreateChecklistEmpilhadeira(request.resource.data);
       allow update: if hasAdminManagementAccess()
@@ -392,7 +492,7 @@ service cloud.firestore {
     }
 
     match /manutencoes/{id} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
       allow create: if isManutencaoValida(request.resource.data, id)
         && canCreateManutencao(request.resource.data);
       allow update: if isManutencaoValida(request.resource.data, id)
@@ -405,15 +505,20 @@ service cloud.firestore {
     }
 
     match /usuarios/{id} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
 
       allow create: if isSignedIn()
         && request.auth.uid == id
         && request.resource.data.id == request.auth.uid
         && request.resource.data.status == "Ativo"
         && isPerfilValido(request.resource.data.perfil)
+        && isEmpresaVinculoValido(
+          request.resource.data.perfil,
+          request.resource.data.empresa_id
+        )
         && isSupermercadoVinculoValido(
           request.resource.data.perfil,
+          request.resource.data.empresa_id,
           request.resource.data.supermercado_id
         );
 
@@ -425,12 +530,14 @@ service cloud.firestore {
           && request.resource.data.nome == resource.data.nome
           && request.resource.data.email == resource.data.email
           && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.empresa_id == resource.data.empresa_id
           && request.resource.data.status == resource.data.status
           && request.resource.data.criado_em == resource.data.criado_em
           && (
             request.resource.data.supermercado_id == resource.data.supermercado_id
-            || isSupermercadoAtivo(request.resource.data.supermercado_id)
+            || isSupermercadoDaEmpresaAtivo(resource.data.empresa_id, request.resource.data.supermercado_id)
             || (resource.data.perfil == "Administrador Geral" && request.resource.data.supermercado_id == null)
+            || (resource.data.perfil == "Administrador da Empresa" && request.resource.data.supermercado_id == null)
           )
         );
 

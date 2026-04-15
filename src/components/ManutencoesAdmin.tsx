@@ -184,6 +184,7 @@ export default function ManutencoesAdmin({
     }
 
     const payload: NovaManutencaoInput = {
+      empresa_id: empilhadeira.empresa_id,
       supermercado_id: empilhadeira.supermercado_id,
       empilhadeira_id: empilhadeira.id,
       tipo: form.tipo,

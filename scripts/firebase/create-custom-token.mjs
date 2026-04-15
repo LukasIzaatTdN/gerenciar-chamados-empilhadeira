@@ -19,7 +19,8 @@ function requireArg(name) {
 
 const uid = requireArg("uid");
 const perfil = requireArg("perfil");
-const supermercadoId = requireArg("supermercado-id");
+const empresaId = readArg("empresa-id");
+const supermercadoId = readArg("supermercado-id");
 const nome = readArg("nome");
 const serviceAccountPath = readArg("service-account");
 
@@ -37,7 +38,8 @@ admin.initializeApp({
 
 const additionalClaims = {
   perfil,
-  supermercado_id: supermercadoId,
+  empresa_id: empresaId ?? undefined,
+  supermercado_id: supermercadoId ?? undefined,
   nome: nome ?? undefined,
 };
 

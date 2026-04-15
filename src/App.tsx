@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { getSupermercadoById } from "./data/supermercados";
+import { getEmpresaById } from "./data/empresas";
+import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
 import AdminScopeSelector from "./components/AdminScopeSelector";
 import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
 import ChamadoTimeMetricsPanel from "./components/ChamadoTimeMetricsPanel";
 import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
-import SupermercadosAdmin from "./components/SupermercadosAdmin";
+import EmpresasAdmin from "./components/EmpresasAdmin";
+import UnidadesAdmin from "./components/UnidadesAdmin";
 import UsuariosAdmin from "./components/UsuariosAdmin";
 import EmpilhadeirasAdmin from "./components/EmpilhadeirasAdmin";
 import ManutencoesAdmin from "./components/ManutencoesAdmin";
@@ -20,7 +22,8 @@ import { isEmAtendimentoStatus, isPendenteStatus } from "./utils/chamadoStatus";
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
-import { useSupermercados } from "./hooks/useSupermercados";
+import { useUnidades } from "./hooks/useUnidades";
+import { useEmpresas } from "./hooks/useEmpresas";
 import { useUsuarios } from "./hooks/useUsuarios";
 import { useEmpilhadeiras } from "./hooks/useEmpilhadeiras";
 import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
@@ -46,13 +49,15 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
+import { LEGACY_EMPRESA_ID } from "./utils/tenant";
 
 type View =
   | "geral"
   | "operador"
   | "perfil"
   | "dashboard"
-  | "supermercados"
+  | "empresas"
+  | "unidades"
   | "usuarios"
   | "empilhadeiras"
   | "manutencoes";
@@ -73,13 +78,20 @@ function isPerfilAcesso(value: unknown): value is UsuarioSistema["perfil"] {
     value === "Operador" ||
     value === "Supervisor" ||
     value === "Televendas" ||
+    value === "Administrador da Empresa" ||
     value === "Administrador Geral"
   );
 }
 
 function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
   if (perfil === "Operador") return "operador";
-  if (perfil === "Supervisor" || perfil === "Administrador Geral") return "dashboard";
+  if (
+    perfil === "Supervisor" ||
+    perfil === "Administrador da Empresa" ||
+    perfil === "Administrador Geral"
+  ) {
+    return "dashboard";
+  }
   return "geral";
 }
 
@@ -118,15 +130,22 @@ export default function App() {
     return saved === "dark" ? "dark" : "light";
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [adminEmpresaFiltro, setAdminEmpresaFiltro] = useState<string>("todas");
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
   const {
-    supermercados,
-    createSupermercado,
-    updateSupermercado,
-    toggleSupermercadoStatus,
-  } = useSupermercados();
+    empresas,
+    createEmpresa,
+    updateEmpresa,
+    toggleEmpresaStatus,
+  } = useEmpresas();
+  const {
+    unidades: supermercados,
+    createUnidade: createSupermercado,
+    updateUnidade: updateSupermercado,
+    toggleUnidadeStatus: toggleSupermercadoStatus,
+  } = useUnidades();
   const {
     usuarios,
     upsertUsuarioFromLogin,
@@ -136,10 +155,29 @@ export default function App() {
   const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
   const perfilAcesso = usuarioAtual?.perfil ?? null;
+  const isPlatformAdmin = perfilAcesso === "Administrador Geral";
   const permissions = getPermissions(perfilAcesso);
+  const linkedEmpresaId =
+    usuarioAtual?.empresa_id ??
+    getUnidadeById(usuarioAtual?.supermercado_id, supermercados)?.empresa_id ??
+    (perfilAcesso === "Administrador Geral" ? null : LEGACY_EMPRESA_ID);
+  const empresaId = linkedEmpresaId;
   const supermercadoId = usuarioAtual?.supermercado_id ?? null;
-  const supermercadoNome = getSupermercadoById(supermercadoId, supermercados)?.nome ?? null;
+  const empresaNome = getEmpresaById(empresaId, empresas)?.nome ?? null;
+  const supermercadoNome = getUnidadeById(supermercadoId, supermercados)?.nome ?? null;
   const canViewAllUnits = permissions.canViewAllUnits;
+  const canViewAllCompanies = permissions.canViewAllCompanies;
+  const empresaSelecionadaId =
+    canViewAllCompanies && adminEmpresaFiltro !== "todas"
+      ? adminEmpresaFiltro
+      : empresaId;
+  const supermercadosDoEscopo = useMemo(
+    () =>
+      empresaSelecionadaId
+        ? supermercados.filter((item) => item.empresa_id === empresaSelecionadaId)
+        : supermercados,
+    [empresaSelecionadaId, supermercados]
+  );
   const supermercadoSelecionadoId =
     canViewAllUnits && adminSupermercadoFiltro !== "todos"
       ? adminSupermercadoFiltro
@@ -147,23 +185,44 @@ export default function App() {
   const unidadeAtualNome =
     canViewAllUnits && adminSupermercadoFiltro === "todos"
       ? "Todas as unidades"
-      : getSupermercadoById(supermercadoSelecionadoId, supermercados)?.nome ?? supermercadoNome ?? "Unidade não definida";
+      : getUnidadeById(supermercadoSelecionadoId, supermercados)?.nome ?? supermercadoNome ?? "Unidade não definida";
+  const nomeEscopoAtual =
+    canViewAllCompanies && adminEmpresaFiltro === "todas"
+      ? "Todas as empresas"
+      : adminSupermercadoFiltro === "todos"
+      ? empresaNome ?? getEmpresaById(empresaSelecionadaId, empresas)?.nome ?? "Empresa não definida"
+      : unidadeAtualNome;
+  const platformSummary = useMemo(
+    () => ({
+      empresasAtivas: empresas.filter((empresa) => empresa.status === "Ativa").length,
+      empresasTotais: empresas.length,
+      unidadesAtivas: supermercados.filter((supermercado) => supermercado.status === "Ativo").length,
+      unidadesTotais: supermercados.length,
+    }),
+    [empresas, supermercados]
+  );
   const {
     empilhadeiras,
     createEmpilhadeira,
     updateEmpilhadeira,
     updateEmpilhadeiraStatus,
   } = useEmpilhadeiras({
+    empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
-    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllCompanies,
   });
   const { checklists, createChecklist } = useChecklistsEmpilhadeira({
+    empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
-    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllCompanies,
   });
   const { manutencoes, createManutencao, updateManutencao } = useManutencoes({
+    empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
-    canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    canViewAllCompanies,
   });
 
   // Notification system
@@ -239,8 +298,10 @@ export default function App() {
     finalizarChamado,
   } = useChamados(
     {
+      empresaId: empresaSelecionadaId,
       supermercadoId: supermercadoSelecionadoId,
-      canViewAll: canViewAllUnits && adminSupermercadoFiltro === "todos",
+      canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+      canViewAllCompanies,
     },
     chamadoCallbacks
   );
@@ -342,6 +403,7 @@ export default function App() {
 
         const tokenResult = await getIdTokenResult(firebaseUser, true);
         const perfilClaim = tokenResult.claims.perfil;
+        const empresaClaim = tokenResult.claims.empresa_id;
         const supermercadoClaim = tokenResult.claims.supermercado_id;
         const nomeClaim = tokenResult.claims.nome;
 
@@ -362,7 +424,14 @@ export default function App() {
 
           setUsuarioAtual(nextUsuario);
           setView((prev) => {
-            if (prev === "perfil" || prev === "supermercados" || prev === "usuarios") return prev;
+            if (
+              prev === "perfil" ||
+              prev === "empresas" ||
+              prev === "unidades" ||
+              prev === "usuarios"
+            ) {
+              return prev;
+            }
             return getViewByPerfil(nextUsuario.perfil);
           });
         };
@@ -378,10 +447,20 @@ export default function App() {
                       firebaseUser.email?.trim() ||
                       "Usuário",
                 perfil: perfilClaim,
+                empresa_id:
+                  typeof empresaClaim === "string" && empresaClaim.trim()
+                    ? empresaClaim.trim()
+                    : perfilClaim === "Administrador Geral"
+                    ? null
+                    : LEGACY_EMPRESA_ID,
                 supermercado_id:
                   typeof supermercadoClaim === "string" && supermercadoClaim.trim()
                     ? supermercadoClaim.trim()
                     : null,
+                supermercado_ids:
+                  typeof supermercadoClaim === "string" && supermercadoClaim.trim()
+                    ? [supermercadoClaim.trim()]
+                    : [],
               }
             : null;
 
@@ -405,10 +484,25 @@ export default function App() {
                         ? userData.nome.trim()
                         : firebaseUser.email?.trim() || "Usuário",
                     perfil: userData.perfil,
+                    empresa_id:
+                      typeof userData.empresa_id === "string" && userData.empresa_id.trim()
+                        ? userData.empresa_id
+                        : userData.perfil === "Administrador Geral"
+                        ? null
+                        : LEGACY_EMPRESA_ID,
                     supermercado_id:
                       typeof userData.supermercado_id === "string"
                         ? userData.supermercado_id
                         : null,
+                    supermercado_ids:
+                      Array.isArray(userData.supermercado_ids)
+                        ? userData.supermercado_ids.filter(
+                            (item): item is string =>
+                              typeof item === "string" && item.trim().length > 0
+                          )
+                        : typeof userData.supermercado_id === "string"
+                        ? [userData.supermercado_id]
+                        : [],
                   };
                   await applyUsuarioResolved(usuarioResolved);
                   setAuthHydrated(true);
@@ -460,6 +554,12 @@ export default function App() {
   }, [tema]);
 
   useEffect(() => {
+    if (!canViewAllCompanies) {
+      setAdminEmpresaFiltro("todas");
+    }
+  }, [canViewAllCompanies]);
+
+  useEffect(() => {
     if (!canViewAllUnits) {
       setAdminSupermercadoFiltro("todos");
     }
@@ -489,24 +589,27 @@ export default function App() {
             solicitantePerfil={perfilAcesso}
             supermercadoNome={
               permissions.canViewAllUnits
-                ? getSupermercadoById(adminChamadoSupermercadoId, supermercados)?.nome ?? null
+                ? getUnidadeById(adminChamadoSupermercadoId, supermercados)?.nome ?? null
                 : supermercadoNome
             }
             isAdminGeral={permissions.canViewAllUnits}
-            supermercados={supermercados}
+            supermercados={supermercadosDoEscopo}
             supermercadoSelecionadoId={adminChamadoSupermercadoId}
             onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
             onSubmit={async (data) => {
               const supermercadoChamadoId = permissions.canViewAllUnits
                 ? adminChamadoSupermercadoId
                 : supermercadoId;
+              const empresaChamadoId =
+                getUnidadeById(supermercadoChamadoId, supermercados)?.empresa_id ?? empresaId;
 
-              if (!supermercadoChamadoId) {
-                throw new Error("Supermercado não definido");
+              if (!supermercadoChamadoId || !empresaChamadoId) {
+                throw new Error("Empresa ou unidade não definida");
               }
 
               await criarChamado({
                 ...data,
+                empresa_id: empresaChamadoId,
                 supermercado_id: supermercadoChamadoId,
               });
               setShowForm(false);
@@ -522,6 +625,7 @@ export default function App() {
             onFirebaseGoogleLogin={handleFirebaseGoogleLogin}
             onFirebaseRegister={handleFirebaseRegister}
             onCancel={() => setShowLoginModal(false)}
+            empresas={empresas}
             supermercados={supermercados}
             authMode={hasFirebaseConfig ? "firebase" : "local"}
           />
@@ -565,7 +669,7 @@ export default function App() {
   function handleNovoChamadoAccess() {
     if (isAuthenticated && permissions.canCreateChamado) {
       if (permissions.canViewAllUnits) {
-        const firstAtivo = supermercados.find((item) => item.status === "Ativo");
+        const firstAtivo = supermercadosDoEscopo.find((item) => item.status === "Ativo");
         const defaultSupermercadoId =
           adminSupermercadoFiltro !== "todos" ? adminSupermercadoFiltro : firstAtivo?.id ?? "";
         setAdminChamadoSupermercadoId(defaultSupermercadoId);
@@ -589,6 +693,7 @@ export default function App() {
 
     if (
       usuarioPersistido.perfil === "Supervisor" ||
+      usuarioPersistido.perfil === "Administrador da Empresa" ||
       usuarioPersistido.perfil === "Administrador Geral"
     ) {
       setPreviousView(view);
@@ -650,6 +755,7 @@ export default function App() {
     email: string;
     password: string;
     perfil: UsuarioSistema["perfil"];
+    empresa_id: string | null;
     supermercado_id: string | null;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
@@ -674,7 +780,9 @@ export default function App() {
           id: credential.user.uid,
           nome: input.nome.trim(),
           perfil: input.perfil,
+          empresa_id: input.empresa_id,
           supermercado_id: input.supermercado_id,
+          supermercado_ids: input.supermercado_id ? [input.supermercado_id] : [],
           status: "Ativo",
           email: input.email.trim().toLowerCase(),
           criado_em: new Date().toISOString(),
@@ -704,12 +812,53 @@ export default function App() {
     setShowLoginModal(true);
   }
 
+  async function handleCreateEmpresa(input: {
+    nome: string;
+    codigo: string;
+    cnpj?: string;
+    plano_codigo: string;
+    plano_nome: string;
+    plano_status: "Ativo" | "Teste" | "Suspenso" | "Cancelado";
+    plano_ciclo: "Mensal" | "Trimestral" | "Semestral" | "Anual";
+    max_usuarios?: number | null;
+    max_unidades?: number | null;
+    contrato_inicio?: string | null;
+    contrato_fim?: string | null;
+  }) {
+    await createEmpresa(input);
+  }
+
+  async function handleUpdateEmpresa(
+    id: string,
+    input: {
+      nome: string;
+      codigo: string;
+      cnpj?: string;
+      plano_codigo: string;
+      plano_nome: string;
+      plano_status: "Ativo" | "Teste" | "Suspenso" | "Cancelado";
+      plano_ciclo: "Mensal" | "Trimestral" | "Semestral" | "Anual";
+      max_usuarios?: number | null;
+      max_unidades?: number | null;
+      contrato_inicio?: string | null;
+      contrato_fim?: string | null;
+    }
+  ) {
+    await updateEmpresa(id, input);
+  }
+
+  async function handleToggleEmpresaStatus(id: string) {
+    await toggleEmpresaStatus(id);
+  }
+
   async function handleCreateSupermercado(input: {
+    empresa_id: string;
     nome: string;
     codigo: string;
     endereco: string;
   }) {
     await createSupermercado({
+      empresa_id: input.empresa_id,
       nome: input.nome.trim(),
       codigo: input.codigo.trim().toUpperCase(),
       endereco: input.endereco.trim(),
@@ -718,9 +867,10 @@ export default function App() {
 
   async function handleUpdateSupermercado(
     id: string,
-    input: { nome: string; codigo: string; endereco: string }
+    input: { empresa_id: string; nome: string; codigo: string; endereco: string }
   ) {
     await updateSupermercado(id, {
+      empresa_id: input.empresa_id,
       nome: input.nome.trim(),
       codigo: input.codigo.trim().toUpperCase(),
       endereco: input.endereco.trim(),
@@ -766,6 +916,7 @@ export default function App() {
   }
 
   async function handleCreateChecklistEmpilhadeira(input: {
+    empresa_id: string;
     supermercado_id: string;
     empilhadeira_id: string;
     operador_id: string;
@@ -807,6 +958,7 @@ export default function App() {
 
     await createManutencao(
       {
+        empresa_id: empilhadeira.empresa_id,
         supermercado_id: empilhadeira.supermercado_id,
         empilhadeira_id: empilhadeira.id,
         tipo: "Corretiva",
@@ -825,6 +977,7 @@ export default function App() {
   }
 
   async function handleCreateManutencao(input: {
+    empresa_id: string;
     supermercado_id: string;
     empilhadeira_id: string;
     tipo: ManutencaoTipo;
@@ -853,9 +1006,15 @@ export default function App() {
     await updateManutencao(id, input);
   }
 
-  function handleOpenSupermercadosAdmin() {
+  function handleOpenEmpresasAdmin() {
+    if (permissions.canViewAllCompanies) {
+      navigateTo("empresas");
+    }
+  }
+
+  function handleOpenUnidadesAdmin() {
     if (permissions.canViewAllUnits) {
-      navigateTo("supermercados");
+      navigateTo("unidades");
     }
   }
 
@@ -898,13 +1057,22 @@ export default function App() {
     try {
       if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
         await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
+          empresa_id: unidadeAtiva.empresa_id,
           supermercado_id: nextSupermercadoId,
+          supermercado_ids: [nextSupermercadoId],
           atualizado_em: new Date().toISOString(),
         });
       }
 
       setUsuarioAtual((prev) =>
-        prev ? { ...prev, supermercado_id: nextSupermercadoId } : prev
+        prev
+          ? {
+              ...prev,
+              empresa_id: unidadeAtiva.empresa_id,
+              supermercado_id: nextSupermercadoId,
+              supermercado_ids: [nextSupermercadoId],
+            }
+          : prev
       );
       notify(
         "perfil_atualizado",
@@ -922,10 +1090,14 @@ export default function App() {
 
   async function handleUpdateUsuarioAdmin(
     id: string,
-    input: { perfil: UsuarioSistema["perfil"]; supermercado_id: string | null }
+    input: {
+      perfil: UsuarioSistema["perfil"];
+      empresa_id: string | null;
+      supermercado_id: string | null;
+    }
   ) {
     await updateUsuarioAdmin(id, input);
-    notify("perfil_atualizado", "Usuário atualizado", "Perfil/unidade alterados com sucesso.");
+    notify("perfil_atualizado", "Usuário atualizado", "Perfil, empresa e unidade alterados com sucesso.");
   }
 
   async function handleToggleUsuarioStatus(id: string) {
@@ -1012,8 +1184,8 @@ export default function App() {
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"
-          showManageSupermercadosAction={canViewAllUnits}
-          onManageSupermercados={handleOpenSupermercadosAdmin}
+          showManageUnidadesAction={canViewAllUnits}
+          onManageUnidades={handleOpenUnidadesAdmin}
           onLogout={handleLogoutToLogin}
         />
         {renderGlobalOverlays()}
@@ -1029,7 +1201,8 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
-          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1043,27 +1216,32 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
-          showOperatorAction={permissions.canAccessOperatorPanel}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-          showSupermercadosAction={canViewAllUnits}
-          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-          showManutencoesAction={permissions.canAccessOperatorPanel}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
 
           <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
           {canViewAllUnits && (
             <AdminScopeSelector
-              value={adminSupermercadoFiltro}
-              onChange={setAdminSupermercadoFiltro}
+              empresaValue={adminEmpresaFiltro}
+              supermercadoValue={adminSupermercadoFiltro}
+              onEmpresaChange={setAdminEmpresaFiltro}
+              onSupermercadoChange={setAdminSupermercadoFiltro}
+              empresas={empresas}
               supermercados={supermercados}
+              allowEmpresaSelection={canViewAllCompanies}
             />
           )}
 
           {canViewAllUnits && (
             <AdminExecutiveSummary
               chamados={dashboardChamados}
-              supermercados={supermercados}
+              supermercados={supermercadosDoEscopo}
               selectedSupermercadoId={adminSupermercadoFiltro === "todos" ? null : adminSupermercadoFiltro}
               isConsolidated={adminSupermercadoFiltro === "todos"}
             />
@@ -1073,17 +1251,23 @@ export default function App() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {canViewAllUnits ? "Dashboard executivo" : "Dashboard da operação"}
+                  {isPlatformAdmin
+                    ? "Gestão da plataforma"
+                    : canViewAllUnits
+                    ? "Dashboard executivo"
+                    : "Dashboard da operação"}
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                  {unidadeAtualNome}
+                  {isPlatformAdmin ? "Administração geral da plataforma" : nomeEscopoAtual}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                  {canViewAllUnits
-                    ? adminSupermercadoFiltro === "todos"
-                      ? "Painel consolidado para acompanhar pressão operacional, comparar lojas e tomar decisões de priorização."
-                      : "Painel gerencial da unidade selecionada com foco em desempenho, fila e ritmo de atendimento."
-                    : "Painel exclusivo para supervisão e administração com visão de desempenho por unidade."}
+                  {isPlatformAdmin
+                    ? "Use este espaço para gerenciar a estrutura SaaS, cadastrar empresas clientes e organizar as unidades de cada operação."
+                    : canViewAllCompanies && adminEmpresaFiltro === "todas"
+                    ? "Painel consolidado da plataforma para acompanhar empresas clientes, comparar unidades e priorizar operação."
+                    : canViewAllUnits && adminSupermercadoFiltro === "todos"
+                    ? "Painel consolidado da empresa com foco em desempenho entre unidades e priorização operacional."
+                    : "Painel gerencial com foco em desempenho, fila e ritmo de atendimento."}
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:items-end">
@@ -1121,36 +1305,113 @@ export default function App() {
               </div>
             </div>
           </div>
+          {isPlatformAdmin ? (
+            <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+              <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Estrutura SaaS
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {[
+                    {
+                      label: "Empresas ativas",
+                      value: String(platformSummary.empresasAtivas),
+                      hint: `${platformSummary.empresasTotais} cadastradas na plataforma`,
+                    },
+                    {
+                      label: "Unidades ativas",
+                      value: String(platformSummary.unidadesAtivas),
+                      hint: `${platformSummary.unidadesTotais} cadastradas no total`,
+                    },
+                    {
+                      label: "Recorte atual",
+                      value: adminEmpresaFiltro === "todas" ? "Plataforma" : "Empresa",
+                      hint: nomeEscopoAtual,
+                    },
+                    {
+                      label: "Sincronização",
+                      value: hasFirebaseConfig ? "Firebase" : "Local",
+                      hint: "modo operacional da plataforma",
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-black tracking-tight text-slate-900">{item.value}</p>
+                      <p className="mt-1 text-sm text-slate-500">{item.hint}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
-          <div className="mb-5 fade-up">
-            <Stats
-              stats={{
-                aguardando: canViewAllUnits ? dashboardStats.aguardando : stats.aguardando,
-                emAtendimento: canViewAllUnits ? dashboardStats.emAtendimento : stats.emAtendimento,
-                finalizadosHoje: canViewAllUnits ? dashboardStats.finalizadosHoje : dashboardFinalizadosHoje,
-                urgentes: canViewAllUnits ? dashboardStats.urgentes : stats.urgentes,
-                setorMaisAcionado: canViewAllUnits ? dashboardStats.setorMaisAcionado : dashboardSetorMaisAcionado,
-              }}
-              mediaMin={canViewAllUnits ? dashboardTimeEstimates.mediaMin : timeEstimates.mediaMin}
-              totalFinalizadosComTempo={
-                canViewAllUnits ? dashboardTimeEstimates.totalFinalizados : timeEstimates.totalFinalizados
-              }
-              finalizadosLabel={canViewAllUnits ? dashboardPeriodLabel : "Finalizados Hoje"}
-            />
-          </div>
-
-          <div className="mb-5 fade-up">
-            <ChamadoTimeMetricsPanel
-              chamados={canViewAllUnits ? dashboardChamados : allChamados}
-              title="Tempos por etapa do atendimento"
-              subtitle="Use estes tempos para localizar gargalos desde a abertura até a conclusão."
-            />
-          </div>
-
-          {canViewAllUnits && adminSupermercadoFiltro === "todos" && (
-            <div className="mb-5 fade-up">
-              <SupermercadoComparison chamados={dashboardChamados} supermercados={supermercados} />
+              <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Atalhos administrativos
+                </p>
+                <div className="mt-4 grid gap-3">
+                  <button
+                    type="button"
+                    onClick={handleOpenEmpresasAdmin}
+                    className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:bg-slate-100"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-slate-900">Empresas</span>
+                      <span className="mt-1 block text-sm text-slate-500">
+                        Cadastre clientes, planos e status da conta.
+                      </span>
+                    </span>
+                    <span className="text-xl">🏢</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenUnidadesAdmin}
+                    className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:bg-slate-100"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-slate-900">Unidades</span>
+                      <span className="mt-1 block text-sm text-slate-500">
+                        Organize as unidades operacionais de cada empresa cliente.
+                      </span>
+                    </span>
+                    <span className="text-xl">🏬</span>
+                  </button>
+                </div>
+              </section>
             </div>
+          ) : (
+            <>
+              <div className="mb-5 fade-up">
+                <Stats
+                  stats={{
+                    aguardando: canViewAllUnits ? dashboardStats.aguardando : stats.aguardando,
+                    emAtendimento: canViewAllUnits ? dashboardStats.emAtendimento : stats.emAtendimento,
+                    finalizadosHoje: canViewAllUnits ? dashboardStats.finalizadosHoje : dashboardFinalizadosHoje,
+                    urgentes: canViewAllUnits ? dashboardStats.urgentes : stats.urgentes,
+                    setorMaisAcionado: canViewAllUnits ? dashboardStats.setorMaisAcionado : dashboardSetorMaisAcionado,
+                  }}
+                  mediaMin={canViewAllUnits ? dashboardTimeEstimates.mediaMin : timeEstimates.mediaMin}
+                  totalFinalizadosComTempo={
+                    canViewAllUnits ? dashboardTimeEstimates.totalFinalizados : timeEstimates.totalFinalizados
+                  }
+                  finalizadosLabel={canViewAllUnits ? dashboardPeriodLabel : "Finalizados Hoje"}
+                />
+              </div>
+
+              <div className="mb-5 fade-up">
+                <ChamadoTimeMetricsPanel
+                  chamados={canViewAllUnits ? dashboardChamados : allChamados}
+                  title="Tempos por etapa do atendimento"
+                  subtitle="Use estes tempos para localizar gargalos desde a abertura até a conclusão."
+                />
+              </div>
+
+              {canViewAllUnits && adminSupermercadoFiltro === "todos" && (
+                <div className="mb-5 fade-up">
+                  <SupermercadoComparison chamados={dashboardChamados} supermercados={supermercadosDoEscopo} />
+                </div>
+              )}
+            </>
           )}
           </main>
         </div>
@@ -1159,14 +1420,15 @@ export default function App() {
     );
   }
 
-  if (view === "supermercados" && permissions.canViewAllUnits) {
+  if (view === "unidades" && permissions.canViewAllUnits) {
     return (
       <>
         <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
-          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1180,18 +1442,64 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
-          showOperatorAction={permissions.canAccessOperatorPanel}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-          showSupermercadosAction={canViewAllUnits}
-          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-          showManutencoesAction={permissions.canAccessOperatorPanel}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
-        <SupermercadosAdmin
-          supermercados={supermercados}
+        <UnidadesAdmin
+          empresas={empresas}
+          unidades={supermercadosDoEscopo}
           onCreate={handleCreateSupermercado}
           onUpdate={handleUpdateSupermercado}
           onToggleStatus={handleToggleSupermercadoStatus}
+          onVoltar={goBackToPreviousView}
+          canSelectEmpresa={canViewAllCompanies}
+          currentEmpresaId={empresaSelecionadaId}
+        />
+        {renderGlobalOverlays()}
+      </>
+    );
+  }
+
+  if (view === "empresas" && permissions.canViewAllCompanies) {
+    return (
+      <>
+        <Header
+          onNovoChamado={handleNovoChamadoAccess}
+          onOperadorPanel={handleOperadorAccess}
+          onDashboard={handleDashboardAccess}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
+          onOpenManutencoes={handleOpenManutencoes}
+          onAccessProfile={handleAccessProfile}
+          onOpenLogin={openLoginModal}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClearAll={clearAll}
+          syncMode={hasFirebaseConfig ? "firebase" : "local"}
+          perfilAcesso={perfilAcesso}
+          usuarioNome={operadorNome}
+          supermercadoNome={supermercadoNome}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+        />
+        <EmpresasAdmin
+          empresas={empresas}
+          onCreate={handleCreateEmpresa}
+          onUpdate={handleUpdateEmpresa}
+          onToggleStatus={handleToggleEmpresaStatus}
           onVoltar={goBackToPreviousView}
         />
         {renderGlobalOverlays()}
@@ -1206,7 +1514,8 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
-          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1220,20 +1529,28 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
-          showOperatorAction={permissions.canAccessOperatorPanel}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-          showSupermercadosAction={canViewAllUnits}
-          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-          showManutencoesAction={permissions.canAccessOperatorPanel}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
         <UsuariosAdmin
-          usuarios={usuarios}
-          supermercados={supermercados}
+          empresas={empresas}
+          usuarios={
+            canViewAllCompanies
+              ? usuarios
+              : usuarios.filter((usuario) => usuario.empresa_id === empresaSelecionadaId)
+          }
+          supermercados={supermercadosDoEscopo}
           currentAdminId={usuarioAtual?.id ?? null}
           onUpdate={handleUpdateUsuarioAdmin}
           onToggleStatus={handleToggleUsuarioStatus}
           onVoltar={goBackToPreviousView}
+          canSelectEmpresa={canViewAllCompanies}
+          currentEmpresaId={empresaSelecionadaId}
         />
         {renderGlobalOverlays()}
       </>
@@ -1247,7 +1564,8 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
-          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1261,19 +1579,24 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
-          showOperatorAction={permissions.canAccessOperatorPanel}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-          showSupermercadosAction={canViewAllUnits}
-          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-          showManutencoesAction={permissions.canAccessOperatorPanel}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
         {canViewAllUnits && (
           <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
             <AdminScopeSelector
-              value={adminSupermercadoFiltro}
-              onChange={setAdminSupermercadoFiltro}
+              empresaValue={adminEmpresaFiltro}
+              supermercadoValue={adminSupermercadoFiltro}
+              onEmpresaChange={setAdminEmpresaFiltro}
+              onSupermercadoChange={setAdminSupermercadoFiltro}
+              empresas={empresas}
               supermercados={supermercados}
+              allowEmpresaSelection={canViewAllCompanies}
             />
           </div>
         )}
@@ -1282,7 +1605,7 @@ export default function App() {
           chamados={allChamados}
           checklists={checklists}
           manutencoes={manutencoes}
-          supermercados={supermercados}
+          supermercados={supermercadosDoEscopo}
           isAdminGeral={canViewAllUnits}
           canManage={canViewAllUnits}
           canManageStatus={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
@@ -1305,7 +1628,8 @@ export default function App() {
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
-          onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+          onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+          onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1319,26 +1643,31 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
-          showOperatorAction={permissions.canAccessOperatorPanel}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-          showSupermercadosAction={canViewAllUnits}
-          showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-          showManutencoesAction={permissions.canAccessOperatorPanel}
+          showEmpresasAction={canViewAllCompanies}
+          showUnidadesAction={canViewAllUnits}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
         {canViewAllUnits && (
           <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
             <AdminScopeSelector
-              value={adminSupermercadoFiltro}
-              onChange={setAdminSupermercadoFiltro}
+              empresaValue={adminEmpresaFiltro}
+              supermercadoValue={adminSupermercadoFiltro}
+              onEmpresaChange={setAdminEmpresaFiltro}
+              onSupermercadoChange={setAdminSupermercadoFiltro}
+              empresas={empresas}
               supermercados={supermercados}
+              allowEmpresaSelection={canViewAllCompanies}
             />
           </div>
         )}
         <ManutencoesAdmin
           manutencoes={manutencoes}
           empilhadeiras={empilhadeiras}
-          supermercados={supermercados}
+          supermercados={supermercadosDoEscopo}
           isAdminGeral={canViewAllUnits}
           canCreate={permissions.canAccessOperatorPanel}
           canEdit={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
@@ -1361,7 +1690,8 @@ export default function App() {
         onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
         onDashboard={handleDashboardAccess}
-        onOpenSupermercadosAdmin={handleOpenSupermercadosAdmin}
+        onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
+        onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
         onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
         onOpenManutencoes={handleOpenManutencoes}
         onAccessProfile={handleAccessProfile}
@@ -1375,12 +1705,13 @@ export default function App() {
         perfilAcesso={perfilAcesso}
         usuarioNome={operadorNome}
         supermercadoNome={supermercadoNome}
-        showCreateAction={permissions.canCreateChamado}
-        showOperatorAction={permissions.canAccessOperatorPanel}
+        showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
+        showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
-        showSupermercadosAction={canViewAllUnits}
-        showEmpilhadeirasAction={permissions.canAccessOperatorPanel}
-        showManutencoesAction={permissions.canAccessOperatorPanel}
+        showEmpresasAction={canViewAllCompanies}
+        showUnidadesAction={canViewAllUnits}
+        showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+        showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
       />
 
       <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
@@ -1465,8 +1796,8 @@ export default function App() {
                     },
                     {
                       icon: "📈",
-                      title: "Supervisor e Administrador",
-                      description: "Visão gerencial, dashboards, usuários e supermercados.",
+                      title: "Supervisão e Administração",
+                      description: "Visão gerencial, dashboards, usuários, empresas e unidades.",
                     },
                   ].map((item) => (
                     <div
@@ -1492,47 +1823,67 @@ export default function App() {
 
         {canViewAllUnits && (
           <AdminScopeSelector
-            value={adminSupermercadoFiltro}
-            onChange={setAdminSupermercadoFiltro}
+            empresaValue={adminEmpresaFiltro}
+            supermercadoValue={adminSupermercadoFiltro}
+            onEmpresaChange={setAdminEmpresaFiltro}
+            onSupermercadoChange={setAdminSupermercadoFiltro}
+            empresas={empresas}
             supermercados={supermercados}
+            allowEmpresaSelection={canViewAllCompanies}
           />
         )}
 
         {canViewAllUnits && (
           <div className="mb-5">
             <div className="flex flex-wrap gap-2">
+              {canViewAllCompanies && (
+                <button
+                  type="button"
+                  onClick={handleOpenEmpresasAdmin}
+                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+                >
+                  <span>🏢</span>
+                  <span>Gerenciar Empresas</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleOpenSupermercadosAdmin}
+                onClick={handleOpenUnidadesAdmin}
                 className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
               >
                 <span>🏬</span>
-                <span>Gerenciar Supermercados</span>
+                <span>Gerenciar Unidades</span>
               </button>
-              <button
-                type="button"
-                onClick={handleOpenUsuariosAdmin}
-                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-              >
-                <span>👥</span>
-                <span>Gerenciar Usuários</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenEmpilhadeirasAdmin}
-                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-              >
-                <span>🚜</span>
-                <span>Empilhadeiras</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenManutencoes}
-                className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-              >
-                <span>🛠️</span>
-                <span>Manutenções</span>
-              </button>
+              {!isPlatformAdmin && (
+                <button
+                  type="button"
+                  onClick={handleOpenUsuariosAdmin}
+                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+                >
+                  <span>👥</span>
+                  <span>Gerenciar Usuários</span>
+                </button>
+              )}
+              {!isPlatformAdmin && (
+                <button
+                  type="button"
+                  onClick={handleOpenEmpilhadeirasAdmin}
+                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+                >
+                  <span>🚜</span>
+                  <span>Empilhadeiras</span>
+                </button>
+              )}
+              {!isPlatformAdmin && (
+                <button
+                  type="button"
+                  onClick={handleOpenManutencoes}
+                  className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
+                >
+                  <span>🛠️</span>
+                  <span>Manutenções</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1574,7 +1925,7 @@ export default function App() {
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.5)]" />
             {permissions.canTrackOwnChamados
               ? "Acompanhamento restrito ao seu usuário"
-              : "Fila isolada por supermercado"}
+              : "Fila isolada por unidade"}
           </div>
         </div>
 

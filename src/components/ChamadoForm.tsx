@@ -15,7 +15,7 @@ import type { NovoChamadoInput } from "../hooks/useChamados";
 import type { Supermercado } from "../types/supermercado";
 import { normalizeItemTelevendas } from "../utils/televendasItems";
 
-type NovoChamadoFormInput = Omit<NovoChamadoInput, "supermercado_id">;
+type NovoChamadoFormInput = Omit<NovoChamadoInput, "empresa_id" | "supermercado_id">;
 
 interface ChamadoFormProps {
   solicitanteNome: string;

@@ -1,5 +1,6 @@
 export interface ChecklistEmpilhadeira {
   id: string;
+  empresa_id: string;
   supermercado_id: string;
   empilhadeira_id: string;
   operador_id: string;
@@ -20,6 +21,7 @@ export interface ChecklistEmpilhadeira {
 }
 
 export interface NovoChecklistEmpilhadeiraInput {
+  empresa_id: string;
   supermercado_id: string;
   empilhadeira_id: string;
   operador_id: string;

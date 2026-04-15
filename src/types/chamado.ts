@@ -33,6 +33,7 @@ export interface ItemTelevendas {
 export interface Chamado {
   id: string;
   categoria: CategoriaChamado;
+  empresa_id: string;
   supermercado_id: string;
   solicitante_nome: string;
   setor: Setor;

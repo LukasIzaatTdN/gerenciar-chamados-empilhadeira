@@ -10,12 +10,15 @@ import {
   getChecklistEmpilhadeiraItensReprovados,
   getChecklistEmpilhadeiraOcorrencia,
 } from "../utils/checklistEmpilhadeira";
+import { resolveEmpresaId } from "../utils/tenant";
 
 const CHECKLISTS_COLLECTION = "checklists_empilhadeira";
 
 interface ChecklistScope {
+  empresaId: string | null;
   supermercadoId: string | null;
-  canViewAll: boolean;
+  canViewAllUnits: boolean;
+  canViewAllCompanies: boolean;
 }
 
 function normalizeChecklist(
@@ -24,6 +27,7 @@ function normalizeChecklist(
 ): ChecklistEmpilhadeira {
   return {
     id: data.id ?? fallbackId,
+    empresa_id: resolveEmpresaId(data.empresa_id),
     supermercado_id: data.supermercado_id ?? "",
     empilhadeira_id: data.empilhadeira_id ?? "",
     operador_id: data.operador_id ?? "",
@@ -74,7 +78,7 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
       return;
     }
 
-    if (!scope.canViewAll && !scope.supermercadoId) {
+    if (!scope.canViewAllCompanies && !scope.empresaId) {
       setChecklists([]);
       return;
     }
@@ -89,7 +93,8 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
               snapshotDoc.id
             )
           )
-          .filter((item) => scope.canViewAll || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
+          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
           .sort(
             (a, b) =>
               new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime()
@@ -101,18 +106,25 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
         setChecklists([]);
       }
     );
-  }, [scope.canViewAll, scope.supermercadoId]);
+  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
 
   const createChecklist = useCallback(
     async (
       input: NovoChecklistEmpilhadeiraInput,
       empilhadeira: Empilhadeira
     ) => {
+      if (empilhadeira.empresa_id !== input.empresa_id) {
+        throw new Error("A empilhadeira selecionada não pertence à empresa informada.");
+      }
       if (empilhadeira.supermercado_id !== input.supermercado_id) {
         throw new Error("A empilhadeira selecionada não pertence à unidade informada.");
       }
 
-      if (!scope.canViewAll && scope.supermercadoId !== input.supermercado_id) {
+      if (!scope.canViewAllCompanies && scope.empresaId !== input.empresa_id) {
+        throw new Error("Você só pode registrar checklist da sua própria empresa.");
+      }
+
+      if (!scope.canViewAllUnits && scope.supermercadoId !== input.supermercado_id) {
         throw new Error("Você só pode registrar checklist da sua própria unidade.");
       }
 
@@ -123,6 +135,7 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
       const id = db ? doc(collection(db, CHECKLISTS_COLLECTION)).id : createLocalId();
       const novo: ChecklistEmpilhadeira = {
         id,
+        empresa_id: resolveEmpresaId(input.empresa_id),
         supermercado_id: input.supermercado_id,
         empilhadeira_id: input.empilhadeira_id,
         operador_id: input.operador_id,
@@ -152,7 +165,7 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
 
       setChecklists((prev) => [novo, ...prev]);
     },
-    [scope.canViewAll, scope.supermercadoId]
+    [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
 
   return {

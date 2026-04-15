@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
+import { normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
 
 const USUARIOS_COLLECTION = "usuarios";
 
@@ -18,8 +19,9 @@ function slugify(value: string) {
 function buildUsuarioDocId(usuario: UsuarioSistema) {
   const nome = slugify(usuario.nome);
   const perfil = slugify(usuario.perfil);
+  const empresa = slugify(usuario.empresa_id ?? "empresa");
   const unidade = usuario.supermercado_id ?? "all";
-  return `usr-${perfil}-${nome}-${unidade}`;
+  return `usr-${empresa}-${perfil}-${nome}-${unidade}`;
 }
 
 function normalizeUsuario(
@@ -32,6 +34,7 @@ function normalizeUsuario(
     data.perfil === "Operador" ||
     data.perfil === "Supervisor" ||
     data.perfil === "Televendas" ||
+    data.perfil === "Administrador da Empresa" ||
     data.perfil === "Administrador Geral"
       ? data.perfil
       : "Promotor";
@@ -42,10 +45,15 @@ function normalizeUsuario(
     id: data.id ?? fallbackId,
     nome: typeof data.nome === "string" && data.nome.trim() ? data.nome.trim() : "Usuário",
     perfil,
+    empresa_id: resolveEmpresaId(data.empresa_id, null),
     supermercado_id:
       typeof data.supermercado_id === "string" && data.supermercado_id.trim()
         ? data.supermercado_id.trim()
         : null,
+    supermercado_ids: normalizeScopedUnitIds(
+      typeof data.supermercado_id === "string" ? data.supermercado_id : null,
+      data.supermercado_ids
+    ),
     status,
     email: typeof data.email === "string" ? data.email : undefined,
     criado_em: typeof data.criado_em === "string" ? data.criado_em : undefined,
@@ -88,6 +96,8 @@ export function useUsuarios() {
       ...usuario,
       nome: usuario.nome.trim(),
       id: buildUsuarioDocId(usuario),
+      empresa_id: resolveEmpresaId(usuario.empresa_id, null),
+      supermercado_ids: normalizeScopedUnitIds(usuario.supermercado_id, usuario.supermercado_ids),
       status: usuario.status ?? "Ativo",
     };
 
@@ -109,13 +119,22 @@ export function useUsuarios() {
       id: string,
       input: {
         perfil: PerfilAcesso;
+        empresa_id: string | null;
         supermercado_id: string | null;
+        supermercado_ids?: string[];
       }
     ) => {
+      const supermercado_ids = normalizeScopedUnitIds(
+        input.supermercado_id,
+        input.supermercado_ids
+      );
+
       if (db) {
         await updateDoc(doc(db, USUARIOS_COLLECTION, id), {
           perfil: input.perfil,
+          empresa_id: resolveEmpresaId(input.empresa_id, null),
           supermercado_id: input.supermercado_id,
+          supermercado_ids,
           atualizado_em: new Date().toISOString(),
         });
         return;
@@ -127,7 +146,9 @@ export function useUsuarios() {
             ? {
                 ...item,
                 perfil: input.perfil,
+                empresa_id: resolveEmpresaId(input.empresa_id, null),
                 supermercado_id: input.supermercado_id,
+                supermercado_ids,
                 atualizado_em: new Date().toISOString(),
               }
             : item

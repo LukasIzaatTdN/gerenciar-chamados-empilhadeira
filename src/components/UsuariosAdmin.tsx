@@ -1,17 +1,21 @@
 import { useMemo, useState } from "react";
+import type { Empresa } from "../types/empresa";
 import type { Supermercado } from "../types/supermercado";
 import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
 
 interface UsuariosAdminProps {
+  empresas: Empresa[];
   usuarios: UsuarioSistema[];
   supermercados: Supermercado[];
   currentAdminId: string | null;
   onUpdate: (
     id: string,
-    input: { perfil: PerfilAcesso; supermercado_id: string | null }
+    input: { perfil: PerfilAcesso; empresa_id: string | null; supermercado_id: string | null }
   ) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
   onVoltar: () => void;
+  canSelectEmpresa?: boolean;
+  currentEmpresaId?: string | null;
 }
 
 const PERFIS: PerfilAcesso[] = [
@@ -20,6 +24,7 @@ const PERFIS: PerfilAcesso[] = [
   "Operador",
   "Supervisor",
   "Televendas",
+  "Administrador da Empresa",
   "Administrador Geral",
 ];
 
@@ -33,23 +38,40 @@ function formatDate(iso?: string) {
 }
 
 export default function UsuariosAdmin({
+  empresas,
   usuarios,
   supermercados,
   currentAdminId,
   onUpdate,
   onToggleStatus,
   onVoltar,
+  canSelectEmpresa = false,
+  currentEmpresaId = null,
 }: UsuariosAdminProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPerfil, setEditPerfil] = useState<PerfilAcesso>("Promotor");
+  const [editEmpresaId, setEditEmpresaId] = useState<string>("");
   const [editSupermercadoId, setEditSupermercadoId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [pendingSaveId, setPendingSaveId] = useState<string | null>(null);
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
 
+  const empresasAtivas = useMemo(
+    () => empresas.filter((empresa) => empresa.status === "Ativa"),
+    [empresas]
+  );
   const supermercadosAtivos = useMemo(
     () => supermercados.filter((item) => item.status === "Ativo"),
     [supermercados]
+  );
+  const supermercadosDisponiveis = useMemo(
+    () =>
+      supermercadosAtivos.filter((item) =>
+        (canSelectEmpresa ? editEmpresaId : currentEmpresaId)
+          ? item.empresa_id === (canSelectEmpresa ? editEmpresaId : currentEmpresaId)
+          : true
+      ),
+    [canSelectEmpresa, currentEmpresaId, editEmpresaId, supermercadosAtivos]
   );
 
   const usuariosOrdenados = useMemo(
@@ -65,6 +87,7 @@ export default function UsuariosAdmin({
   function startEdit(usuario: UsuarioSistema) {
     setEditingId(usuario.id);
     setEditPerfil(usuario.perfil);
+    setEditEmpresaId(usuario.empresa_id ?? "");
     setEditSupermercadoId(usuario.supermercado_id ?? "");
     setError(null);
   }
@@ -75,10 +98,25 @@ export default function UsuariosAdmin({
   }
 
   async function handleSave(usuarioId: string) {
+    const empresa_id =
+      editPerfil === "Administrador Geral"
+        ? null
+        : (canSelectEmpresa ? editEmpresaId : currentEmpresaId) || null;
     const supermercado_id =
-      editPerfil === "Administrador Geral" ? null : editSupermercadoId || null;
+      editPerfil === "Administrador Geral" || editPerfil === "Administrador da Empresa"
+        ? null
+        : editSupermercadoId || null;
 
-    if (editPerfil !== "Administrador Geral" && !supermercado_id) {
+    if (editPerfil !== "Administrador Geral" && !empresa_id) {
+      setError("Selecione a empresa para este perfil.");
+      return;
+    }
+
+    if (
+      editPerfil !== "Administrador Geral" &&
+      editPerfil !== "Administrador da Empresa" &&
+      !supermercado_id
+    ) {
       setError("Selecione uma unidade para este perfil.");
       return;
     }
@@ -88,6 +126,7 @@ export default function UsuariosAdmin({
       setError(null);
       await onUpdate(usuarioId, {
         perfil: editPerfil,
+        empresa_id,
         supermercado_id,
       });
       setEditingId(null);
@@ -124,13 +163,13 @@ export default function UsuariosAdmin({
         <div className="mb-6 flex flex-col gap-3 rounded-[30px] border border-white/70 bg-white/75 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Administração geral
+              Administração de acesso
             </p>
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
               Usuários
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Altere perfil/unidade e inative ou reative acessos do sistema.
+              Altere perfil, empresa, unidade e status de acesso mantendo isolamento por cliente.
             </p>
           </div>
           <button
@@ -167,22 +206,16 @@ export default function UsuariosAdmin({
                 return (
                   <div
                     key={usuario.id}
-                    className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.2fr_1fr_1fr_0.8fr_0.8fr_auto]"
+                    className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.9fr_0.9fr_0.9fr_0.8fr_0.8fr_auto]"
                   >
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Nome
-                      </p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Nome</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{usuario.nome}</p>
-                      {usuario.email && (
-                        <p className="mt-0.5 text-xs text-slate-500">{usuario.email}</p>
-                      )}
+                      {usuario.email && <p className="mt-0.5 text-xs text-slate-500">{usuario.email}</p>}
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Perfil
-                      </p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Perfil</p>
                       {isEditing ? (
                         <select
                           value={editPerfil}
@@ -190,6 +223,10 @@ export default function UsuariosAdmin({
                             const next = e.target.value as PerfilAcesso;
                             setEditPerfil(next);
                             if (next === "Administrador Geral") {
+                              setEditEmpresaId("");
+                              setEditSupermercadoId("");
+                            }
+                            if (next === "Administrador da Empresa") {
                               setEditSupermercadoId("");
                             }
                           }}
@@ -207,22 +244,56 @@ export default function UsuariosAdmin({
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Unidade
-                      </p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
+                      {isEditing ? (
+                        <select
+                          value={editEmpresaId}
+                          disabled={!canSelectEmpresa || editPerfil === "Administrador Geral"}
+                          onChange={(e) => {
+                            setEditEmpresaId(e.target.value);
+                            setEditSupermercadoId("");
+                          }}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        >
+                          <option value="">
+                            {editPerfil === "Administrador Geral" ? "Todas as empresas" : "Selecione a empresa"}
+                          </option>
+                          {empresasAtivas.map((empresa) => (
+                            <option key={empresa.id} value={empresa.id}>
+                              {empresa.nome}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-1 text-sm text-slate-700">
+                          {usuario.empresa_id
+                            ? empresas.find((empresa) => empresa.id === usuario.empresa_id)?.nome ??
+                              usuario.empresa_id
+                            : "Todas as empresas"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Unidade</p>
                       {isEditing ? (
                         <select
                           value={editSupermercadoId}
-                          disabled={editPerfil === "Administrador Geral"}
+                          disabled={
+                            editPerfil === "Administrador Geral" ||
+                            editPerfil === "Administrador da Empresa"
+                          }
                           onChange={(e) => setEditSupermercadoId(e.target.value)}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
                         >
                           <option value="">
-                            {editPerfil === "Administrador Geral"
-                              ? "Todas as unidades"
-                              : "Selecione a unidade"}
+                            {editPerfil === "Administrador da Empresa"
+                              ? "Todas as unidades da empresa"
+                              : editPerfil === "Administrador Geral"
+                                ? "Todas as unidades"
+                                : "Selecione a unidade"}
                           </option>
-                          {supermercadosAtivos.map((supermercado) => (
+                          {supermercadosDisponiveis.map((supermercado) => (
                             <option key={supermercado.id} value={supermercado.id}>
                               {supermercado.nome} ({supermercado.codigo})
                             </option>
@@ -239,75 +310,34 @@ export default function UsuariosAdmin({
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Status
-                      </p>
-                      <span
-                        className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          usuario.status === "Inativo"
-                            ? "bg-slate-200 text-slate-600"
-                            : "bg-emerald-100 text-emerald-700"
-                        }`}
-                      >
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Status</p>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${usuario.status === "Inativo" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>
                         {usuario.status ?? "Ativo"}
                       </span>
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Criação
-                      </p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Criação</p>
                       <p className="mt-1 text-sm text-slate-700">{formatDate(usuario.criado_em)}</p>
                     </div>
 
                     <div className="flex items-center gap-2 md:justify-end">
                       {isEditing ? (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleSave(usuario.id);
-                            }}
-                            disabled={pendingSaveId === usuario.id}
-                            className="rounded-xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-3 py-2 text-xs font-semibold text-white"
-                          >
+                          <button type="button" onClick={() => { void handleSave(usuario.id); }} disabled={pendingSaveId === usuario.id} className="rounded-xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-3 py-2 text-xs font-semibold text-white">
                             {pendingSaveId === usuario.id ? "Salvando..." : "Salvar"}
                           </button>
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                          >
+                          <button type="button" onClick={cancelEdit} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
                             Cancelar
                           </button>
                         </>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(usuario)}
-                            disabled={isSelf}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
+                          <button type="button" onClick={() => startEdit(usuario)} disabled={isSelf} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
                             Editar
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleToggleStatus(usuario.id);
-                            }}
-                            disabled={pendingStatusId === usuario.id || isSelf}
-                            className={`rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-                              usuario.status === "Inativo"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {pendingStatusId === usuario.id
-                              ? "Atualizando..."
-                              : usuario.status === "Inativo"
-                                ? "Reativar"
-                                : "Inativar"}
+                          <button type="button" onClick={() => { void handleToggleStatus(usuario.id); }} disabled={pendingStatusId === usuario.id || isSelf} className={`rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${usuario.status === "Inativo" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            {pendingStatusId === usuario.id ? "Atualizando..." : usuario.status === "Inativo" ? "Reativar" : "Inativar"}
                           </button>
                         </>
                       )}

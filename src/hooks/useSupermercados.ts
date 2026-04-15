@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Supermercado } from "../types/supermercado";
+import { resolveEmpresaId } from "../utils/tenant";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
@@ -27,6 +28,7 @@ function normalizeSupermercado(
 ): Supermercado {
   return {
     id: data.id ?? fallbackId,
+    empresa_id: resolveEmpresaId(data.empresa_id),
     nome: data.nome ?? "Unidade sem nome",
     codigo: data.codigo ?? "UND",
     endereco: data.endereco ?? "Endereço não informado",
@@ -67,10 +69,16 @@ export function useSupermercados() {
   }, []);
 
   const createSupermercado = useCallback(
-    async (input: { nome: string; codigo: string; endereco: string }) => {
+    async (input: {
+      empresa_id: string;
+      nome: string;
+      codigo: string;
+      endereco: string;
+    }) => {
       const codigoNormalizado = input.codigo.trim().toUpperCase();
       const novo: Supermercado = {
         id: normalizeIdFromCodigo(codigoNormalizado),
+        empresa_id: resolveEmpresaId(input.empresa_id),
         nome: input.nome.trim(),
         codigo: codigoNormalizado,
         endereco: input.endereco.trim(),
@@ -95,11 +103,12 @@ export function useSupermercados() {
   const updateSupermercado = useCallback(
     async (
       id: string,
-      input: { nome: string; codigo: string; endereco: string }
+      input: { empresa_id: string; nome: string; codigo: string; endereco: string }
     ) => {
       try {
         if (db) {
           await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
+            empresa_id: resolveEmpresaId(input.empresa_id),
             nome: input.nome.trim(),
             codigo: input.codigo.trim().toUpperCase(),
             endereco: input.endereco.trim(),
@@ -115,6 +124,7 @@ export function useSupermercados() {
           item.id === id
             ? {
                 ...item,
+                empresa_id: resolveEmpresaId(input.empresa_id),
                 nome: input.nome.trim(),
                 codigo: input.codigo.trim().toUpperCase(),
                 endereco: input.endereco.trim(),
