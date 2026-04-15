@@ -3,8 +3,10 @@ import {
   collection,
   doc,
   onSnapshot,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Empilhadeira, EmpilhadeiraStatus } from "../types/empilhadeira";
@@ -62,8 +64,15 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       return;
     }
 
+    const empilhadeirasQuery = scope.canViewAllCompanies
+      ? query(collection(firestore, EMPILHADEIRAS_COLLECTION))
+      : query(
+          collection(firestore, EMPILHADEIRAS_COLLECTION),
+          where("empresa_id", "==", scope.empresaId)
+        );
+
     return onSnapshot(
-      collection(firestore, EMPILHADEIRAS_COLLECTION),
+      empilhadeirasQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>
