@@ -447,7 +447,7 @@ service cloud.firestore {
     }
 
     match /supermercados/{id} {
-      allow read: if canAccessEmpresa(resource.data.empresa_id);
+      allow read: if !isSignedIn() || canAccessEmpresa(resource.data.empresa_id);
       allow create: if hasAdminManagementAccess()
         && canAccessEmpresa(request.resource.data.empresa_id);
       allow update: if hasAdminManagementAccess()

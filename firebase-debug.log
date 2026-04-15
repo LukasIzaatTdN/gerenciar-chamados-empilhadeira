@@ -1,0 +1,57 @@
+[debug] [2026-04-15T19:00:05.358Z] ----------------------------------------------------------------------
+[debug] [2026-04-15T19:00:05.377Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only firestore:rules --project painel-772bf
+[debug] [2026-04-15T19:00:05.378Z] CLI Version:   15.14.0
+[debug] [2026-04-15T19:00:05.378Z] Platform:      linux
+[debug] [2026-04-15T19:00:05.379Z] Node Version:  v24.14.1
+[debug] [2026-04-15T19:00:05.379Z] Time:          Wed Apr 15 2026 15:00:05 GMT-0400 (Horário Padrão do Amazonas)
+[debug] [2026-04-15T19:00:05.380Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-15T19:00:13.038Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-15T19:00:13.045Z] > authorizing via signed-in user (llucas.ls157@gmail.com)
+[debug] [2026-04-15T19:00:13.046Z] [iam] checking project painel-772bf for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-04-15T19:00:13.052Z] Checked if tokens are valid: false, expires at: 1776277785181
+[debug] [2026-04-15T19:00:13.053Z] Checked if tokens are valid: false, expires at: 1776277785181
+[debug] [2026-04-15T19:00:13.053Z] > refreshing access token with scopes: []
+[debug] [2026-04-15T19:00:13.063Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-04-15T19:00:13.064Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-15T19:00:13.443Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-04-15T19:00:13.445Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-15T19:00:13.461Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions [none]
+[debug] [2026-04-15T19:00:13.461Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions  x-goog-user-project=painel-772bf
+[debug] [2026-04-15T19:00:13.461Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-04-15T19:00:14.551Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions 200
+[debug] [2026-04-15T19:00:14.551Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/painel-772bf:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'painel-772bf'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-04-15T19:00:14.590Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:14.590Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:14.591Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/painel-772bf/databases/(default) [none]
+[debug] [2026-04-15T19:00:14.939Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/painel-772bf/databases/(default) 200
+[debug] [2026-04-15T19:00:14.940Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/painel-772bf/databases/(default) {"name":"projects/painel-772bf/databases/(default)","uid":"4bfe3504-26e5-41ad-b086-0f795515b2fd","createTime":"2026-04-02T16:30:25.314071Z","updateTime":"2026-04-02T16:30:25.314071Z","locationId":"southamerica-east1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-04-15T18:00:15.093462Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"i","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"ILnw6pvF8JMDMMjFgoXMz5MD"}
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-04-15T19:00:14.949Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:14.950Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:14.952Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf:test [none]
+[debug] [2026-04-15T19:00:14.952Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf:test [omitted]
+[debug] [2026-04-15T19:00:16.711Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf:test 200
+[debug] [2026-04-15T19:00:16.712Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf:test {}
+[info] ✔  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-04-15T19:00:16.717Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:16.717Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:16.718Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/releases pageSize=10&pageToken=
+[debug] [2026-04-15T19:00:17.900Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/releases 200
+[debug] [2026-04-15T19:00:17.901Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/releases {"releases":[{"name":"projects/painel-772bf/releases/cloud.firestore","rulesetName":"projects/painel-772bf/rulesets/f33ee202-ad24-4244-97fb-06dcc538c07c","createTime":"2026-04-02T16:30:39.116497Z","updateTime":"2026-04-15T18:09:03.420225Z"}]}
+[debug] [2026-04-15T19:00:17.909Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:17.910Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:17.911Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/rulesets/f33ee202-ad24-4244-97fb-06dcc538c07c [none]
+[debug] [2026-04-15T19:00:19.191Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/rulesets/f33ee202-ad24-4244-97fb-06dcc538c07c 200
+[debug] [2026-04-15T19:00:19.191Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/painel-772bf/rulesets/f33ee202-ad24-4244-97fb-06dcc538c07c [omitted]
+[info] i  firestore: uploading rules firestore.rules... 
+[debug] [2026-04-15T19:00:19.196Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:19.196Z] Checked if tokens are valid: true, expires at: 1776283212445
+[debug] [2026-04-15T19:00:19.197Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf/rulesets [none]
+[debug] [2026-04-15T19:00:19.198Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/painel-772bf/rulesets [omitted]

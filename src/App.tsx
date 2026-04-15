@@ -150,6 +150,7 @@ export default function App() {
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
   const canViewAllCompanies = permissions.canViewAllCompanies;
+  const isAuthenticated = Boolean(usuarioAtual?.nome && perfilAcesso);
   const {
     empresas,
     createEmpresa,
@@ -162,8 +163,8 @@ export default function App() {
     updateUnidade: updateSupermercado,
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
-    empresaId: usuarioAtual?.empresa_id ?? null,
-    canViewAllCompanies,
+    empresaId: isAuthenticated ? usuarioAtual?.empresa_id ?? null : null,
+    canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
   });
   const {
     usuarios,
@@ -174,6 +175,7 @@ export default function App() {
   const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
   const isPlatformAdmin = perfilAcesso === "Administrador Geral";
+  const isCompanyAdmin = perfilAcesso === "Administrador da Empresa";
   const linkedEmpresaId =
     usuarioAtual?.empresa_id ??
     getUnidadeById(usuarioAtual?.supermercado_id, supermercados)?.empresa_id ??
@@ -587,7 +589,6 @@ export default function App() {
     return [];
   }, [chamados, operadorNome, permissions]);
 
-  const isAuthenticated = Boolean(operadorNome && perfilAcesso);
   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
 
   function renderGlobalOverlays() {
@@ -1235,8 +1236,8 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
-          showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showCreateAction={permissions.canCreateChamado}
+          showOperatorAction={!isCompanyAdmin && !isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}

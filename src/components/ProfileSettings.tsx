@@ -162,20 +162,6 @@ export default function ProfileSettings({
                 Gerenciar unidades
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className={cn(
-                "touch-target inline-flex items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all",
-                isDark
-                  ? "border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-                  : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
-              )}
-            >
-              <span>⎋</span>
-              Sair
-            </button>
           </div>
         </div>
 
@@ -421,6 +407,34 @@ export default function ProfileSettings({
                       <div className="h-16 rounded-2xl bg-[linear-gradient(135deg,#1d4ed8,#0f172a)]" />
                     </div>
                   </div>
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "rounded-[32px] border p-5 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:p-6",
+                isDark ? "border-slate-800 bg-slate-950/70" : "border-white/70 bg-white/75"
+              )}
+            >
+              <h2 className="text-lg font-black tracking-tight">Conta e sessão</h2>
+              <p className={cn("mt-1 text-sm", isDark ? "text-slate-400" : "text-slate-500")}>
+                Gerencie sua sessão atual e troque de usuário quando necessário.
+              </p>
+
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className={cn(
+                    "touch-target inline-flex w-full items-center justify-center gap-2 rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all sm:w-auto",
+                    isDark
+                      ? "border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15"
+                      : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                  )}
+                >
+                  <span>⎋</span>
+                  Trocar usuário
                 </button>
               </div>
             </div>
