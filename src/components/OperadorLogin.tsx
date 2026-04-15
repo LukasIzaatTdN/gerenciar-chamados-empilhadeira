@@ -31,6 +31,14 @@ const PERFIS_LOGIN: PerfilAcesso[] = [
   "Administrador Geral",
 ];
 
+const PERFIS_AUTO_CADASTRO: PerfilAcesso[] = [
+  "Promotor",
+  "Funcionário",
+  "Operador",
+  "Supervisor",
+  "Televendas",
+];
+
 export default function OperadorLogin({
   onLogin,
   onFirebaseLogin,
@@ -67,6 +75,10 @@ export default function OperadorLogin({
 
   const isAdminGeral = perfilSelecionado === "Administrador Geral";
   const isAdminEmpresa = perfilSelecionado === "Administrador da Empresa";
+  const perfisDisponiveisCadastro =
+    authMode === "firebase" && authTab === "register"
+      ? PERFIS_AUTO_CADASTRO
+      : PERFIS_LOGIN;
   const precisaEmpresa = Boolean(perfilSelecionado) && !isAdminGeral;
   const precisaUnidade = Boolean(perfilSelecionado) && !isAdminGeral && !isAdminEmpresa;
   const shouldDisableSubmit =
@@ -300,7 +312,7 @@ export default function OperadorLogin({
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Perfil de acesso</label>
                 <select value={perfilSelecionado} onChange={(e) => { setPerfilSelecionado(e.target.value as PerfilAcesso | ""); setError(""); }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900">
                   <option value="">Selecione seu acesso</option>
-                  {PERFIS_LOGIN.map((perfil) => (
+                  {perfisDisponiveisCadastro.map((perfil) => (
                     <option key={perfil} value={perfil}>
                       {perfil}
                     </option>

@@ -127,6 +127,14 @@ service cloud.firestore {
         || perfilInput == "Administrador Geral";
     }
 
+    function isPerfilAutoCadastroPermitido(perfilInput) {
+      return perfilInput == "Promotor"
+        || perfilInput == "Funcionário"
+        || perfilInput == "Operador"
+        || perfilInput == "Supervisor"
+        || perfilInput == "Televendas";
+    }
+
     function isEmpresaAtiva(empresaId) {
       return empresaId is string
         && empresaId.size() > 0
@@ -567,6 +575,7 @@ service cloud.firestore {
         && request.resource.data.id == request.auth.uid
         && request.resource.data.status == "Ativo"
         && isPerfilValido(request.resource.data.perfil)
+        && isPerfilAutoCadastroPermitido(request.resource.data.perfil)
         && isEmpresaVinculoValido(
           request.resource.data.perfil,
           request.resource.data.empresa_id
