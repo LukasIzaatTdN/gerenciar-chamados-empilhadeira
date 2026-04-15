@@ -288,49 +288,55 @@ export default function EmpresasAdmin({
             Empresas cadastradas
           </h2>
           <div className="space-y-3">
-            {empresasOrdenadas.map((empresa) => (
-              <div key={empresa.id} className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.55fr_0.95fr_0.9fr_0.9fr_auto]">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{empresa.nome}</p>
-                  <p className="mt-1 text-xs text-slate-500">{empresa.cnpj ?? "Sem CNPJ"}</p>
+            {empresasOrdenadas.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                Nenhuma empresa cadastrada ou visível para este perfil.
+              </p>
+            ) : (
+              empresasOrdenadas.map((empresa) => (
+                <div key={empresa.id} className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.55fr_0.95fr_0.9fr_0.9fr_auto]">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{empresa.nome}</p>
+                    <p className="mt-1 text-xs text-slate-500">{empresa.cnpj ?? "Sem CNPJ"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Código</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.codigo}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.plano_nome}</p>
+                    <p className="mt-1 text-xs text-slate-500">{empresa.plano_codigo} · {empresa.plano_ciclo}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites</p>
+                    <p className="mt-1 text-sm text-slate-700">{empresa.max_usuarios ?? "Livre"} usu.</p>
+                    <p className="text-xs text-slate-500">{empresa.max_unidades ?? "Livre"} unid.</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Contrato</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getPlanStatusClassName(empresa.plano_status)}`}>
+                      {empresa.plano_status}
+                    </span>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {formatDate(empresa.contrato_inicio)} ate {formatDate(empresa.contrato_fim)}
+                    </p>
+                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                      {empresa.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 md:justify-end">
+                    <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                      Editar
+                    </button>
+                    <button type="button" onClick={() => { void handleToggleStatus(empresa.id); }} disabled={pendingStatusId === empresa.id} className={`rounded-xl px-3 py-2 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {pendingStatusId === empresa.id ? "Atualizando..." : empresa.status === "Ativa" ? "Inativar" : "Ativar"}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Código</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.codigo}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.plano_nome}</p>
-                  <p className="mt-1 text-xs text-slate-500">{empresa.plano_codigo} · {empresa.plano_ciclo}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites</p>
-                  <p className="mt-1 text-sm text-slate-700">{empresa.max_usuarios ?? "Livre"} usu.</p>
-                  <p className="text-xs text-slate-500">{empresa.max_unidades ?? "Livre"} unid.</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Contrato</p>
-                  <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getPlanStatusClassName(empresa.plano_status)}`}>
-                    {empresa.plano_status}
-                  </span>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {formatDate(empresa.contrato_inicio)} ate {formatDate(empresa.contrato_fim)}
-                  </p>
-                  <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                    {empresa.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 md:justify-end">
-                  <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                    Editar
-                  </button>
-                  <button type="button" onClick={() => { void handleToggleStatus(empresa.id); }} disabled={pendingStatusId === empresa.id} className={`rounded-xl px-3 py-2 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                    {pendingStatusId === empresa.id ? "Atualizando..." : empresa.status === "Ativa" ? "Inativar" : "Ativar"}
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </main>

@@ -40,6 +40,10 @@ service cloud.firestore {
       return isAdminGeral() || isAdminGeralByUserDoc() || isAdminEmpresa() || isAdminEmpresaByUserDoc();
     }
 
+    function isPlatformAdminAccess() {
+      return isAdminGeral() || isAdminGeralByUserDoc();
+    }
+
     function currentUserEmpresaId() {
       return isSignedIn()
         ? (
@@ -442,7 +446,11 @@ service cloud.firestore {
         && canAccessEmpresa(request.resource.data.empresa_id);
       allow update: if hasAdminManagementAccess()
         && canAccessEmpresa(resource.data.empresa_id)
-        && request.resource.data.empresa_id == resource.data.empresa_id;
+        && canAccessEmpresa(request.resource.data.empresa_id)
+        && (
+          isPlatformAdminAccess()
+          || request.resource.data.empresa_id == resource.data.empresa_id
+        );
       allow delete: if hasAdminManagementAccess()
         && canAccessEmpresa(resource.data.empresa_id);
     }
