@@ -50,7 +50,6 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
-import { LEGACY_EMPRESA_ID } from "./utils/tenant";
 
 type View =
   | "geral"
@@ -174,7 +173,7 @@ export default function App() {
   const linkedEmpresaId =
     usuarioAtual?.empresa_id ??
     getUnidadeById(usuarioAtual?.supermercado_id, supermercados)?.empresa_id ??
-    (perfilAcesso === "Administrador Geral" ? null : LEGACY_EMPRESA_ID);
+    null;
   const empresaId = linkedEmpresaId;
   const supermercadoId = usuarioAtual?.supermercado_id ?? null;
   const empresaNome = getEmpresaById(empresaId, empresas)?.nome ?? null;
@@ -462,9 +461,7 @@ export default function App() {
                 empresa_id:
                   typeof empresaClaim === "string" && empresaClaim.trim()
                     ? empresaClaim.trim()
-                    : perfilClaim === "Administrador Geral"
-                    ? null
-                    : LEGACY_EMPRESA_ID,
+                    : null,
                 supermercado_id:
                   typeof supermercadoClaim === "string" && supermercadoClaim.trim()
                     ? supermercadoClaim.trim()
@@ -499,9 +496,7 @@ export default function App() {
                     empresa_id:
                       typeof userData.empresa_id === "string" && userData.empresa_id.trim()
                         ? userData.empresa_id
-                        : userData.perfil === "Administrador Geral"
-                        ? null
-                        : LEGACY_EMPRESA_ID,
+                        : null,
                     supermercado_id:
                       typeof userData.supermercado_id === "string"
                         ? userData.supermercado_id
@@ -874,6 +869,10 @@ export default function App() {
     codigo: string;
     endereco: string;
   }) {
+    if (!input.empresa_id?.trim()) {
+      throw new Error("Empresa do administrador não vinculada. Revise o cadastro do usuário.");
+    }
+
     await createSupermercado({
       empresa_id: input.empresa_id,
       nome: input.nome.trim(),
