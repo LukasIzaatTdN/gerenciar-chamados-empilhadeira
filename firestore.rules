@@ -159,24 +159,6 @@ service cloud.firestore {
         || (currentUserEmpresaId() != null && currentUserEmpresaId() == empresaId);
     }
 
-    function canAccessSupermercado(supermercadoId) {
-      return isAdminGeral()
-        || isAdminGeralByUserDoc()
-        || (
-          isTextoNaoVazio(supermercadoId)
-          && exists(/databases/$(database)/documents/supermercados/$(supermercadoId))
-          && canAccessEmpresa(
-            get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.empresa_id
-          )
-          && (
-            currentUserPerfil() == "Administrador da Empresa"
-            || currentUserSupermercadoId() == null
-            || currentUserSupermercadoId() == supermercadoId
-          )
-        )
-      );
-    }
-
     function isTextoNaoVazio(valor) {
       return valor is string && valor.size() > 0;
     }
@@ -456,7 +438,13 @@ service cloud.firestore {
 
     match /supermercados/{id} {
       allow read: if canAccessEmpresa(resource.data.empresa_id);
-      allow write: if hasAdminManagementAccess();
+      allow create: if hasAdminManagementAccess()
+        && canAccessEmpresa(request.resource.data.empresa_id);
+      allow update: if hasAdminManagementAccess()
+        && canAccessEmpresa(resource.data.empresa_id)
+        && request.resource.data.empresa_id == resource.data.empresa_id;
+      allow delete: if hasAdminManagementAccess()
+        && canAccessEmpresa(resource.data.empresa_id);
     }
 
     match /empilhadeiras/{id} {
