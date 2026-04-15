@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
-import { auth, db, hasFirebaseConfig } from "../config/firebase";
+import { db } from "../config/firebase";
 import type { Empresa, EmpresaStatus, PlanoCiclo, PlanoStatus } from "../types/empresa";
 import { resolveEmpresaId, sanitizeTenantId } from "../utils/tenant";
 
@@ -56,27 +55,13 @@ function buildEmpresaId(codigo: string) {
 
 export function useEmpresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [authHydrated, setAuthHydrated] = useState(!hasFirebaseConfig || !auth);
   const isRemoteSyncEnabled = db !== null;
-
-  useEffect(() => {
-    if (!hasFirebaseConfig || !auth) {
-      setAuthHydrated(true);
-      return;
-    }
-
-    return onAuthStateChanged(auth, () => {
-      setAuthHydrated(true);
-    });
-  }, []);
 
   useEffect(() => {
     if (!db) {
       setEmpresas([]);
       return;
     }
-
-    if (!authHydrated) return;
 
     return onSnapshot(
       collection(db, EMPRESAS_COLLECTION),
@@ -91,7 +76,7 @@ export function useEmpresas() {
       },
       () => setEmpresas([])
     );
-  }, [authHydrated]);
+  }, []);
 
   const createEmpresa = useCallback(
     async (input: {

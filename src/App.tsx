@@ -30,6 +30,7 @@ import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
 import { useManutencoes } from "./hooks/useManutencoes";
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   GoogleAuthProvider,
   getIdTokenResult,
   onAuthStateChanged,
@@ -803,6 +804,11 @@ export default function App() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
+      try {
+        await deleteUser(credential.user);
+      } catch {
+        // Best-effort rollback; if this fails, user may need manual cleanup.
+      }
       throw new Error(`Falha ao salvar perfil/unidade no Firestore: ${message}`);
     }
 
