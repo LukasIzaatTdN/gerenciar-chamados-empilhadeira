@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, query, setDoc, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  setDoc,
+  where,
+  type FirestoreError,
+} from "firebase/firestore";
 import { db } from "../config/firebase";
 import type {
   ChecklistEmpilhadeira,
@@ -175,7 +183,14 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
       };
 
       if (db) {
-        await setDoc(doc(db, CHECKLISTS_COLLECTION, id), novo);
+        try {
+          await setDoc(doc(db, CHECKLISTS_COLLECTION, id), novo);
+        } catch (error) {
+          throw mapFirestoreChecklistError(
+            error,
+            "Falha ao registrar checklist antes do turno."
+          );
+        }
         return;
       }
 
@@ -188,4 +203,20 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
     checklists,
     createChecklist,
   };
+}
+
+function mapFirestoreChecklistError(error: unknown, fallback: string): Error {
+  const firestoreError = error as FirestoreError | undefined;
+
+  if (firestoreError?.code === "permission-denied") {
+    return new Error(`${fallback} Verifique login, empresa/unidade e regras do Firestore. (permission-denied)`);
+  }
+  if (firestoreError?.code === "unauthenticated") {
+    return new Error(`${fallback} Sessão expirada, faça login novamente. (unauthenticated)`);
+  }
+  if (firestoreError?.code === "unavailable") {
+    return new Error(`${fallback} Firebase indisponível no momento. (unavailable)`);
+  }
+
+  return new Error(fallback);
 }

@@ -367,6 +367,14 @@ export default function OperadorPanel({
       (item) => item.operador_id === operadorId && item.data === hoje
     );
   }, [checklists, operadorId]);
+  const checklistActionError = useMemo(() => {
+    if (!actionError) return null;
+    const normalized = actionError.toLowerCase();
+    if (normalized.includes("checklist") || normalized.includes("turno")) {
+      return actionError;
+    }
+    return null;
+  }, [actionError]);
 
   async function handleChecklistSubmit() {
     const empilhadeira = empilhadeiras.find((item) => item.id === checklistForm.empilhadeira_id);
@@ -861,6 +869,12 @@ export default function OperadorPanel({
                   >
                     {loadingActionId === "checklist-turno" ? "Registrando..." : "Registrar checklist"}
                   </button>
+
+                  {checklistActionError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700">
+                      {checklistActionError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
