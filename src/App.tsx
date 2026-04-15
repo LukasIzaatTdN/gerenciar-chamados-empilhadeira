@@ -95,6 +95,19 @@ function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
   return "geral";
 }
 
+function canAccessViewByPerfil(view: View, perfil: UsuarioSistema["perfil"]) {
+  const nextPermissions = getPermissions(perfil);
+
+  if (view === "empresas") return nextPermissions.canViewAllCompanies;
+  if (view === "unidades") return nextPermissions.canViewAllUnits;
+  if (view === "usuarios") return nextPermissions.canViewAllUnits;
+  if (view === "dashboard") {
+    return nextPermissions.canViewUnitDashboard || nextPermissions.canViewAllUnits;
+  }
+  if (view === "operador") return nextPermissions.canAccessOperatorPanel;
+  return true;
+}
+
 export default function App() {
   const [authHydrated, setAuthHydrated] = useState(!hasFirebaseConfig);
   const [showForm, setShowForm] = useState(false);
@@ -424,12 +437,10 @@ export default function App() {
 
           setUsuarioAtual(nextUsuario);
           setView((prev) => {
-            if (
-              prev === "perfil" ||
-              prev === "empresas" ||
-              prev === "unidades" ||
-              prev === "usuarios"
-            ) {
+            if (prev === "perfil") {
+              return prev;
+            }
+            if (canAccessViewByPerfil(prev, nextUsuario.perfil)) {
               return prev;
             }
             return getViewByPerfil(nextUsuario.perfil);
