@@ -47,11 +47,13 @@ service cloud.firestore {
     function currentUserEmpresaId() {
       return isSignedIn()
         ? (
-            request.auth.token.empresa_id != null
-            ? request.auth.token.empresa_id
+            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id != null
+            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
             : (
-                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
+                request.auth.token.empresa_id is string
+                && request.auth.token.empresa_id.size() > 0
+                ? request.auth.token.empresa_id
                 : null
               )
           )
@@ -61,11 +63,13 @@ service cloud.firestore {
     function currentUserSupermercadoId() {
       return isSignedIn()
         ? (
-            request.auth.token.supermercado_id != null
-            ? request.auth.token.supermercado_id
+            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id != null
+            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
             : (
-                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+                request.auth.token.supermercado_id is string
+                && request.auth.token.supermercado_id.size() > 0
+                ? request.auth.token.supermercado_id
                 : null
               )
           )
@@ -75,11 +79,13 @@ service cloud.firestore {
     function currentUserPerfil() {
       return isSignedIn()
         ? (
-            request.auth.token.perfil != null
-            ? request.auth.token.perfil
+            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil != null
+            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
             : (
-                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+                request.auth.token.perfil is string
+                && request.auth.token.perfil.size() > 0
+                ? request.auth.token.perfil
                 : null
               )
           )
