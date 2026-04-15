@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, setDoc, where } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type {
   ChecklistEmpilhadeira,
@@ -78,13 +78,29 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
       return;
     }
 
-    if (!scope.canViewAllCompanies && !scope.empresaId) {
+    if (
+      !scope.canViewAllCompanies &&
+      !scope.empresaId &&
+      !(scope.supermercadoId && !scope.canViewAllUnits)
+    ) {
       setChecklists([]);
       return;
     }
 
+    const checklistsQuery = scope.canViewAllCompanies
+      ? query(collection(db, CHECKLISTS_COLLECTION))
+      : !scope.canViewAllUnits && scope.supermercadoId
+        ? query(
+            collection(db, CHECKLISTS_COLLECTION),
+            where("supermercado_id", "==", scope.supermercadoId)
+          )
+        : query(
+            collection(db, CHECKLISTS_COLLECTION),
+            where("empresa_id", "==", scope.empresaId)
+          );
+
     return onSnapshot(
-      collection(db, CHECKLISTS_COLLECTION),
+      checklistsQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>

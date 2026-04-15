@@ -177,7 +177,20 @@ service cloud.firestore {
       return isAdminGeral()
         || isAdminGeralByUserDoc()
         || isAdminEmpresaDaEmpresa(empresaId)
-        || (currentUserEmpresaId() != null && currentUserEmpresaId() == empresaId);
+        || (currentUserEmpresaId() != null && currentUserEmpresaId() == empresaId)
+        || (
+          currentUserSupermercadoId() is string
+          && currentUserSupermercadoId().size() > 0
+          && exists(/databases/$(database)/documents/supermercados/$(currentUserSupermercadoId()))
+          && get(/databases/$(database)/documents/supermercados/$(currentUserSupermercadoId())).data.empresa_id == empresaId
+        );
+    }
+
+    function canAccessCurrentSupermercado(supermercadoId) {
+      return isSignedIn()
+        && currentUserSupermercadoId() is string
+        && currentUserSupermercadoId().size() > 0
+        && currentUserSupermercadoId() == supermercadoId;
     }
 
     function isTextoNaoVazio(valor) {
@@ -199,7 +212,7 @@ service cloud.firestore {
     }
 
     function isListaItensTelevendasValida(valor) {
-      return valor is list;
+      return valor == null || valor is list;
     }
 
     function isStatusChamadoValido(status) {
@@ -284,6 +297,7 @@ service cloud.firestore {
 
     function canCreateChecklistEmpilhadeira(data) {
       return hasAdminManagementAccess()
+        || canAccessEmpresa(data.empresa_id)
         || (
           isSignedIn()
           && currentUserSupermercadoId() != null
@@ -348,7 +362,7 @@ service cloud.firestore {
 
     function isChamadoBaseValido(data) {
       return isTextoNaoVazio(data.id)
-        && isCategoriaValida(data.categoria)
+        && (isCampoVazio(data.categoria) || isCategoriaValida(data.categoria))
         && isTextoNaoVazio(data.empresa_id)
         && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
         && isTextoNaoVazio(data.supermercado_id)
@@ -402,6 +416,8 @@ service cloud.firestore {
 
     function isCriacaoChamadoValida() {
       return isChamadoBaseValido(request.resource.data)
+        && isCategoriaValida(request.resource.data.categoria)
+        && request.resource.data.itens is list
         && (
           (request.resource.data.categoria == "operacional" && request.resource.data.status == "Aguardando")
           || (request.resource.data.categoria == "televendas" && request.resource.data.status == "Aberto")
@@ -420,34 +436,52 @@ service cloud.firestore {
     }
 
     function isAtualizacaoChamadoValida() {
-      return isChamadoBaseValido(request.resource.data)
-        && request.resource.data.categoria == resource.data.categoria
+      return request.resource.data.id == resource.data.id
+        && (
+          request.resource.data.categoria == resource.data.categoria
+          || isCampoVazio(resource.data.categoria)
+        )
         && request.resource.data.empresa_id == resource.data.empresa_id
         && request.resource.data.supermercado_id == resource.data.supermercado_id
-        && request.resource.data.id == resource.data.id
-        && request.resource.data.solicitante_nome == resource.data.solicitante_nome
-        && request.resource.data.setor == resource.data.setor
-        && request.resource.data.tipo_servico == resource.data.tipo_servico
-        && request.resource.data.numero_pedido == resource.data.numero_pedido
-        && request.resource.data.cliente == resource.data.cliente
-        && request.resource.data.local_separacao == resource.data.local_separacao
-        && request.resource.data.prazo_limite == resource.data.prazo_limite
-        && request.resource.data.prioridade == resource.data.prioridade
-        && request.resource.data.criado_em == resource.data.criado_em
-        && isStatusChamadoValido(request.resource.data.status);
+        && isTextoNaoVazio(request.resource.data.id)
+        && isTextoNaoVazio(request.resource.data.empresa_id)
+        && isTextoNaoVazio(request.resource.data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(
+          request.resource.data.empresa_id,
+          request.resource.data.supermercado_id
+        )
+        && isStatusChamadoValido(request.resource.data.status)
+        && (isCampoVazio(request.resource.data.operador_nome) || isTextoNaoVazio(request.resource.data.operador_nome))
+        && (isCampoVazio(request.resource.data.assumido_em) || isTextoNaoVazio(request.resource.data.assumido_em))
+        && (isCampoVazio(request.resource.data.a_caminho_em) || isTextoNaoVazio(request.resource.data.a_caminho_em))
+        && (isCampoVazio(request.resource.data.cheguei_em) || isTextoNaoVazio(request.resource.data.cheguei_em))
+        && (isCampoVazio(request.resource.data.iniciado_em) || isTextoNaoVazio(request.resource.data.iniciado_em))
+        && (isCampoVazio(request.resource.data.finalizado_em) || isTextoNaoVazio(request.resource.data.finalizado_em))
+        && (isCampoVazio(request.resource.data.cancelado_em) || isTextoNaoVazio(request.resource.data.cancelado_em))
+        && isEmpilhadeiraCompativelComChamado(request.resource.data);
     }
 
     match /chamados/{id} {
-      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
+      allow read: if isSignedIn()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
 
       allow create: if isSignedIn()
         && request.resource.data.id == id
         && isCriacaoChamadoValida()
-        && canAccessEmpresa(request.resource.data.empresa_id);
+        && (
+          canAccessEmpresa(request.resource.data.empresa_id)
+          || canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+        );
 
       allow update: if isSignedIn()
         && isAtualizacaoChamadoValida()
-        && canAccessEmpresa(resource.data.empresa_id);
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
 
       allow delete: if isAdminGeral() || isAdminGeralByUserDoc();
     }
@@ -496,7 +530,11 @@ service cloud.firestore {
     }
 
     match /checklists_empilhadeira/{id} {
-      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
+      allow read: if isSignedIn()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
       allow create: if isChecklistEmpilhadeiraValido(request.resource.data, id)
         && canCreateChecklistEmpilhadeira(request.resource.data);
       allow update: if hasAdminManagementAccess()
