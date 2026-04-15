@@ -8,6 +8,7 @@ interface HeaderProps {
   onDashboard: () => void;
   onOpenEmpresasAdmin?: () => void;
   onOpenUnidadesAdmin?: () => void;
+  onOpenUsuariosAdmin?: () => void;
   onOpenSupermercadosAdmin?: () => void;
   onOpenEmpilhadeiras?: () => void;
   onOpenManutencoes?: () => void;
@@ -27,6 +28,7 @@ interface HeaderProps {
   showDashboardAction: boolean;
   showEmpresasAction?: boolean;
   showUnidadesAction?: boolean;
+  showUsuariosAction?: boolean;
   showSupermercadosAction?: boolean;
   showEmpilhadeirasAction?: boolean;
   showManutencoesAction?: boolean;
@@ -38,6 +40,7 @@ export default function Header({
   onDashboard,
   onOpenEmpresasAdmin,
   onOpenUnidadesAdmin,
+  onOpenUsuariosAdmin,
   onOpenSupermercadosAdmin,
   onOpenEmpilhadeiras,
   onOpenManutencoes,
@@ -57,6 +60,7 @@ export default function Header({
   showDashboardAction,
   showEmpresasAction = false,
   showUnidadesAction = false,
+  showUsuariosAction = false,
   showSupermercadosAction = false,
   showEmpilhadeirasAction = false,
   showManutencoesAction = false,
@@ -230,6 +234,15 @@ export default function Header({
                   <span>Unidades</span>
                 </button>
               )}
+              {showUsuariosAction && onOpenUsuariosAdmin && (
+                <button
+                  onClick={onOpenUsuariosAdmin}
+                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                >
+                  <span>👥</span>
+                  <span>Usuários</span>
+                </button>
+              )}
               {showCreateAction && (
                 <button
                   onClick={onNovoChamado}
@@ -367,6 +380,19 @@ export default function Header({
                   >
                     <span>🏬</span>
                     <span>Unidades</span>
+                  </button>
+                )}
+                {showUsuariosAction && onOpenUsuariosAdmin && (
+                  <button
+                    onClick={onOpenUsuariosAdmin}
+                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
+                      perfilAcesso === "Administrador Geral"
+                        ? "bg-amber-500 text-slate-950"
+                        : "border border-white/20 bg-white/10 text-white"
+                    }`}
+                  >
+                    <span>👥</span>
+                    <span>Usuários</span>
                   </button>
                 )}
 

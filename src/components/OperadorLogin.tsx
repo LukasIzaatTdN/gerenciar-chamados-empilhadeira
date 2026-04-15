@@ -14,6 +14,7 @@ interface OperadorLoginProps {
     perfil: PerfilAcesso;
     empresa_id: string | null;
     supermercado_id: string | null;
+    invite_token?: string;
   }) => void | Promise<void>;
   onCancel: () => void;
   empresas: Empresa[];
@@ -57,6 +58,7 @@ export default function OperadorLogin({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
   const [error, setError] = useState("");
 
   const empresasAtivas = useMemo(
@@ -75,12 +77,19 @@ export default function OperadorLogin({
 
   const isAdminGeral = perfilSelecionado === "Administrador Geral";
   const isAdminEmpresa = perfilSelecionado === "Administrador da Empresa";
+  const usingAdminInvite = authMode === "firebase" && authTab === "register" && inviteToken.trim().length > 0;
   const perfisDisponiveisCadastro =
     authMode === "firebase" && authTab === "register"
       ? PERFIS_AUTO_CADASTRO
       : PERFIS_LOGIN;
-  const precisaEmpresa = Boolean(perfilSelecionado) && !isAdminGeral;
-  const precisaUnidade = Boolean(perfilSelecionado) && !isAdminGeral && !isAdminEmpresa;
+  const perfilEfetivo = usingAdminInvite
+    ? ("Administrador da Empresa" as PerfilAcesso)
+    : perfilSelecionado;
+  const precisaEmpresa = Boolean(perfilEfetivo) && perfilEfetivo !== "Administrador Geral";
+  const precisaUnidade =
+    Boolean(perfilEfetivo) &&
+    perfilEfetivo !== "Administrador Geral" &&
+    perfilEfetivo !== "Administrador da Empresa";
   const shouldDisableSubmit =
     authMode === "firebase" && authTab === "register" && precisaEmpresa && empresasAtivas.length === 0;
 
@@ -147,8 +156,9 @@ export default function OperadorLogin({
 
     const nomeFinal = nomeColaborador.trim();
     if (!nomeFinal) return setError("Informe o nome do colaborador");
-    if (!perfilSelecionado) return setError("Selecione um perfil");
-    if (precisaEmpresa && !empresaId) return setError("Selecione a empresa");
+    if (!perfilEfetivo) return setError("Selecione um perfil");
+    if (usingAdminInvite && !inviteToken.trim()) return setError("Informe o token de convite.");
+    if (precisaEmpresa && !empresaId && !usingAdminInvite) return setError("Selecione a empresa");
     if (precisaUnidade && !supermercadoId) return setError("Selecione a unidade");
 
     if (authMode === "firebase") {
@@ -159,9 +169,10 @@ export default function OperadorLogin({
           nome: nomeFinal,
           email: email.trim(),
           password,
-          perfil: perfilSelecionado,
-          empresa_id: isAdminGeral ? null : empresaId,
+          perfil: perfilEfetivo,
+          empresa_id: perfilEfetivo === "Administrador Geral" ? null : empresaId,
           supermercado_id: precisaUnidade ? supermercadoId : null,
+          invite_token: inviteToken.trim() || undefined,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
@@ -182,13 +193,38 @@ export default function OperadorLogin({
   }
 
   function renderTenantSelectors() {
-    if (!perfilSelecionado) return null;
+    if (!perfilEfetivo) return null;
 
     return (
       <>
+        {authMode === "firebase" && authTab === "register" && (
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Token de convite (Admin da Empresa)
+            </label>
+            <input
+              type="text"
+              value={inviteToken}
+              onChange={(e) => {
+                setInviteToken(e.target.value);
+                setError("");
+              }}
+              placeholder="Cole aqui o token recebido"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Com token válido, o cadastro será criado como Administrador da Empresa automaticamente.
+            </p>
+          </div>
+        )}
+
         {isAdminGeral ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             Administrador Geral usa visão consolidada de todas as empresas e unidades.
+          </div>
+        ) : usingAdminInvite ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+            Convite detectado: este cadastro será vinculado à empresa do token com acesso de Administrador da Empresa.
           </div>
         ) : (
           <div>
@@ -212,7 +248,7 @@ export default function OperadorLogin({
           </div>
         )}
 
-        {precisaUnidade && (
+        {precisaUnidade && !usingAdminInvite && (
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">Unidade</label>
             <select
@@ -233,7 +269,7 @@ export default function OperadorLogin({
           </div>
         )}
 
-        {isAdminEmpresa && (
+        {perfilEfetivo === "Administrador da Empresa" && (
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
             Administrador da Empresa terá visão de todas as unidades do cliente selecionado.
           </div>
@@ -322,12 +358,12 @@ export default function OperadorLogin({
 
               {renderTenantSelectors()}
 
-              {perfilSelecionado && (
+              {perfilEfetivo && (
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                   <p className="font-semibold text-slate-900">{nomeColaborador.trim() || "Nome não informado"}</p>
-                  <p className="mt-1">Perfil: {perfilSelecionado}</p>
+                  <p className="mt-1">Perfil: {perfilEfetivo}</p>
                   <p className="mt-1">
-                    Empresa: {isAdminGeral ? "Todas as empresas" : empresasAtivas.find((item) => item.id === empresaId)?.nome ?? "Não definida"}
+                    Empresa: {perfilEfetivo === "Administrador Geral" ? "Todas as empresas" : empresasAtivas.find((item) => item.id === empresaId)?.nome ?? (usingAdminInvite ? "Definida pelo convite" : "Não definida")}
                   </p>
                   <p className="mt-1">
                     Unidade: {precisaUnidade ? supermercadosDisponiveis.find((item) => item.id === supermercadoId)?.nome ?? "Não definida" : "Todas as unidades vinculadas"}

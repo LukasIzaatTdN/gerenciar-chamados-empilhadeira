@@ -28,6 +28,7 @@ import { useUsuarios } from "./hooks/useUsuarios";
 import { useEmpilhadeiras } from "./hooks/useEmpilhadeiras";
 import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
 import { useManutencoes } from "./hooks/useManutencoes";
+import { useAdminInvites } from "./hooks/useAdminInvites";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -50,6 +51,7 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
+import type { AdminInvite } from "./types/adminInvite";
 
 type View =
   | "geral"
@@ -189,6 +191,10 @@ export default function App() {
     canViewAllCompanies && adminEmpresaFiltro !== "todas"
       ? adminEmpresaFiltro
       : empresaId;
+  const { invites: adminInvites, createAdminInvite, validateInviteToken, consumeInvite } = useAdminInvites({
+    empresaId: empresaSelecionadaId,
+    canViewAllCompanies,
+  });
   const supermercadosDoEscopo = useMemo(
     () =>
       empresaSelecionadaId
@@ -768,6 +774,7 @@ export default function App() {
     perfil: UsuarioSistema["perfil"];
     empresa_id: string | null;
     supermercado_id: string | null;
+    invite_token?: string;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
 
@@ -784,22 +791,42 @@ export default function App() {
       throw new Error(`Falha ao criar autenticação: ${message}`);
     }
 
+    const inviteToken = typeof input.invite_token === "string" ? input.invite_token.trim() : "";
+    let invite: AdminInvite | null = null;
+
     try {
+      if (inviteToken) {
+        invite = await validateInviteToken(inviteToken);
+      }
+
+      const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
+      const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
+      const supermercadoFinal = invite ? null : input.supermercado_id;
+
       await setDoc(
         doc(db, "usuarios", credential.user.uid),
         {
           id: credential.user.uid,
           nome: input.nome.trim(),
-          perfil: input.perfil,
-          empresa_id: input.empresa_id,
-          supermercado_id: input.supermercado_id,
-          supermercado_ids: input.supermercado_id ? [input.supermercado_id] : [],
+          perfil: perfilFinal,
+          empresa_id: empresaFinal,
+          supermercado_id: supermercadoFinal,
+          supermercado_ids: supermercadoFinal ? [supermercadoFinal] : [],
           status: "Ativo",
           email: input.email.trim().toLowerCase(),
           criado_em: new Date().toISOString(),
+          convite_token: inviteToken || null,
         },
         { merge: true }
       );
+
+      if (inviteToken) {
+        await consumeInvite({
+          token: inviteToken,
+          usedByUid: credential.user.uid,
+          usedByName: input.nome.trim(),
+        });
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
@@ -1223,6 +1250,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1241,6 +1269,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1449,6 +1478,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1467,6 +1497,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1494,6 +1525,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1512,6 +1544,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1536,6 +1569,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1554,6 +1588,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1568,6 +1603,15 @@ export default function App() {
           currentAdminId={usuarioAtual?.id ?? null}
           onUpdate={handleUpdateUsuarioAdmin}
           onToggleStatus={handleToggleUsuarioStatus}
+          onCreateAdminInvite={async (inviteInput) =>
+            createAdminInvite({
+              ...inviteInput,
+              criado_por_uid: usuarioAtual?.id ?? null,
+              criado_por_nome: usuarioAtual?.nome ?? null,
+            })
+          }
+          adminInvites={adminInvites}
+          canCreateAdminInvite={canViewAllCompanies}
           onVoltar={goBackToPreviousView}
           canSelectEmpresa={canViewAllCompanies}
           currentEmpresaId={empresaSelecionadaId}
@@ -1586,6 +1630,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1604,6 +1649,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1650,6 +1696,7 @@ export default function App() {
           onDashboard={handleDashboardAccess}
           onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
           onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+          onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
           onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
           onOpenManutencoes={handleOpenManutencoes}
           onAccessProfile={handleAccessProfile}
@@ -1668,6 +1715,7 @@ export default function App() {
           showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
+          showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         />
@@ -1712,6 +1760,7 @@ export default function App() {
         onDashboard={handleDashboardAccess}
         onOpenEmpresasAdmin={handleOpenEmpresasAdmin}
         onOpenUnidadesAdmin={handleOpenUnidadesAdmin}
+        onOpenUsuariosAdmin={handleOpenUsuariosAdmin}
         onOpenEmpilhadeiras={handleOpenEmpilhadeirasAdmin}
         onOpenManutencoes={handleOpenManutencoes}
         onAccessProfile={handleAccessProfile}
@@ -1730,6 +1779,7 @@ export default function App() {
         showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
         showEmpresasAction={canViewAllCompanies}
         showUnidadesAction={canViewAllUnits}
+        showUsuariosAction={canViewAllUnits}
         showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
       />

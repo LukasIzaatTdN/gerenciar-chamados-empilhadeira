@@ -135,6 +135,25 @@ service cloud.firestore {
         || perfilInput == "Televendas";
     }
 
+    function isConviteAdminEmpresaValido(token) {
+      return token is string
+        && token.size() > 0
+        && exists(/databases/$(database)/documents/convites_admin_empresa/$(token))
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.status == "Pendente"
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.perfil == "Administrador da Empresa"
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.empresa_id
+          == request.resource.data.empresa_id
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.expira_em_ms
+          > request.time.toMillis();
+    }
+
+    function isCadastroAdminEmpresaPorConviteValido() {
+      return request.resource.data.perfil == "Administrador da Empresa"
+        && request.resource.data.supermercado_id == null
+        && request.resource.data.convite_token is string
+        && isConviteAdminEmpresaValido(request.resource.data.convite_token);
+    }
+
     function isEmpresaAtiva(empresaId) {
       return empresaId is string
         && empresaId.size() > 0
@@ -575,7 +594,10 @@ service cloud.firestore {
         && request.resource.data.id == request.auth.uid
         && request.resource.data.status == "Ativo"
         && isPerfilValido(request.resource.data.perfil)
-        && isPerfilAutoCadastroPermitido(request.resource.data.perfil)
+        && (
+          isPerfilAutoCadastroPermitido(request.resource.data.perfil)
+          || isCadastroAdminEmpresaPorConviteValido()
+        )
         && isEmpresaVinculoValido(
           request.resource.data.perfil,
           request.resource.data.empresa_id
@@ -606,6 +628,69 @@ service cloud.firestore {
         );
 
       allow delete: if hasAdminManagementAccess();
+    }
+
+    match /convites_admin_empresa/{id} {
+      allow get: if (
+          isSignedIn() && hasAdminManagementAccess()
+        ) || (
+          && resource.data.status == "Pendente"
+          && resource.data.expira_em_ms > request.time.toMillis()
+        );
+      allow list: if isSignedIn() && hasAdminManagementAccess();
+
+      allow create: if hasAdminManagementAccess()
+        && request.resource.data.id == id
+        && request.resource.data.perfil == "Administrador da Empresa"
+        && isEmpresaAtiva(request.resource.data.empresa_id)
+        && request.resource.data.status == "Pendente"
+        && request.resource.data.expira_em_ms is int
+        && request.resource.data.expira_em_ms > request.time.toMillis()
+        && isTextoNaoVazio(request.resource.data.criado_em)
+        && isTextoNaoVazio(request.resource.data.expira_em)
+        && (
+          request.resource.data.criado_por_uid == null
+          || isTextoNaoVazio(request.resource.data.criado_por_uid)
+        )
+        && (
+          request.resource.data.criado_por_nome == null
+          || isTextoNaoVazio(request.resource.data.criado_por_nome)
+        )
+        && request.resource.data.usado_em == null
+        && request.resource.data.usado_por_uid == null
+        && request.resource.data.usado_por_nome == null
+        && canAccessEmpresa(request.resource.data.empresa_id);
+
+      allow update: if (
+          hasAdminManagementAccess()
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.criado_em == resource.data.criado_em
+          && request.resource.data.expira_em == resource.data.expira_em
+          && request.resource.data.expira_em_ms == resource.data.expira_em_ms
+          && canAccessEmpresa(resource.data.empresa_id)
+        ) || (
+          isSignedIn()
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.criado_em == resource.data.criado_em
+          && request.resource.data.expira_em == resource.data.expira_em
+          && request.resource.data.expira_em_ms == resource.data.expira_em_ms
+          && resource.data.status == "Pendente"
+          && resource.data.expira_em_ms > request.time.toMillis()
+          && request.resource.data.status == "Usado"
+          && request.resource.data.usado_por_uid == request.auth.uid
+          && isTextoNaoVazio(request.resource.data.usado_em)
+          && (
+            request.resource.data.usado_por_nome == null
+            || isTextoNaoVazio(request.resource.data.usado_por_nome)
+          )
+        );
+
+      allow delete: if hasAdminManagementAccess()
+        && canAccessEmpresa(resource.data.empresa_id);
     }
   }
 }

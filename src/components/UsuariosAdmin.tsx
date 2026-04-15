@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Empresa } from "../types/empresa";
 import type { Supermercado } from "../types/supermercado";
 import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
+import type { AdminInvite } from "../types/adminInvite";
 
 interface UsuariosAdminProps {
   empresas: Empresa[];
@@ -13,6 +14,9 @@ interface UsuariosAdminProps {
     input: { perfil: PerfilAcesso; empresa_id: string | null; supermercado_id: string | null }
   ) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
+  onCreateAdminInvite?: (input: { empresa_id: string; expiresInDays: number }) => Promise<string>;
+  adminInvites?: AdminInvite[];
+  canCreateAdminInvite?: boolean;
   onVoltar: () => void;
   canSelectEmpresa?: boolean;
   currentEmpresaId?: string | null;
@@ -44,6 +48,9 @@ export default function UsuariosAdmin({
   currentAdminId,
   onUpdate,
   onToggleStatus,
+  onCreateAdminInvite,
+  adminInvites = [],
+  canCreateAdminInvite = false,
   onVoltar,
   canSelectEmpresa = false,
   currentEmpresaId = null,
@@ -55,6 +62,11 @@ export default function UsuariosAdmin({
   const [error, setError] = useState<string | null>(null);
   const [pendingSaveId, setPendingSaveId] = useState<string | null>(null);
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
+  const [inviteEmpresaId, setInviteEmpresaId] = useState<string>(currentEmpresaId ?? "");
+  const [inviteExpiresInDays, setInviteExpiresInDays] = useState<number>(7);
+  const [inviteTokenCreated, setInviteTokenCreated] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [pendingInvite, setPendingInvite] = useState(false);
 
   const empresasAtivas = useMemo(
     () => empresas.filter((empresa) => empresa.status === "Ativa"),
@@ -83,6 +95,19 @@ export default function UsuariosAdmin({
       }),
     [usuarios]
   );
+  const convitesRecentes = useMemo(
+    () =>
+      [...adminInvites]
+        .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+        .slice(0, 8),
+    [adminInvites]
+  );
+
+  useEffect(() => {
+    if (!canSelectEmpresa) {
+      setInviteEmpresaId(currentEmpresaId ?? "");
+    }
+  }, [canSelectEmpresa, currentEmpresaId]);
 
   function startEdit(usuario: UsuarioSistema) {
     setEditingId(usuario.id);
@@ -157,6 +182,30 @@ export default function UsuariosAdmin({
     }
   }
 
+  async function handleCreateInvite() {
+    if (!onCreateAdminInvite) return;
+    const targetEmpresaId = canSelectEmpresa ? inviteEmpresaId : currentEmpresaId;
+    if (!targetEmpresaId) {
+      setInviteError("Selecione a empresa para gerar o convite.");
+      return;
+    }
+    try {
+      setPendingInvite(true);
+      setInviteError(null);
+      const token = await onCreateAdminInvite({
+        empresa_id: targetEmpresaId,
+        expiresInDays: inviteExpiresInDays,
+      });
+      setInviteTokenCreated(token);
+    } catch (inviteErr) {
+      setInviteError(
+        inviteErr instanceof Error ? inviteErr.message : "Não foi possível gerar convite."
+      );
+    } finally {
+      setPendingInvite(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-transparent">
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -181,6 +230,93 @@ export default function UsuariosAdmin({
             Voltar ao painel
           </button>
         </div>
+
+        {canCreateAdminInvite && (
+          <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+              Convite Admin da Empresa
+            </h2>
+            <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+              {canSelectEmpresa ? (
+                <select
+                  value={inviteEmpresaId}
+                  onChange={(e) => setInviteEmpresaId(e.target.value)}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+                >
+                  <option value="">Selecione a empresa</option>
+                  {empresasAtivas.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                  Empresa do escopo:{" "}
+                  {empresas.find((empresa) => empresa.id === currentEmpresaId)?.nome ?? "Não definida"}
+                </div>
+              )}
+
+              <select
+                value={String(inviteExpiresInDays)}
+                onChange={(e) => setInviteExpiresInDays(Number(e.target.value))}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+              >
+                <option value="1">Expira em 1 dia</option>
+                <option value="3">Expira em 3 dias</option>
+                <option value="7">Expira em 7 dias</option>
+                <option value="15">Expira em 15 dias</option>
+                <option value="30">Expira em 30 dias</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCreateInvite();
+                }}
+                disabled={pendingInvite}
+                className="rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-3 text-sm font-semibold text-white"
+              >
+                {pendingInvite ? "Gerando..." : "Gerar token"}
+              </button>
+            </div>
+            {inviteError && (
+              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {inviteError}
+              </p>
+            )}
+            {inviteTokenCreated && (
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                Token criado: <span className="font-bold">{inviteTokenCreated}</span>
+              </div>
+            )}
+            <div className="mt-3">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                Convites recentes
+              </p>
+              <div className="mt-2 space-y-2">
+                {convitesRecentes.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                    Nenhum convite gerado.
+                  </p>
+                ) : (
+                  convitesRecentes.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs md:grid-cols-[1fr_1fr_auto]"
+                    >
+                      <p className="text-slate-700">
+                        Token: <span className="font-semibold">{invite.id}</span>
+                      </p>
+                      <p className="text-slate-600">Status: {invite.status}</p>
+                      <p className="text-slate-600">Expira: {formatDate(invite.expira_em)}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
