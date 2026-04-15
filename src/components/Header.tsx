@@ -63,15 +63,9 @@ export default function Header({
 }: HeaderProps) {
   const unidadesActionVisible = showUnidadesAction || showSupermercadosAction;
   const openUnidadesAdmin = onOpenUnidadesAdmin ?? onOpenSupermercadosAdmin;
-  const firebaseProjectId =
-    typeof import.meta.env.VITE_FIREBASE_PROJECT_ID === "string"
-      ? import.meta.env.VITE_FIREBASE_PROJECT_ID
-      : "";
   const syncLabel =
     syncMode === "firebase"
-      ? firebaseProjectId
-        ? `Sincronização ativa · ${firebaseProjectId}`
-        : "Sincronização ativa"
+      ? "Sincronização ativa"
       : "Modo local";
 
   const syncBadgeClassName =
@@ -85,7 +79,7 @@ export default function Header({
       : perfilAcesso === "Operador"
       ? "Fluxo ativo: central operacional da unidade"
       : perfilAcesso === "Supervisor"
-      ? "Fluxo ativo: supervisão da unidade"
+      ? "Fluxo ativo: gestão consolidada da empresa"
       : perfilAcesso === "Administrador da Empresa"
       ? "Fluxo ativo: gestão consolidada da empresa"
       : perfilAcesso === "Administrador Geral"
@@ -173,7 +167,8 @@ export default function Header({
                 className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 lg:px-5"
                 hidden={
                   perfilAcesso === "Administrador Geral" ||
-                  perfilAcesso === "Administrador da Empresa"
+                  perfilAcesso === "Administrador da Empresa" ||
+                  perfilAcesso === "Supervisor"
                 }
               >
                 <span>🔐</span>
@@ -182,7 +177,8 @@ export default function Header({
 
               {showOperatorAction &&
                 perfilAcesso !== "Administrador Geral" &&
-                perfilAcesso !== "Administrador da Empresa" && (
+                perfilAcesso !== "Administrador da Empresa" &&
+                perfilAcesso !== "Supervisor" && (
                 <button
                   onClick={onOperadorPanel}
                   className={getActionClassName(perfilAcesso === "Operador")}
@@ -288,7 +284,8 @@ export default function Header({
                   className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-semibold text-white"
                   hidden={
                     perfilAcesso === "Administrador Geral" ||
-                    perfilAcesso === "Administrador da Empresa"
+                    perfilAcesso === "Administrador da Empresa" ||
+                    perfilAcesso === "Supervisor"
                   }
                 >
                   <span>🔐</span>
@@ -297,7 +294,8 @@ export default function Header({
 
                 {showOperatorAction &&
                   perfilAcesso !== "Administrador Geral" &&
-                  perfilAcesso !== "Administrador da Empresa" && (
+                  perfilAcesso !== "Administrador da Empresa" &&
+                  perfilAcesso !== "Supervisor" && (
                   <button
                     onClick={onOperadorPanel}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
