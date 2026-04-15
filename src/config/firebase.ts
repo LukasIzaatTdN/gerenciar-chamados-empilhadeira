@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,7 +19,19 @@ const app = hasFirebaseConfig
     : initializeApp(firebaseConfig)
   : null;
 
-export const db = app ? getFirestore(app) : null;
+let firestoreInstance: Firestore | null = null;
+if (app) {
+  try {
+    firestoreInstance = initializeFirestore(app, {
+      // More resilient transport mode for production networks/proxies.
+      experimentalAutoDetectLongPolling: true,
+    });
+  } catch {
+    firestoreInstance = getFirestore(app);
+  }
+}
+
+export const db = firestoreInstance;
 export const auth = app ? getAuth(app) : null;
 
 export default app;
