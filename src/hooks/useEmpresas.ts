@@ -57,7 +57,6 @@ function buildEmpresaId(codigo: string) {
 export function useEmpresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [authHydrated, setAuthHydrated] = useState(!hasFirebaseConfig || !auth);
-  const [authUid, setAuthUid] = useState<string | null>(auth?.currentUser?.uid ?? null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
@@ -66,8 +65,7 @@ export function useEmpresas() {
       return;
     }
 
-    return onAuthStateChanged(auth, (user) => {
-      setAuthUid(user?.uid ?? null);
+    return onAuthStateChanged(auth, () => {
       setAuthHydrated(true);
     });
   }, []);
@@ -79,8 +77,6 @@ export function useEmpresas() {
     }
 
     if (!authHydrated) return;
-
-    if (hasFirebaseConfig && !authUid) return;
 
     return onSnapshot(
       collection(db, EMPRESAS_COLLECTION),
@@ -95,7 +91,7 @@ export function useEmpresas() {
       },
       () => setEmpresas([])
     );
-  }, [authHydrated, authUid]);
+  }, [authHydrated]);
 
   const createEmpresa = useCallback(
     async (input: {

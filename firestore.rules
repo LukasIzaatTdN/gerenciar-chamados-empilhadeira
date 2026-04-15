@@ -436,7 +436,7 @@ service cloud.firestore {
     }
 
     match /empresas/{id} {
-      allow read: if canAccessEmpresa(id);
+      allow read: if !isSignedIn() || canAccessEmpresa(id);
       allow write: if isAdminGeral() || isAdminGeralByUserDoc();
     }
 
