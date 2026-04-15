@@ -3,7 +3,7 @@ import type { Chamado, ItemTelevendas, Setor } from "../types/chamado";
 import type { ChecklistEmpilhadeira } from "../types/checklistEmpilhadeira";
 import type { Empilhadeira } from "../types/empilhadeira";
 import type { Manutencao, ManutencaoPrioridade } from "../types/manutencao";
-import { isEmpilhadeiraSelecionavelParaChamado } from "../types/empilhadeira";
+import { isEmpilhadeiraCompativelComChamado } from "../types/empilhadeira";
 import type { AppNotification } from "../types/notification";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
@@ -482,7 +482,7 @@ export default function OperadorPanel({
           item.id === selectedId &&
           item.supermercado_id === chamado.supermercado_id &&
           (
-            isEmpilhadeiraSelecionavelParaChamado(
+            isEmpilhadeiraCompativelComChamado(
               getEmpilhadeiraStatusEfetivo(item, chamados, checklists, manutencoes)
             ) ||
             item.id === chamado.empilhadeira_id
@@ -1181,7 +1181,7 @@ export default function OperadorPanel({
                   const isEmpilhadeiraJaVinculada = item.id === chamado.empilhadeira_id;
 
                   return (
-                    isEmpilhadeiraSelecionavelParaChamado(statusEfetivo) ||
+                    isEmpilhadeiraCompativelComChamado(statusEfetivo) ||
                     isEmpilhadeiraJaVinculada
                   );
                 }

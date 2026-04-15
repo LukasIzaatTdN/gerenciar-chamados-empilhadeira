@@ -117,6 +117,11 @@ export default function EmpilhadeirasAdmin({
     () => supermercados.filter((item) => item.status === "Ativo"),
     [supermercados]
   );
+  const supermercadoSelecionado = useMemo(
+    () => supermercados.find((item) => item.id === form.supermercado_id) ?? null,
+    [form.supermercado_id, supermercados]
+  );
+  const empresaIdDerivadaDaUnidade = supermercadoSelecionado?.empresa_id ?? "";
   const ordenadas = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
@@ -173,6 +178,9 @@ export default function EmpilhadeirasAdmin({
     setEditingId(null);
     setForm({
       ...EMPTY_FORM,
+      empresa_id: !isAdminGeral
+        ? supermercados.find((item) => item.id === (currentSupermercadoId ?? ""))?.empresa_id ?? ""
+        : "",
       supermercado_id: !isAdminGeral ? currentSupermercadoId ?? "" : "",
     });
     setError(null);
@@ -183,14 +191,29 @@ export default function EmpilhadeirasAdmin({
     if (!isAdminGeral) {
       setForm((prev) => ({
         ...prev,
+        empresa_id:
+          supermercados.find((item) => item.id === (currentSupermercadoId ?? ""))?.empresa_id ?? "",
         supermercado_id: currentSupermercadoId ?? "",
       }));
     }
-  }, [currentSupermercadoId, isAdminGeral, isEditing]);
+  }, [currentSupermercadoId, isAdminGeral, isEditing, supermercados]);
+
+  useEffect(() => {
+    if (!form.supermercado_id) return;
+    if (!empresaIdDerivadaDaUnidade) return;
+
+    setForm((prev) =>
+      prev.empresa_id === empresaIdDerivadaDaUnidade
+        ? prev
+        : { ...prev, empresa_id: empresaIdDerivadaDaUnidade }
+    );
+  }, [empresaIdDerivadaDaUnidade, form.supermercado_id]);
 
   function validateForm() {
-    if (!form.empresa_id.trim()) return "Informe a empresa responsável pela empilhadeira.";
     if (!form.supermercado_id) return "Selecione a unidade vinculada.";
+    if (!empresaIdDerivadaDaUnidade && !form.empresa_id.trim()) {
+      return "Não foi possível identificar a empresa da unidade selecionada.";
+    }
     if (!form.identificacao.trim()) return "Informe a identificação do equipamento.";
     if (!form.modelo.trim()) return "Informe o modelo da empilhadeira.";
     if (!form.numero_interno.trim()) return "Informe o número interno do equipamento.";
@@ -206,7 +229,7 @@ export default function EmpilhadeirasAdmin({
     }
 
     const payload = {
-      empresa_id: form.empresa_id.trim(),
+      empresa_id: (empresaIdDerivadaDaUnidade || form.empresa_id).trim(),
       supermercado_id: form.supermercado_id,
       identificacao: form.identificacao.trim(),
       modelo: form.modelo.trim(),
@@ -355,12 +378,9 @@ export default function EmpilhadeirasAdmin({
             <form onSubmit={handleSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
               <input
                 type="text"
-                value={form.empresa_id}
-                onChange={(e) => {
-                  setForm((prev) => ({ ...prev, empresa_id: e.target.value }));
-                  setError(null);
-                }}
-                placeholder="Empresa / grupo"
+                value={empresaIdDerivadaDaUnidade || form.empresa_id}
+                readOnly
+                placeholder="Empresa vinculada pela unidade"
                 className="touch-target rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-[#0f3d75] focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
               />
               {isAdminGeral ? (

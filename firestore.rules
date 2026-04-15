@@ -51,10 +51,21 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id != null
             ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
             : (
-                request.auth.token.empresa_id is string
-                && request.auth.token.empresa_id.size() > 0
-                ? request.auth.token.empresa_id
-                : null
+                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
+                && exists(
+                  /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
+                )
+                ? get(
+                    /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
+                  ).data.empresa_id
+                : (
+                    request.auth.token.empresa_id is string
+                    && request.auth.token.empresa_id.size() > 0
+                    ? request.auth.token.empresa_id
+                    : null
+                  )
               )
           )
         : null;
