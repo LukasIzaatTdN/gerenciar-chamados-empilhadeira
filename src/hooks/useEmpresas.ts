@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Empresa, EmpresaStatus, PlanoCiclo, PlanoStatus } from "../types/empresa";
 import { resolveEmpresaId, sanitizeTenantId } from "../utils/tenant";
+import { EMPRESAS } from "../data/empresas";
 
 const EMPRESAS_COLLECTION = "empresas";
+const EMPRESAS_CACHE_KEY = "empresas_cache_v1";
 
 function normalizeEmpresa(data: Partial<Empresa>, fallbackId: string): Empresa {
   const planoCodigo = data.plano_codigo?.trim().toLowerCase() || "starter";
@@ -54,13 +56,36 @@ function buildEmpresaId(codigo: string) {
 }
 
 export function useEmpresas() {
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>(() => {
+    if (typeof window === "undefined") return EMPRESAS;
+
+    try {
+      const raw = window.sessionStorage.getItem(EMPRESAS_CACHE_KEY);
+      if (!raw) return EMPRESAS;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return EMPRESAS;
+      return parsed
+        .map((item, index) =>
+          normalizeEmpresa(item as Partial<Empresa>, EMPRESAS[index]?.id ?? `empresa-${index}`)
+        )
+        .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+    } catch {
+      return EMPRESAS;
+    }
+  });
+  const [retryTick, setRetryTick] = useState(0);
+  const retryTimeoutRef = useRef<number | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     if (!db) {
-      setEmpresas([]);
+      setEmpresas(EMPRESAS);
       return;
+    }
+
+    if (retryTimeoutRef.current !== null) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
 
     return onSnapshot(
@@ -73,9 +98,32 @@ export function useEmpresas() {
           );
 
         setEmpresas(remote);
+
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(EMPRESAS_CACHE_KEY, JSON.stringify(remote));
+          } catch {
+            // Ignore storage errors to avoid breaking render flow.
+          }
+        }
       },
-      () => setEmpresas([])
+      () => {
+        // Keep current cache and retry listener soon to avoid "empty until reload" behavior.
+        if (retryTimeoutRef.current !== null) return;
+        retryTimeoutRef.current = window.setTimeout(() => {
+          retryTimeoutRef.current = null;
+          setRetryTick((value) => value + 1);
+        }, 1500);
+      }
     );
+  }, [retryTick]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current !== null) {
+        window.clearTimeout(retryTimeoutRef.current);
+      }
+    };
   }, []);
 
   const createEmpresa = useCallback(
