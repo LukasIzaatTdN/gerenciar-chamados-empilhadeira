@@ -1,13 +1,18 @@
 import { useSupermercados } from "./useSupermercados";
 
-export function useUnidades() {
+interface UseUnidadesOptions {
+  empresaId?: string | null;
+  canViewAllCompanies?: boolean;
+}
+
+export function useUnidades(options: UseUnidadesOptions = {}) {
   const {
     supermercados,
     isRemoteSyncEnabled,
     createSupermercado,
     updateSupermercado,
     toggleSupermercadoStatus,
-  } = useSupermercados();
+  } = useSupermercados(options);
 
   return {
     unidades: supermercados,

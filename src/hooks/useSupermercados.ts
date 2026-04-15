@@ -3,14 +3,21 @@ import {
   collection,
   doc,
   onSnapshot,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Supermercado } from "../types/supermercado";
 import { resolveEmpresaId } from "../utils/tenant";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
+
+interface UseSupermercadosOptions {
+  empresaId?: string | null;
+  canViewAllCompanies?: boolean;
+}
 
 function normalizeIdFromCodigo(codigo: string) {
   return `sm-${codigo
@@ -37,7 +44,8 @@ function normalizeSupermercado(
   };
 }
 
-export function useSupermercados() {
+export function useSupermercados(options: UseSupermercadosOptions = {}) {
+  const { empresaId = null, canViewAllCompanies = false } = options;
   const [supermercados, setSupermercados] = useState<Supermercado[]>([]);
   const isRemoteSyncEnabled = db !== null;
 
@@ -48,8 +56,21 @@ export function useSupermercados() {
       return;
     }
 
+    if (!canViewAllCompanies && !empresaId) {
+      setSupermercados([]);
+      return;
+    }
+
+    const supermercadosQuery =
+      canViewAllCompanies || !empresaId
+        ? collection(firestore, SUPERMERCADOS_COLLECTION)
+        : query(
+            collection(firestore, SUPERMERCADOS_COLLECTION),
+            where("empresa_id", "==", empresaId)
+          );
+
     return onSnapshot(
-      collection(firestore, SUPERMERCADOS_COLLECTION),
+      supermercadosQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>
@@ -66,7 +87,7 @@ export function useSupermercados() {
         setSupermercados([]);
       }
     );
-  }, []);
+  }, [canViewAllCompanies, empresaId]);
 
   const createSupermercado = useCallback(
     async (input: {

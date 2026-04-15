@@ -147,6 +147,9 @@ export default function App() {
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
+  const perfilAcesso = usuarioAtual?.perfil ?? null;
+  const permissions = getPermissions(perfilAcesso);
+  const canViewAllCompanies = permissions.canViewAllCompanies;
   const {
     empresas,
     createEmpresa,
@@ -158,7 +161,10 @@ export default function App() {
     createUnidade: createSupermercado,
     updateUnidade: updateSupermercado,
     toggleUnidadeStatus: toggleSupermercadoStatus,
-  } = useUnidades();
+  } = useUnidades({
+    empresaId: usuarioAtual?.empresa_id ?? null,
+    canViewAllCompanies,
+  });
   const {
     usuarios,
     upsertUsuarioFromLogin,
@@ -167,9 +173,7 @@ export default function App() {
   } = useUsuarios();
   const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
-  const perfilAcesso = usuarioAtual?.perfil ?? null;
   const isPlatformAdmin = perfilAcesso === "Administrador Geral";
-  const permissions = getPermissions(perfilAcesso);
   const linkedEmpresaId =
     usuarioAtual?.empresa_id ??
     getUnidadeById(usuarioAtual?.supermercado_id, supermercados)?.empresa_id ??
@@ -179,7 +183,6 @@ export default function App() {
   const empresaNome = getEmpresaById(empresaId, empresas)?.nome ?? null;
   const supermercadoNome = getUnidadeById(supermercadoId, supermercados)?.nome ?? null;
   const canViewAllUnits = permissions.canViewAllUnits;
-  const canViewAllCompanies = permissions.canViewAllCompanies;
   const empresaSelecionadaId =
     canViewAllCompanies && adminEmpresaFiltro !== "todas"
       ? adminEmpresaFiltro
