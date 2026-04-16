@@ -1,6 +1,6 @@
 # Painel Empilhadeira
 
-Plataforma web para gestão de chamados operacionais, televendas, empilhadeiras e manutenção em ambiente multiunidade.
+Plataforma web para gestão de chamados operacionais, televendas, empilhadeiras e manutenção em ambiente multiempresa e multiunidade (modelo SaaS).
 
 O sistema foi estruturado para operações com múltiplos supermercados ou centros de distribuição, mantendo isolamento por unidade, controle por perfil e rastreabilidade entre solicitante, operador, equipamento e atendimento.
 
@@ -23,19 +23,27 @@ Na prática, a aplicação permite:
 
 ## Arquitetura Funcional
 
-### 1. Multiunidade
+### 1. Multiempresa e Multiunidade
 
-O sistema usa `supermercado_id` como eixo principal de separação operacional.
+O sistema usa `empresa_id` e `supermercado_id` como eixo principal de separação operacional.
 
 Implementado:
 
+- entidade `empresas`
 - entidade `supermercados`
+- vínculo de `supermercados` por `empresa_id`
+- vínculo de `usuarios` por `empresa_id`
 - vínculo de `usuarios` por `supermercado_id`
+- vínculo de `chamados` por `empresa_id`
 - vínculo de `chamados` por `supermercado_id`
+- vínculo de `empilhadeiras` por `empresa_id`
 - vínculo de `empilhadeiras` por `supermercado_id`
+- vínculo de `checklists_empilhadeira` por `empresa_id`
 - vínculo de `checklists_empilhadeira` por `supermercado_id`
+- vínculo de `manutencoes` por `empresa_id`
 - vínculo de `manutencoes` por `supermercado_id`
-- visão consolidada apenas para `Administrador Geral`
+- visão consolidada para `Administrador Geral`
+- visão consolidada da própria empresa para `Administrador da Empresa`
 
 ### 2. Perfis de Acesso
 
@@ -46,6 +54,7 @@ Perfis atualmente suportados:
 - `Operador`
 - `Supervisor`
 - `Televendas`
+- `Administrador da Empresa`
 - `Administrador Geral`
 
 Resumo por perfil:
@@ -54,6 +63,7 @@ Resumo por perfil:
 - `Televendas`: abre pedidos internos com estrutura de itens e acompanhamento específico
 - `Operador`: atua na fila operacional da unidade, assume chamados, registra checklist e reporta falhas
 - `Supervisor`: acompanha operação, dashboards, empilhadeiras e manutenções da própria unidade
+- `Administrador da Empresa`: gerencia usuários, unidades, ativos e operação apenas da empresa vinculada
 - `Administrador Geral`: visualiza todas as unidades, usa filtros globais e acessa módulos administrativos
 
 ## Módulos Implementados
@@ -274,9 +284,21 @@ Regras já aplicadas:
 - login por e-mail e senha
 - login com Google
 - criação de conta com nome, perfil e unidade
-- administrador geral pode se cadastrar sem unidade
+- auto-cadastro permitido somente para perfis operacionais (`Promotor`, `Funcionário`, `Operador`, `Supervisor`, `Televendas`)
+- perfil administrativo não pode mais ser autoatribuído no cadastro público
 - modal e landing harmonizados visualmente
 - mostrar/ocultar senha no login e cadastro
+
+### Convites de Admin da Empresa
+
+Fluxo implementado para onboarding seguro de cliente:
+
+- geração de token de convite no módulo `Usuários` (Admin Geral)
+- convite com expiração (1, 3, 7, 15 ou 30 dias)
+- validação de token no cadastro
+- criação de conta como `Administrador da Empresa` vinculada à empresa do convite
+- consumo de token com uso único
+- bloqueio em regra para impedir auto-cadastro admin sem convite válido
 
 ### Painel do Operador
 
@@ -305,6 +327,7 @@ Regras já aplicadas:
 - alteração de perfil
 - alteração de unidade
 - inativação e reativação
+- geração e acompanhamento de convites para `Administrador da Empresa`
 
 ### Empilhadeiras
 
@@ -330,10 +353,12 @@ O projeto foi desenhado para não misturar operação entre supermercados.
 Regras já aplicadas no app e refletidas nas coleções:
 
 - usuários comuns, operadores e supervisores atuam apenas na própria unidade
+- administrador da empresa atua apenas no recorte da própria empresa
 - administrador geral pode visualizar todas as unidades com filtro
 - nenhum chamado deve usar empilhadeira de unidade diferente
 - checklist, manutenção, histórico e uso operacional respeitam `supermercado_id`
 - relatórios e dashboards usam o mesmo recorte da unidade ativa
+- criação de usuário admin por auto-cadastro público foi bloqueada por regra
 
 ## Tecnologias
 
@@ -452,6 +477,11 @@ Deploy:
 firebase deploy --only firestore:rules
 ```
 
+Importante:
+
+- várias correções recentes de permissão e isolamento dependem do deploy atualizado de `firestore.rules`
+- sem deploy, o comportamento no ambiente pode permanecer com erros antigos de `permission-denied`
+
 ## Validação Técnica
 
 Verificação de tipos:
@@ -471,9 +501,11 @@ npm run build
 Base já funcional para:
 
 - autenticação
-- multiunidade
+- multiempresa e multiunidade
+- gestão de empresas (Admin Geral)
 - gestão de supermercados
 - gestão de usuários
+- convite de administrador da empresa por token
 - chamados operacionais
 - televendas com itens e pedido incompleto
 - painel do operador
@@ -484,12 +516,33 @@ Base já funcional para:
 - manutenções
 - histórico técnico por máquina
 
+## O Que Foi Atualizado Recentemente
+
+- isolamento por `empresa_id` + `supermercado_id` no app e nas regras
+- correções de leitura por escopo nos hooks (`chamados`, `empilhadeiras`, `checklists`)
+- correções de permissão em fluxos de iniciar atendimento e checklist
+- melhorias no painel do operador para seleção de empilhadeira compatível
+- mensagens de erro mais claras para falhas de checklist
+- bloqueio de auto-cadastro com perfil administrativo
+- novo fluxo de convite para `Administrador da Empresa` com expiração e uso único
+- ajustes de navegação do Admin Geral para exibir acesso a `Usuários`
+
+## O Que Falta Arrumar
+
+- revisar e reduzir a leitura pública de `empresas` e `supermercados` para evitar exposição desnecessária pré-login
+- validar ponta a ponta no ambiente publicado se todas as regras novas já foram aplicadas (`firebase deploy --only firestore:rules`)
+- criar testes automatizados para regras e fluxos críticos de cadastro por convite
+- criar testes automatizados para iniciar atendimento com empilhadeira
+- criar testes automatizados para checklist antes do turno
+- padronizar telemetria e logs de erro para diagnóstico em produção
+- documentar fluxo operacional para cliente final (Admin Empresa, Supervisor e Operador)
+
 ## Próximos Passos Recomendados
 
 - adicionar relatórios técnicos exportáveis por empilhadeira e unidade
 - consolidar indicadores de manutenção e checklist no dashboard executivo
+- criar suíte de testes de integração para fluxos com Firestore Rules
 - revisar documentação de operação para usuários finais
-- adicionar testes automatizados para helpers críticos de fluxo
 
 ## Licença
 
