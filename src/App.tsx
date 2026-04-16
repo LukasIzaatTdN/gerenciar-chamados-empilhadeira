@@ -596,6 +596,34 @@ export default function App() {
   }, [chamados, operadorNome, permissions]);
 
   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
+  const safeFallbackView: View =
+    isPlatformAdmin && defaultViewForCurrentUser !== "dashboard"
+      ? "dashboard"
+      : defaultViewForCurrentUser;
+
+  useEffect(() => {
+    if (!isAuthenticated || !perfilAcesso) return;
+
+    const currentView =
+      canAccessViewByPerfil(view, perfilAcesso) ? view : safeFallbackView;
+    window.history.replaceState({ appView: currentView }, "");
+
+    const onPopState = (event: PopStateEvent) => {
+      const candidate = event.state?.appView as View | undefined;
+      if (candidate && canAccessViewByPerfil(candidate, perfilAcesso)) {
+        setPreviousView(view);
+        setView(candidate);
+        return;
+      }
+
+      setPreviousView(view);
+      setView(safeFallbackView);
+      window.history.replaceState({ appView: safeFallbackView }, "");
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [isAuthenticated, perfilAcesso, safeFallbackView, view]);
 
   function renderGlobalOverlays() {
     return (
@@ -654,12 +682,25 @@ export default function App() {
   }
 
   function navigateTo(nextView: View) {
+    if (nextView === view) return;
     setPreviousView(view);
     setView(nextView);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ appView: nextView }, "");
+    }
   }
 
   function goBackToPreviousView() {
-    setView(previousView === view ? defaultViewForCurrentUser : previousView);
+    const hasValidPrevious =
+      perfilAcesso &&
+      previousView !== view &&
+      canAccessViewByPerfil(previousView, perfilAcesso);
+
+    const targetView = hasValidPrevious ? previousView : safeFallbackView;
+    setView(targetView);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({ appView: targetView }, "");
+    }
   }
 
   function openLoginModal() {
@@ -1903,7 +1944,7 @@ export default function App() {
           />
         )}
 
-        {canViewAllUnits && (
+        {canViewAllUnits && !isPlatformAdmin && (
           <div className="mb-5">
             <div className="flex flex-wrap gap-2">
               {canViewAllCompanies && (
@@ -2037,6 +2078,7 @@ export default function App() {
         Painel Empilhadeira · Sistema de Gerenciamento de Chamados
       </footer>
 
+      {!isPlatformAdmin && (
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/92 px-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:hidden">
         <div className="app-main overflow-x-auto pb-0.5">
           <div className="flex min-w-max items-center gap-2">
@@ -2077,6 +2119,7 @@ export default function App() {
           </div>
         </div>
       </div>
+      )}
 
       {renderGlobalOverlays()}
     </div>

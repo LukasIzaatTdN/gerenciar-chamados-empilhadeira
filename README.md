@@ -529,7 +529,7 @@ Base já funcional para:
 
 ## O Que Falta Arrumar
 
-- revisar e reduzir a leitura pública de `empresas` e `supermercados` para evitar exposição desnecessária pré-login
+-  a leitura pública de `revisar e reduzirempresas` e `supermercados` para evitar exposição desnecessária pré-login
 - validar ponta a ponta no ambiente publicado se todas as regras novas já foram aplicadas (`firebase deploy --only firestore:rules`)
 - criar testes automatizados para regras e fluxos críticos de cadastro por convite
 - criar testes automatizados para iniciar atendimento com empilhadeira
