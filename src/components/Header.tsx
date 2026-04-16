@@ -92,6 +92,7 @@ export default function Header({
 
   const createActionLabel =
     perfilAcesso === "Administrador Geral" ? "Abrir chamado" : "Solicitar Empilhadeira";
+  const canShowCreateAction = showCreateAction && perfilAcesso !== "Administrador da Empresa";
   const operatorActionLabel =
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
   const dashboardActionLabel =
@@ -216,7 +217,7 @@ export default function Header({
                   <span>Manutenções</span>
                 </button>
               )}
-              {showEmpresasAction && onOpenEmpresasAdmin && (
+              {perfilAcesso !== "Administrador Geral" && showEmpresasAction && onOpenEmpresasAdmin && (
                 <button
                   onClick={onOpenEmpresasAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -225,7 +226,7 @@ export default function Header({
                   <span>Empresas</span>
                 </button>
               )}
-              {unidadesActionVisible && openUnidadesAdmin && (
+              {perfilAcesso !== "Administrador Geral" && unidadesActionVisible && openUnidadesAdmin && (
                 <button
                   onClick={openUnidadesAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -234,7 +235,7 @@ export default function Header({
                   <span>Unidades</span>
                 </button>
               )}
-              {showUsuariosAction && onOpenUsuariosAdmin && (
+              {perfilAcesso !== "Administrador Geral" && showUsuariosAction && onOpenUsuariosAdmin && (
                 <button
                   onClick={onOpenUsuariosAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -243,7 +244,7 @@ export default function Header({
                   <span>Usuários</span>
                 </button>
               )}
-              {showCreateAction && (
+              {canShowCreateAction && (
                 <button
                   onClick={onNovoChamado}
                   className={getActionClassName(
@@ -355,7 +356,7 @@ export default function Header({
                   </button>
                 )}
 
-                {showEmpresasAction && onOpenEmpresasAdmin && (
+                {perfilAcesso !== "Administrador Geral" && showEmpresasAction && onOpenEmpresasAdmin && (
                   <button
                     onClick={onOpenEmpresasAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -369,7 +370,7 @@ export default function Header({
                   </button>
                 )}
 
-                {unidadesActionVisible && openUnidadesAdmin && (
+                {perfilAcesso !== "Administrador Geral" && unidadesActionVisible && openUnidadesAdmin && (
                   <button
                     onClick={openUnidadesAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -382,7 +383,7 @@ export default function Header({
                     <span>Unidades</span>
                   </button>
                 )}
-                {showUsuariosAction && onOpenUsuariosAdmin && (
+                {perfilAcesso !== "Administrador Geral" && showUsuariosAction && onOpenUsuariosAdmin && (
                   <button
                     onClick={onOpenUsuariosAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -396,7 +397,7 @@ export default function Header({
                   </button>
                 )}
 
-                {showCreateAction && (
+                {canShowCreateAction && (
                   <button
                     onClick={onNovoChamado}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${

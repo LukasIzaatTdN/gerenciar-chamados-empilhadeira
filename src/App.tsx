@@ -451,6 +451,9 @@ export default function App() {
             if (prev === "perfil") {
               return prev;
             }
+            if (nextUsuario.perfil === "Operador") {
+              return "operador";
+            }
             if (canAccessViewByPerfil(prev, nextUsuario.perfil)) {
               return prev;
             }
@@ -1466,6 +1469,19 @@ export default function App() {
                     </span>
                     <span className="text-xl">🏬</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenUsuariosAdmin}
+                    className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:bg-slate-100"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-slate-900">Usuários</span>
+                      <span className="mt-1 block text-sm text-slate-500">
+                        Gerencie perfis, status de acesso e convites administrativos.
+                      </span>
+                    </span>
+                    <span className="text-xl">👥</span>
+                  </button>
                 </div>
               </section>
             </div>
@@ -1944,7 +1960,7 @@ export default function App() {
           />
         )}
 
-        {canViewAllUnits && !isPlatformAdmin && (
+        {canViewAllUnits && !isPlatformAdmin && !isCompanyAdmin && (
           <div className="mb-5">
             <div className="flex flex-wrap gap-2">
               {canViewAllCompanies && (
