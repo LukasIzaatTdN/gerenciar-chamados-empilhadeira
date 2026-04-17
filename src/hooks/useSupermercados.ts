@@ -11,6 +11,7 @@ import {
 import { db } from "../config/firebase";
 import type { Supermercado } from "../types/supermercado";
 import { resolveEmpresaId } from "../utils/tenant";
+import { SUPERMERCADOS as SUPERMERCADOS_FALLBACK } from "../data/supermercados";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
@@ -46,13 +47,15 @@ function normalizeSupermercado(
 
 export function useSupermercados(options: UseSupermercadosOptions = {}) {
   const { empresaId = null, canViewAllCompanies = false } = options;
-  const [supermercados, setSupermercados] = useState<Supermercado[]>([]);
+  const [supermercados, setSupermercados] = useState<Supermercado[]>(
+    SUPERMERCADOS_FALLBACK
+  );
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     const firestore = db;
     if (!firestore) {
-      setSupermercados([]);
+      setSupermercados(SUPERMERCADOS_FALLBACK);
       return;
     }
 
@@ -84,7 +87,10 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
         setSupermercados(remote);
       },
       () => {
-        setSupermercados([]);
+        // Mantém fallback para não quebrar o pré-cadastro quando houver erro de leitura remota.
+        setSupermercados((prev) =>
+          prev.length > 0 ? prev : SUPERMERCADOS_FALLBACK
+        );
       }
     );
   }, [canViewAllCompanies, empresaId]);

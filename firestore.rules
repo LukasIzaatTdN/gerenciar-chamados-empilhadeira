@@ -634,6 +634,7 @@ service cloud.firestore {
       allow get: if (
           isSignedIn() && hasAdminManagementAccess()
         ) || (
+          resource.data.id == id
           && resource.data.status == "Pendente"
           && resource.data.expira_em_ms > request.time.toMillis()
         );
