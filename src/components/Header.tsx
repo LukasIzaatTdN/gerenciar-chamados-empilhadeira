@@ -101,6 +101,22 @@ export default function Header({
       : perfilAcesso === "Administrador da Empresa"
       ? "Gestão Empresa"
       : "Dashboard";
+  const panelTitle =
+    perfilAcesso === "Promotor"
+      ? "Painel do Promotor"
+      : perfilAcesso === "Funcionário"
+      ? "Painel do Funcionário"
+      : perfilAcesso === "Operador"
+      ? "Painel do Operador"
+      : perfilAcesso === "Supervisor"
+      ? "Painel do Supervisor"
+      : perfilAcesso === "Televendas"
+      ? "Painel de Televendas"
+      : perfilAcesso === "Administrador da Empresa"
+      ? "Painel do Administrador da Empresa"
+      : perfilAcesso === "Administrador Geral"
+      ? "Painel do Administrador Geral"
+      : "Painel Empilhadeira";
 
   const getActionClassName = (isPrimary: boolean) =>
     isPrimary
@@ -117,7 +133,7 @@ export default function Header({
             </div>
             <div>
               <h1 className="text-[1.7rem] font-black leading-none tracking-tight text-white sm:text-2xl">
-                Painel Empilhadeira
+                {panelTitle}
               </h1>
               <p className="text-[13px] text-slate-200/90 sm:text-sm">
                 Operação ágil para pátio, docas e estoque
