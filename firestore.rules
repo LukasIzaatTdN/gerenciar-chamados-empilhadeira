@@ -514,12 +514,12 @@ service cloud.firestore {
     }
 
     match /empresas/{id} {
-      allow read: if !isSignedIn() || canAccessEmpresa(id);
+      allow read: if isSignedIn() && canAccessEmpresa(id);
       allow write: if isAdminGeral() || isAdminGeralByUserDoc();
     }
 
     match /supermercados/{id} {
-      allow read: if !isSignedIn() || canAccessEmpresa(resource.data.empresa_id);
+      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
       allow create: if hasAdminManagementAccess()
         && canAccessEmpresa(request.resource.data.empresa_id);
       allow update: if hasAdminManagementAccess()
@@ -634,6 +634,7 @@ service cloud.firestore {
       allow get: if (
           isSignedIn() && hasAdminManagementAccess()
         ) || (
+          !isSignedIn()
           && resource.data.status == "Pendente"
           && resource.data.expira_em_ms > request.time.toMillis()
         );

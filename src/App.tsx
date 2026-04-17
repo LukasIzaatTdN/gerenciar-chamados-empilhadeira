@@ -158,7 +158,11 @@ export default function App() {
     createEmpresa,
     updateEmpresa,
     toggleEmpresaStatus,
-  } = useEmpresas();
+  } = useEmpresas({
+    enabled: isAuthenticated,
+    empresaId: usuarioAtual?.empresa_id ?? null,
+    canViewAllCompanies,
+  });
   const {
     unidades: supermercados,
     createUnidade: createSupermercado,
@@ -166,7 +170,7 @@ export default function App() {
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
     empresaId: isAuthenticated ? usuarioAtual?.empresa_id ?? null : null,
-    canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
+    canViewAllCompanies,
   });
   const {
     usuarios,
