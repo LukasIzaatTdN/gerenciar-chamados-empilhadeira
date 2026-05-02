@@ -671,6 +671,7 @@ export default function App() {
             onLogin={handleOperadorLogin}
             onFirebaseLogin={handleFirebaseEmailLogin}
             onFirebaseGoogleLogin={handleFirebaseGoogleLogin}
+            onFirebaseGoogleRegister={handleFirebaseGoogleRegister}
             onFirebaseRegister={handleFirebaseRegister}
             onCancel={() => setShowLoginModal(false)}
             empresas={empresas}
@@ -869,6 +870,79 @@ export default function App() {
           token: inviteToken,
           usedByUid: credential.user.uid,
           usedByName: input.nome.trim(),
+        });
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
+      try {
+        await deleteUser(credential.user);
+      } catch {
+        // Best-effort rollback; if this fails, user may need manual cleanup.
+      }
+      throw new Error(`Falha ao salvar perfil/unidade no Firestore: ${message}`);
+    }
+
+    setShowLoginModal(false);
+  }
+
+  async function handleFirebaseGoogleRegister(input: {
+    nome: string;
+    perfil: UsuarioSistema["perfil"];
+    empresa_id: string | null;
+    supermercado_id: string | null;
+    invite_token?: string;
+  }) {
+    if (!auth || !db) throw new Error("Firebase não inicializado");
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const credential = await signInWithPopup(auth, provider);
+    const userRef = doc(db, "usuarios", credential.user.uid);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      await signOut(auth);
+      throw new Error("Conta Google já cadastrada. Use o login com Google para entrar.");
+    }
+
+    const inviteToken = typeof input.invite_token === "string" ? input.invite_token.trim() : "";
+    let invite: AdminInvite | null = null;
+
+    try {
+      if (inviteToken) {
+        invite = await validateInviteToken(inviteToken);
+      }
+
+      const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
+      const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
+      const supermercadoFinal = invite ? null : input.supermercado_id;
+      const nomeFinal =
+        input.nome.trim() || credential.user.displayName?.trim() || "Usuário";
+      const emailFinal = credential.user.email?.trim().toLowerCase() ?? null;
+
+      await setDoc(
+        userRef,
+        {
+          id: credential.user.uid,
+          nome: nomeFinal,
+          perfil: perfilFinal,
+          empresa_id: empresaFinal,
+          supermercado_id: supermercadoFinal,
+          supermercado_ids: supermercadoFinal ? [supermercadoFinal] : [],
+          status: "Ativo",
+          email: emailFinal,
+          criado_em: new Date().toISOString(),
+          convite_token: inviteToken || null,
+        },
+        { merge: true }
+      );
+
+      if (inviteToken) {
+        await consumeInvite({
+          token: inviteToken,
+          usedByUid: credential.user.uid,
+          usedByName: nomeFinal,
         });
       }
     } catch (err) {

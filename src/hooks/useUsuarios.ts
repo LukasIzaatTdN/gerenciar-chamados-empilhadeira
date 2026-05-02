@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
 import { normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
 
@@ -22,6 +22,13 @@ function buildUsuarioDocId(usuario: UsuarioSistema) {
   const empresa = slugify(usuario.empresa_id ?? "empresa");
   const unidade = usuario.supermercado_id ?? "all";
   return `usr-${empresa}-${perfil}-${nome}-${unidade}`;
+}
+
+function resolveUsuarioDocId(usuario: UsuarioSistema) {
+  const authUid = auth?.currentUser?.uid;
+  if (typeof authUid === "string" && authUid.trim()) return authUid;
+  if (typeof usuario.id === "string" && usuario.id.trim()) return usuario.id.trim();
+  return buildUsuarioDocId(usuario);
 }
 
 function normalizeUsuario(
@@ -95,7 +102,7 @@ export function useUsuarios() {
     const usuarioNormalizado: UsuarioSistema = {
       ...usuario,
       nome: usuario.nome.trim(),
-      id: buildUsuarioDocId(usuario),
+      id: resolveUsuarioDocId(usuario),
       empresa_id: resolveEmpresaId(usuario.empresa_id, null),
       supermercado_ids: normalizeScopedUnitIds(usuario.supermercado_id, usuario.supermercado_ids),
       status: usuario.status ?? "Ativo",

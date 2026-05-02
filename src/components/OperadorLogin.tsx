@@ -7,6 +7,13 @@ interface OperadorLoginProps {
   onLogin: (usuario: UsuarioSistema) => void | Promise<void>;
   onFirebaseLogin?: (input: { email: string; password: string }) => void | Promise<void>;
   onFirebaseGoogleLogin?: () => void | Promise<void>;
+  onFirebaseGoogleRegister?: (input: {
+    nome: string;
+    perfil: PerfilAcesso;
+    empresa_id: string | null;
+    supermercado_id: string | null;
+    invite_token?: string;
+  }) => void | Promise<void>;
   onFirebaseRegister?: (input: {
     nome: string;
     email: string;
@@ -44,6 +51,7 @@ export default function OperadorLogin({
   onLogin,
   onFirebaseLogin,
   onFirebaseGoogleLogin,
+  onFirebaseGoogleRegister,
   onFirebaseRegister,
   onCancel,
   empresas,
@@ -192,6 +200,28 @@ export default function OperadorLogin({
     await onLogin(usuario);
   }
 
+  async function handleGoogleRegister() {
+    const nomeFinal = nomeColaborador.trim();
+    if (!nomeFinal) return setError("Informe o nome do colaborador");
+    if (!perfilEfetivo) return setError("Selecione um perfil");
+    if (usingAdminInvite && !inviteToken.trim()) return setError("Informe o token de convite.");
+    if (precisaEmpresa && !empresaId && !usingAdminInvite) return setError("Selecione a empresa");
+    if (precisaUnidade && !supermercadoId) return setError("Selecione a unidade");
+    if (!onFirebaseGoogleRegister) return setError("Fluxo de cadastro Google indisponível");
+
+    try {
+      await onFirebaseGoogleRegister({
+        nome: nomeFinal,
+        perfil: perfilEfetivo,
+        empresa_id: perfilEfetivo === "Administrador Geral" ? null : empresaId,
+        supermercado_id: precisaUnidade ? supermercadoId : null,
+        invite_token: inviteToken.trim() || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível criar conta com Google.");
+    }
+  }
+
   function renderTenantSelectors() {
     if (!perfilEfetivo) return null;
 
@@ -303,6 +333,12 @@ export default function OperadorLogin({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pb-8">
+          {authMode === "local" && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Modo local ativo: sincronização com Firebase desabilitada neste ambiente.
+            </div>
+          )}
+
           {authMode === "firebase" && (
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
               <button type="button" onClick={() => { setAuthTab("login"); setError(""); }} className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${authTab === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
@@ -371,6 +407,18 @@ export default function OperadorLogin({
                 </div>
               )}
             </>
+          )}
+
+          {authMode === "firebase" && authTab === "register" && onFirebaseGoogleRegister && (
+            <button
+              type="button"
+              onClick={() => {
+                void handleGoogleRegister();
+              }}
+              className="w-full rounded-[22px] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700"
+            >
+              Criar conta com Google
+            </button>
           )}
 
           {error && <p className="text-xs text-red-500">{error}</p>}
