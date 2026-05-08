@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
@@ -30,6 +31,7 @@ import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
 import { useManutencoes } from "./hooks/useManutencoes";
 import { useAdminInvites } from "./hooks/useAdminInvites";
 import {
+  getAuth,
   createUserWithEmailAndPassword,
   deleteUser,
   GoogleAuthProvider,
@@ -677,6 +679,7 @@ export default function App() {
             empresas={empresas}
             supermercados={supermercados}
             authMode={hasFirebaseConfig ? "firebase" : "local"}
+            hasActiveSession={Boolean(auth?.currentUser)}
           />
         )}
 
@@ -823,13 +826,35 @@ export default function App() {
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
 
-    let credential;
+    let createdUid = "";
+    let createdUserForRollback: Parameters<typeof deleteUser>[0] | null = null;
+    let secondaryApp: ReturnType<typeof initializeApp> | null = null;
+    let secondaryAuth: ReturnType<typeof getAuth> | null = null;
     try {
-      credential = await createUserWithEmailAndPassword(
-        auth,
-        input.email,
-        input.password
-      );
+      const hasActiveSession = Boolean(auth.currentUser);
+
+      if (hasActiveSession) {
+        secondaryApp = initializeApp(
+          auth.app.options,
+          `register-user-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        );
+        secondaryAuth = getAuth(secondaryApp);
+        const credential = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          input.email,
+          input.password
+        );
+        createdUid = credential.user.uid;
+        createdUserForRollback = credential.user;
+      } else {
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          input.email,
+          input.password
+        );
+        createdUid = credential.user.uid;
+        createdUserForRollback = credential.user;
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Não foi possível criar o usuário no Firebase Auth.";
@@ -849,9 +874,9 @@ export default function App() {
       const supermercadoFinal = invite ? null : input.supermercado_id;
 
       await setDoc(
-        doc(db, "usuarios", credential.user.uid),
+        doc(db, "usuarios", createdUid),
         {
-          id: credential.user.uid,
+          id: createdUid,
           nome: input.nome.trim(),
           perfil: perfilFinal,
           empresa_id: empresaFinal,
@@ -868,7 +893,7 @@ export default function App() {
       if (inviteToken) {
         await consumeInvite({
           token: inviteToken,
-          usedByUid: credential.user.uid,
+          usedByUid: createdUid,
           usedByName: input.nome.trim(),
         });
       }
@@ -876,11 +901,24 @@ export default function App() {
       const message =
         err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
       try {
-        await deleteUser(credential.user);
+        if (createdUserForRollback) {
+          await deleteUser(createdUserForRollback);
+        }
       } catch {
         // Best-effort rollback; if this fails, user may need manual cleanup.
       }
       throw new Error(`Falha ao salvar perfil/unidade no Firestore: ${message}`);
+    } finally {
+      try {
+        if (secondaryAuth?.currentUser) {
+          await signOut(secondaryAuth);
+        }
+      } catch {
+        // Ignore cleanup failures from secondary auth.
+      }
+      if (secondaryApp) {
+        await deleteApp(secondaryApp);
+      }
     }
 
     setShowLoginModal(false);
@@ -894,6 +932,11 @@ export default function App() {
     invite_token?: string;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
+    if (auth.currentUser) {
+      throw new Error(
+        "Cadastro com Google troca a sessão atual. Use cadastro por e-mail/senha para criar outro usuário sem sair da conta atual."
+      );
+    }
 
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });

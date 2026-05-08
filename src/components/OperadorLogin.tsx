@@ -27,6 +27,7 @@ interface OperadorLoginProps {
   empresas: Empresa[];
   supermercados: Supermercado[];
   authMode?: "local" | "firebase";
+  hasActiveSession?: boolean;
 }
 
 const PERFIS_LOGIN: PerfilAcesso[] = [
@@ -57,6 +58,7 @@ export default function OperadorLogin({
   empresas,
   supermercados,
   authMode = "local",
+  hasActiveSession = false,
 }: OperadorLoginProps) {
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [perfilSelecionado, setPerfilSelecionado] = useState<PerfilAcesso | "">("");
@@ -100,6 +102,8 @@ export default function OperadorLogin({
     perfilEfetivo !== "Administrador da Empresa";
   const shouldDisableSubmit =
     authMode === "firebase" && authTab === "register" && precisaEmpresa && empresasAtivas.length === 0;
+  const canUseGoogleRegister =
+    authMode === "firebase" && authTab === "register" && Boolean(onFirebaseGoogleRegister) && !hasActiveSession;
 
   useEffect(() => {
     if (isAdminGeral) {
@@ -409,7 +413,13 @@ export default function OperadorLogin({
             </>
           )}
 
-          {authMode === "firebase" && authTab === "register" && onFirebaseGoogleRegister && (
+          {authMode === "firebase" && authTab === "register" && hasActiveSession && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Cadastro com Google indisponível durante sessão ativa para evitar troca automática de usuário.
+            </div>
+          )}
+
+          {canUseGoogleRegister && (
             <button
               type="button"
               onClick={() => {
