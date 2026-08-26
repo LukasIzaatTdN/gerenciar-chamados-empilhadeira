@@ -173,14 +173,24 @@ service cloud.firestore {
       return empresaId is string
         && empresaId.size() > 0
         && exists(/databases/$(database)/documents/empresas/$(empresaId))
-        && get(/databases/$(database)/documents/empresas/$(empresaId)).data.status == "Ativa";
+        && (
+          !(
+            "status" in get(/databases/$(database)/documents/empresas/$(empresaId)).data
+          )
+          || get(/databases/$(database)/documents/empresas/$(empresaId)).data.status == "Ativa"
+        );
     }
 
     function isSupermercadoAtivo(supermercadoId) {
       return supermercadoId is string
         && supermercadoId.size() > 0
         && exists(/databases/$(database)/documents/supermercados/$(supermercadoId))
-        && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo";
+        && (
+          !(
+            "status" in get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data
+          )
+          || get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo"
+        );
     }
 
     function isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId) {
