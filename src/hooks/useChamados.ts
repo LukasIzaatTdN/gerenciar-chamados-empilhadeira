@@ -547,6 +547,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       if (db) {
         try {
+          await ensureFirebaseSessionForChamado();
           await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
         } catch (error) {
           throw mapFirestoreWriteError(

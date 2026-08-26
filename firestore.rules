@@ -302,20 +302,6 @@ service cloud.firestore {
       return valor == null || (valor is string && valor.size() == 0);
     }
 
-    function isNumeroNaoNegativo(valor) {
-      return valor is int || valor is float
-        ? valor >= 0
-        : false;
-    }
-
-    function isNumeroOpcionalNaoNegativo(valor) {
-      return valor == null || isNumeroNaoNegativo(valor);
-    }
-
-    function isListaItensTelevendasValida(valor) {
-      return valor == null || valor is list;
-    }
-
     function isStatusChamadoValido(status) {
       return status == "Aguardando"
         || status == "Em atendimento"
@@ -469,44 +455,6 @@ service cloud.firestore {
         || isSupervisorDaUnidade(data.supermercado_id);
     }
 
-    function isChamadoBaseValido(data) {
-      return isTextoNaoVazio(data.id)
-        && (isCampoVazio(data.categoria) || isCategoriaValida(data.categoria))
-        && isTextoNaoVazio(data.empresa_id)
-        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
-        && isTextoNaoVazio(data.supermercado_id)
-        && isTextoNaoVazio(data.solicitante_nome)
-        && isTextoNaoVazio(data.setor)
-        && isTipoServicoValido(data.tipo_servico)
-        && (isCampoVazio(data.numero_pedido) || isTextoNaoVazio(data.numero_pedido))
-        && (isCampoVazio(data.cliente) || isTextoNaoVazio(data.cliente))
-        && (isCampoVazio(data.produto) || isTextoNaoVazio(data.produto))
-        && (isCampoVazio(data.quantidade) || isTextoNaoVazio(data.quantidade))
-        && isListaItensTelevendasValida(data.itens)
-        && isNumeroOpcionalNaoNegativo(data.total_solicitado)
-        && isNumeroOpcionalNaoNegativo(data.total_encontrado)
-        && isNumeroOpcionalNaoNegativo(data.percentual_atendido)
-        && (isCampoVazio(data.motivo_incompleto) || isTextoNaoVazio(data.motivo_incompleto))
-        && (isCampoVazio(data.observacao_operador) || isTextoNaoVazio(data.observacao_operador))
-        && (isCampoVazio(data.local_separacao) || isTextoNaoVazio(data.local_separacao))
-        && (isCampoVazio(data.prazo_limite) || isTextoNaoVazio(data.prazo_limite))
-        && (isCampoVazio(data.empilhadeira_id) || isTextoNaoVazio(data.empilhadeira_id))
-        && (isCampoVazio(data.empilhadeira_identificacao) || isTextoNaoVazio(data.empilhadeira_identificacao))
-        && isPrioridadeValida(data.prioridade)
-        && isStatusChamadoValido(data.status)
-        && isTextoNaoVazio(data.criado_em)
-        && (isCampoVazio(data.assumido_em) || isTextoNaoVazio(data.assumido_em))
-        && (isCampoVazio(data.a_caminho_em) || isTextoNaoVazio(data.a_caminho_em))
-        && (isCampoVazio(data.cheguei_em) || isTextoNaoVazio(data.cheguei_em))
-        && (isCampoVazio(data.operador_nome) || isTextoNaoVazio(data.operador_nome))
-        && (isCampoVazio(data.atualizado_em) || isTextoNaoVazio(data.atualizado_em))
-        && (isCampoVazio(data.atualizado_por) || isTextoNaoVazio(data.atualizado_por))
-        && (isCampoVazio(data.iniciado_em) || isTextoNaoVazio(data.iniciado_em))
-        && (isCampoVazio(data.finalizado_em) || isTextoNaoVazio(data.finalizado_em))
-        && (isCampoVazio(data.cancelado_em) || isTextoNaoVazio(data.cancelado_em))
-        && isEmpilhadeiraCompativelComChamado(data);
-    }
-
     function isEmpilhadeiraCompativelComChamado(data) {
       return (
         isCampoVazio(data.empilhadeira_id)
@@ -524,13 +472,37 @@ service cloud.firestore {
     }
 
     function isCriacaoChamadoValida() {
-      return isChamadoBaseValido(request.resource.data)
+      return isTextoNaoVazio(request.resource.data.id)
+        && isTextoNaoVazio(request.resource.data.empresa_id)
+        && isTextoNaoVazio(request.resource.data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(
+          request.resource.data.empresa_id,
+          request.resource.data.supermercado_id
+        )
+        && isTextoNaoVazio(request.resource.data.solicitante_nome)
+        && isTextoNaoVazio(request.resource.data.setor)
         && isCategoriaValida(request.resource.data.categoria)
+        && isTipoServicoValido(request.resource.data.tipo_servico)
+        && isPrioridadeValida(request.resource.data.prioridade)
+        && isTextoNaoVazio(request.resource.data.criado_em)
         && request.resource.data.itens is list
         && (
-          (request.resource.data.categoria == "operacional" && request.resource.data.status == "Aguardando")
-          || (request.resource.data.categoria == "televendas" && request.resource.data.status == "Aberto")
+          (
+            request.resource.data.categoria == "operacional"
+            && request.resource.data.status == "Aguardando"
+          )
+          || (
+            request.resource.data.categoria == "televendas"
+            && request.resource.data.status == "Aberto"
+            && request.resource.data.tipo_servico == "Atendimento Televendas"
+            && isTextoNaoVazio(request.resource.data.numero_pedido)
+            && isTextoNaoVazio(request.resource.data.cliente)
+            && request.resource.data.itens.size() > 0
+            && isTextoNaoVazio(request.resource.data.local_separacao)
+            && isTextoNaoVazio(request.resource.data.prazo_limite)
+          )
         )
+        && isEmpilhadeiraCompativelComChamado(request.resource.data)
         && request.resource.data.operador_nome == null
         && request.resource.data.assumido_em == null
         && request.resource.data.a_caminho_em == null
