@@ -160,7 +160,11 @@ export default function App() {
     createEmpresa,
     updateEmpresa,
     toggleEmpresaStatus,
-  } = useEmpresas();
+  } = useEmpresas({
+    empresaId: usuarioAtual?.empresa_id ?? null,
+    canViewAllCompanies,
+    isAuthenticated,
+  });
   const {
     unidades: supermercados,
     createUnidade: createSupermercado,
@@ -168,6 +172,8 @@ export default function App() {
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
     empresaId: isAuthenticated ? usuarioAtual?.empresa_id ?? null : null,
+    supermercadoId: isAuthenticated ? usuarioAtual?.supermercado_id ?? null : null,
+    canViewAllUnits: permissions.canViewAllUnits,
     canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
   });
   const {
@@ -175,7 +181,12 @@ export default function App() {
     upsertUsuarioFromLogin,
     updateUsuarioAdmin,
     toggleUsuarioStatus,
-  } = useUsuarios();
+  } = useUsuarios({
+    currentUserId: usuarioAtual?.id ?? null,
+    empresaId: usuarioAtual?.empresa_id ?? null,
+    canViewAllCompanies,
+    canManageCompanyUsers: permissions.canManageCompanyAdmin,
+  });
   const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
   const isPlatformAdmin = perfilAcesso === "Administrador Geral";

@@ -2,6 +2,8 @@ import { useSupermercados } from "./useSupermercados";
 
 interface UseUnidadesOptions {
   empresaId?: string | null;
+  supermercadoId?: string | null;
+  canViewAllUnits?: boolean;
   canViewAllCompanies?: boolean;
 }
 

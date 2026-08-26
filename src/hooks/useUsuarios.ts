@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, documentId, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
 import { normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
@@ -68,7 +68,20 @@ function normalizeUsuario(
   };
 }
 
-export function useUsuarios() {
+interface UseUsuariosOptions {
+  currentUserId?: string | null;
+  empresaId?: string | null;
+  canViewAllCompanies?: boolean;
+  canManageCompanyUsers?: boolean;
+}
+
+export function useUsuarios(options: UseUsuariosOptions = {}) {
+  const {
+    currentUserId = null,
+    empresaId = null,
+    canViewAllCompanies = false,
+    canManageCompanyUsers = false,
+  } = options;
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
 
   useEffect(() => {
@@ -77,8 +90,19 @@ export function useUsuarios() {
       return;
     }
 
+    if (!currentUserId) {
+      setUsuarios([]);
+      return;
+    }
+
+    const usuariosQuery = canViewAllCompanies
+      ? collection(db, USUARIOS_COLLECTION)
+      : canManageCompanyUsers && empresaId
+        ? query(collection(db, USUARIOS_COLLECTION), where("empresa_id", "==", empresaId))
+        : query(collection(db, USUARIOS_COLLECTION), where(documentId(), "==", currentUserId));
+
     return onSnapshot(
-      collection(db, USUARIOS_COLLECTION),
+      usuariosQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>
@@ -96,7 +120,7 @@ export function useUsuarios() {
         setUsuarios([]);
       }
     );
-  }, []);
+  }, [canManageCompanyUsers, canViewAllCompanies, currentUserId, empresaId]);
 
   const upsertUsuarioFromLogin = useCallback(async (usuario: UsuarioSistema) => {
     const usuarioNormalizado: UsuarioSistema = {

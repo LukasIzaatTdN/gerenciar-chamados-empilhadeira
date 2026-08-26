@@ -66,7 +66,12 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
     const empilhadeirasQuery = scope.canViewAllCompanies
       ? query(collection(firestore, EMPILHADEIRAS_COLLECTION))
-      : query(
+      : !scope.canViewAllUnits && scope.supermercadoId
+        ? query(
+            collection(firestore, EMPILHADEIRAS_COLLECTION),
+            where("supermercado_id", "==", scope.supermercadoId)
+          )
+        : query(
           collection(firestore, EMPILHADEIRAS_COLLECTION),
           where("empresa_id", "==", scope.empresaId)
         );

@@ -86,7 +86,6 @@ export default function OperadorLogin({
   );
 
   const isAdminGeral = perfilSelecionado === "Administrador Geral";
-  const isAdminEmpresa = perfilSelecionado === "Administrador da Empresa";
   const usingAdminInvite = authMode === "firebase" && authTab === "register" && inviteToken.trim().length > 0;
   const perfisDisponiveisCadastro =
     authMode === "firebase" && authTab === "register"
@@ -193,9 +192,9 @@ export default function OperadorLogin({
     }
 
     const usuario: UsuarioSistema = {
-      id: `session-${perfilSelecionado.toLowerCase().replace(/\s+/g, "-")}-${empresaId || "all"}-${supermercadoId || "all"}`,
+      id: `session-${perfilEfetivo.toLowerCase().replace(/\s+/g, "-")}-${empresaId || "all"}-${supermercadoId || "all"}`,
       nome: nomeFinal,
-      perfil: perfilSelecionado,
+      perfil: perfilEfetivo,
       empresa_id: isAdminGeral ? null : empresaId,
       supermercado_id: precisaUnidade ? supermercadoId : null,
       supermercado_ids: precisaUnidade && supermercadoId ? [supermercadoId] : [],

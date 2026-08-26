@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   collection,
   doc,
+  documentId,
   onSnapshot,
   query,
   setDoc,
@@ -17,6 +18,8 @@ const SUPERMERCADOS_COLLECTION = "supermercados";
 
 interface UseSupermercadosOptions {
   empresaId?: string | null;
+  supermercadoId?: string | null;
+  canViewAllUnits?: boolean;
   canViewAllCompanies?: boolean;
 }
 
@@ -46,7 +49,12 @@ function normalizeSupermercado(
 }
 
 export function useSupermercados(options: UseSupermercadosOptions = {}) {
-  const { empresaId = null, canViewAllCompanies = false } = options;
+  const {
+    empresaId = null,
+    supermercadoId = null,
+    canViewAllUnits = false,
+    canViewAllCompanies = false,
+  } = options;
   const [supermercados, setSupermercados] = useState<Supermercado[]>(
     SUPERMERCADOS_FALLBACK
   );
@@ -59,7 +67,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
       return;
     }
 
-    if (!canViewAllCompanies && !empresaId) {
+    if (!canViewAllCompanies && !empresaId && !supermercadoId) {
       setSupermercados([]);
       return;
     }
@@ -67,10 +75,15 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
     const supermercadosQuery =
       canViewAllCompanies || !empresaId
         ? collection(firestore, SUPERMERCADOS_COLLECTION)
-        : query(
-            collection(firestore, SUPERMERCADOS_COLLECTION),
-            where("empresa_id", "==", empresaId)
-          );
+        : !canViewAllUnits && supermercadoId
+          ? query(
+              collection(firestore, SUPERMERCADOS_COLLECTION),
+              where(documentId(), "==", supermercadoId)
+            )
+          : query(
+              collection(firestore, SUPERMERCADOS_COLLECTION),
+              where("empresa_id", "==", empresaId)
+            );
 
     return onSnapshot(
       supermercadosQuery,
@@ -93,7 +106,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
         );
       }
     );
-  }, [canViewAllCompanies, empresaId]);
+  }, [canViewAllCompanies, canViewAllUnits, empresaId, supermercadoId]);
 
   const createSupermercado = useCallback(
     async (input: {

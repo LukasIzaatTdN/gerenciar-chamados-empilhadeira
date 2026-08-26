@@ -6,34 +6,38 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdminGeral() {
+    function hasCurrentUserDoc() {
       return isSignedIn()
-        && request.auth.token.perfil == "Administrador Geral";
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function isCurrentUserActive() {
+      return isSignedIn()
+        && (
+          !hasCurrentUserDoc()
+          || !(
+            "status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
+          )
+          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+        );
+    }
+
+    function isAdminGeral() {
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Administrador Geral";
     }
 
     function isAdminGeralByUserDoc() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador Geral"
-        && (
-          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-        );
+      return isAdminGeral();
     }
 
     function isAdminEmpresa() {
-      return isSignedIn()
-        && request.auth.token.perfil == "Administrador da Empresa";
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Administrador da Empresa";
     }
 
     function isAdminEmpresaByUserDoc() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador da Empresa"
-        && (
-          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-        );
+      return isAdminEmpresa();
     }
 
     function hasAdminManagementAccess() {
@@ -45,38 +49,45 @@ service cloud.firestore {
     }
 
     function currentUserEmpresaId() {
-      return isSignedIn()
+      return isCurrentUserActive()
         ? (
-            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id != null
-            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
-            : (
-                exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
-                && exists(
-                  /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
-                )
-                ? get(
-                    /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
-                  ).data.empresa_id
+            hasCurrentUserDoc()
+            ? (
+                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id is string
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id.size() > 0
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
                 : (
-                    request.auth.token.empresa_id is string
-                    && request.auth.token.empresa_id.size() > 0
-                    ? request.auth.token.empresa_id
+                    get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
+                    && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
+                    && exists(
+                      /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
+                    )
+                    ? get(
+                        /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
+                      ).data.empresa_id
                     : null
                   )
+              )
+            : (
+                request.auth.token.empresa_id is string
+                && request.auth.token.empresa_id.size() > 0
+                ? request.auth.token.empresa_id
+                : null
               )
           )
         : null;
     }
 
     function currentUserSupermercadoId() {
-      return isSignedIn()
+      return isCurrentUserActive()
         ? (
-            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id != null
-            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+            hasCurrentUserDoc()
+            ? (
+                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
+                : null
+              )
             : (
                 request.auth.token.supermercado_id is string
                 && request.auth.token.supermercado_id.size() > 0
@@ -88,11 +99,15 @@ service cloud.firestore {
     }
 
     function currentUserPerfil() {
-      return isSignedIn()
+      return isCurrentUserActive()
         ? (
-            exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-            && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil != null
-            ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+            hasCurrentUserDoc()
+            ? (
+                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil is string
+                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil.size() > 0
+                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+                : null
+              )
             : (
                 request.auth.token.perfil is string
                 && request.auth.token.perfil.size() > 0
@@ -200,24 +215,73 @@ service cloud.firestore {
       );
     }
 
-    function canAccessEmpresa(empresaId) {
-      return isAdminGeral()
-        || isAdminGeralByUserDoc()
-        || isAdminEmpresaDaEmpresa(empresaId)
-        || (currentUserEmpresaId() != null && currentUserEmpresaId() == empresaId)
-        || (
-          currentUserSupermercadoId() is string
-          && currentUserSupermercadoId().size() > 0
-          && exists(/databases/$(database)/documents/supermercados/$(currentUserSupermercadoId()))
-          && get(/databases/$(database)/documents/supermercados/$(currentUserSupermercadoId())).data.empresa_id == empresaId
+    function isUsuarioVinculoValido(data) {
+      return isPerfilValido(data.perfil)
+        && (!("status" in data) || isStatusUsuarioValido(data.status))
+        && isEmpresaVinculoValido(data.perfil, data.empresa_id)
+        && isSupermercadoVinculoValido(
+          data.perfil,
+          data.empresa_id,
+          data.supermercado_id
         );
     }
 
+    function canAdminEmpresaManageUser(existingData, newData) {
+      return isAdminEmpresa()
+        && existingData.perfil != "Administrador Geral"
+        && newData.perfil != "Administrador Geral"
+        && existingData.empresa_id == currentUserEmpresaId()
+        && newData.empresa_id == currentUserEmpresaId()
+        && isUsuarioVinculoValido(newData);
+    }
+
+    function hasOnlyUserManagementChanges(existingData, newData) {
+      return newData.diff(existingData).affectedKeys().hasOnly([
+        "perfil",
+        "empresa_id",
+        "supermercado_id",
+        "supermercado_ids",
+        "status",
+        "atualizado_em"
+      ]);
+    }
+
+    function canAccessEmpresa(empresaId) {
+      return isAdminGeral()
+        || isAdminGeralByUserDoc()
+        || isAdminEmpresaDaEmpresa(empresaId);
+    }
+
+    function belongsToEmpresa(empresaId) {
+      return isCurrentUserActive()
+        && currentUserEmpresaId() != null
+        && currentUserEmpresaId() == empresaId;
+    }
+
     function canAccessCurrentSupermercado(supermercadoId) {
-      return isSignedIn()
+      return isCurrentUserActive()
         && currentUserSupermercadoId() is string
         && currentUserSupermercadoId().size() > 0
         && currentUserSupermercadoId() == supermercadoId;
+    }
+
+    function canCreateChamado() {
+      return currentUserPerfil() == "Promotor"
+        || currentUserPerfil() == "Funcionário"
+        || currentUserPerfil() == "Televendas"
+        || isAdminEmpresa()
+        || isAdminGeral();
+    }
+
+    function canManageChamado() {
+      return currentUserPerfil() == "Operador"
+        || currentUserPerfil() == "Supervisor"
+        || isAdminEmpresa()
+        || isAdminGeral();
+    }
+
+    function isStatusUsuarioValido(status) {
+      return status == "Ativo" || status == "Inativo";
     }
 
     function isTextoNaoVazio(valor) {
@@ -323,10 +387,14 @@ service cloud.firestore {
     }
 
     function canCreateChecklistEmpilhadeira(data) {
-      return hasAdminManagementAccess()
-        || canAccessEmpresa(data.empresa_id)
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
         || (
-          isSignedIn()
+          isCurrentUserActive()
+          && (
+            currentUserPerfil() == "Operador"
+            || currentUserPerfil() == "Supervisor"
+          )
           && currentUserSupermercadoId() != null
           && currentUserSupermercadoId() == data.supermercado_id
         );
@@ -374,17 +442,21 @@ service cloud.firestore {
     }
 
     function canCreateManutencao(data) {
-      return hasAdminManagementAccess()
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
         || isSupervisorDaUnidade(data.supermercado_id)
         || (
-          isSignedIn()
+          isCurrentUserActive()
+          && currentUserPerfil() == "Operador"
           && currentUserSupermercadoId() != null
           && currentUserSupermercadoId() == data.supermercado_id
         );
     }
 
     function canUpdateManutencao(data) {
-      return hasAdminManagementAccess() || isSupervisorDaUnidade(data.supermercado_id);
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
+        || isSupervisorDaUnidade(data.supermercado_id);
     }
 
     function isChamadoBaseValido(data) {
@@ -496,6 +568,7 @@ service cloud.firestore {
         );
 
       allow create: if isSignedIn()
+        && canCreateChamado()
         && request.resource.data.id == id
         && isCriacaoChamadoValida()
         && (
@@ -504,6 +577,7 @@ service cloud.firestore {
         );
 
       allow update: if isSignedIn()
+        && canManageChamado()
         && isAtualizacaoChamadoValida()
         && (
           canAccessEmpresa(resource.data.empresa_id)
@@ -514,12 +588,14 @@ service cloud.firestore {
     }
 
     match /empresas/{id} {
-      allow read: if !isSignedIn() || canAccessEmpresa(id);
-      allow write: if isAdminGeral() || isAdminGeralByUserDoc();
+      allow read: if !isSignedIn() || canAccessEmpresa(id) || belongsToEmpresa(id);
+      allow write: if isAdminGeral();
     }
 
     match /supermercados/{id} {
-      allow read: if !isSignedIn() || canAccessEmpresa(resource.data.empresa_id);
+      allow read: if !isSignedIn()
+        || canAccessEmpresa(resource.data.empresa_id)
+        || canAccessCurrentSupermercado(id);
       allow create: if hasAdminManagementAccess()
         && canAccessEmpresa(request.resource.data.empresa_id);
       allow update: if hasAdminManagementAccess()
@@ -534,17 +610,28 @@ service cloud.firestore {
     }
 
     match /empilhadeiras/{id} {
-      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
+      allow read: if isCurrentUserActive()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
       allow create: if hasAdminManagementAccess()
+        && canAccessEmpresa(request.resource.data.empresa_id)
         && isEmpilhadeiraValida(request.resource.data, id);
       allow update: if (
-          hasAdminManagementAccess()
+          isAdminGeral()
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
           || isSupervisorDaUnidade(resource.data.supermercado_id)
+        )
+        && (
+          isAdminGeral()
+          || request.resource.data.empresa_id == resource.data.empresa_id
         )
         && isEmpilhadeiraValida(request.resource.data, id)
         && request.resource.data.criado_em == resource.data.criado_em
         && (
-          hasAdminManagementAccess()
+          isAdminGeral()
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
           || (
             request.resource.data.empresa_id == resource.data.empresa_id
             && request.resource.data.supermercado_id == resource.data.supermercado_id
@@ -553,7 +640,8 @@ service cloud.firestore {
             && request.resource.data.numero_interno == resource.data.numero_interno
           )
         );
-      allow delete: if hasAdminManagementAccess();
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
     }
 
     match /checklists_empilhadeira/{id} {
@@ -564,13 +652,19 @@ service cloud.firestore {
         );
       allow create: if isChecklistEmpilhadeiraValido(request.resource.data, id)
         && canCreateChecklistEmpilhadeira(request.resource.data);
-      allow update: if hasAdminManagementAccess()
+      allow update: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
         || isSupervisorDaUnidade(resource.data.supermercado_id);
-      allow delete: if hasAdminManagementAccess();
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
     }
 
     match /manutencoes/{id} {
-      allow read: if isSignedIn() && canAccessEmpresa(resource.data.empresa_id);
+      allow read: if isCurrentUserActive()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
       allow create: if isManutencaoValida(request.resource.data, id)
         && canCreateManutencao(request.resource.data);
       allow update: if isManutencaoValida(request.resource.data, id)
@@ -579,7 +673,8 @@ service cloud.firestore {
         && request.resource.data.supermercado_id == resource.data.supermercado_id
         && request.resource.data.empilhadeira_id == resource.data.empilhadeira_id
         && request.resource.data.criado_por == resource.data.criado_por;
-      allow delete: if hasAdminManagementAccess();
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
     }
 
     match /usuarios/{id} {
@@ -608,10 +703,19 @@ service cloud.firestore {
           request.resource.data.supermercado_id
         );
 
-      allow update: if hasAdminManagementAccess()
+      allow update: if (
+          isAdminGeral()
+          && isUsuarioVinculoValido(request.resource.data)
+          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        )
+        || (
+          canAdminEmpresaManageUser(resource.data, request.resource.data)
+          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        )
         || (
           isSignedIn()
           && request.auth.uid == id
+          && isCurrentUserActive()
           && request.resource.data.id == resource.data.id
           && request.resource.data.nome == resource.data.nome
           && request.resource.data.email == resource.data.email
@@ -619,6 +723,11 @@ service cloud.firestore {
           && request.resource.data.empresa_id == resource.data.empresa_id
           && request.resource.data.status == resource.data.status
           && request.resource.data.criado_em == resource.data.criado_em
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "supermercado_id",
+            "supermercado_ids",
+            "atualizado_em"
+          ])
           && (
             request.resource.data.supermercado_id == resource.data.supermercado_id
             || isSupermercadoDaEmpresaAtivo(resource.data.empresa_id, request.resource.data.supermercado_id)
@@ -627,7 +736,13 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if hasAdminManagementAccess();
+      allow delete: if isAdminGeral()
+        || (
+          isAdminEmpresa()
+          && request.auth.uid != id
+          && resource.data.perfil != "Administrador Geral"
+          && resource.data.empresa_id == currentUserEmpresaId()
+        );
     }
 
     match /convites_admin_empresa/{id} {

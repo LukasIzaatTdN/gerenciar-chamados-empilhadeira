@@ -85,6 +85,10 @@ export default function UsuariosAdmin({
       ),
     [canSelectEmpresa, currentEmpresaId, editEmpresaId, supermercadosAtivos]
   );
+  const perfisDisponiveis = useMemo(
+    () => PERFIS.filter((perfil) => canSelectEmpresa || perfil !== "Administrador Geral"),
+    [canSelectEmpresa]
+  );
 
   const usuariosOrdenados = useMemo(
     () =>
@@ -368,7 +372,7 @@ export default function UsuariosAdmin({
                           }}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
                         >
-                          {PERFIS.map((perfil) => (
+                          {perfisDisponiveis.map((perfil) => (
                             <option key={perfil} value={perfil}>
                               {perfil}
                             </option>

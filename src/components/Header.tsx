@@ -233,7 +233,7 @@ export default function Header({
                   <span>Manutenções</span>
                 </button>
               )}
-              {perfilAcesso !== "Administrador Geral" && showEmpresasAction && onOpenEmpresasAdmin && (
+              {showEmpresasAction && onOpenEmpresasAdmin && (
                 <button
                   onClick={onOpenEmpresasAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -242,7 +242,7 @@ export default function Header({
                   <span>Empresas</span>
                 </button>
               )}
-              {perfilAcesso !== "Administrador Geral" && unidadesActionVisible && openUnidadesAdmin && (
+              {unidadesActionVisible && openUnidadesAdmin && (
                 <button
                   onClick={openUnidadesAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -251,7 +251,7 @@ export default function Header({
                   <span>Unidades</span>
                 </button>
               )}
-              {perfilAcesso !== "Administrador Geral" && showUsuariosAction && onOpenUsuariosAdmin && (
+              {showUsuariosAction && onOpenUsuariosAdmin && (
                 <button
                   onClick={onOpenUsuariosAdmin}
                   className={getActionClassName(perfilAcesso === "Administrador Geral")}
@@ -372,7 +372,7 @@ export default function Header({
                   </button>
                 )}
 
-                {perfilAcesso !== "Administrador Geral" && showEmpresasAction && onOpenEmpresasAdmin && (
+                {showEmpresasAction && onOpenEmpresasAdmin && (
                   <button
                     onClick={onOpenEmpresasAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -386,7 +386,7 @@ export default function Header({
                   </button>
                 )}
 
-                {perfilAcesso !== "Administrador Geral" && unidadesActionVisible && openUnidadesAdmin && (
+                {unidadesActionVisible && openUnidadesAdmin && (
                   <button
                     onClick={openUnidadesAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -399,7 +399,7 @@ export default function Header({
                     <span>Unidades</span>
                   </button>
                 )}
-                {perfilAcesso !== "Administrador Geral" && showUsuariosAction && onOpenUsuariosAdmin && (
+                {showUsuariosAction && onOpenUsuariosAdmin && (
                   <button
                     onClick={onOpenUsuariosAdmin}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${

@@ -396,7 +396,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       const chamadosQuery = scope.canViewAllCompanies
         ? query(collection(db, CHAMADOS_COLLECTION))
-        : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
+        : !scope.canViewAllUnits && scope.supermercadoId
+          ? query(
+              collection(db, CHAMADOS_COLLECTION),
+              where("supermercado_id", "==", scope.supermercadoId)
+            )
+          : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
 
       return onSnapshot(
         chamadosQuery,

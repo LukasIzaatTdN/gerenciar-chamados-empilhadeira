@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, documentId, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Empresa, EmpresaStatus, PlanoCiclo, PlanoStatus } from "../types/empresa";
 import { resolveEmpresaId, sanitizeTenantId } from "../utils/tenant";
@@ -55,7 +55,18 @@ function buildEmpresaId(codigo: string) {
   return `emp-${sanitizeTenantId(codigo)}`;
 }
 
-export function useEmpresas() {
+interface UseEmpresasOptions {
+  empresaId?: string | null;
+  canViewAllCompanies?: boolean;
+  isAuthenticated?: boolean;
+}
+
+export function useEmpresas(options: UseEmpresasOptions = {}) {
+  const {
+    empresaId = null,
+    canViewAllCompanies = false,
+    isAuthenticated = false,
+  } = options;
   const [empresas, setEmpresas] = useState<Empresa[]>(() => {
     if (typeof window === "undefined") return EMPRESAS;
 
@@ -88,8 +99,18 @@ export function useEmpresas() {
       retryTimeoutRef.current = null;
     }
 
+    if (isAuthenticated && !canViewAllCompanies && !empresaId) {
+      setEmpresas([]);
+      return;
+    }
+
+    const empresasQuery =
+      !isAuthenticated || canViewAllCompanies
+        ? collection(db, EMPRESAS_COLLECTION)
+        : query(collection(db, EMPRESAS_COLLECTION), where(documentId(), "==", empresaId));
+
     return onSnapshot(
-      collection(db, EMPRESAS_COLLECTION),
+      empresasQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((item) => normalizeEmpresa(item.data() as Partial<Empresa>, item.id))
@@ -116,7 +137,7 @@ export function useEmpresas() {
         }, 1500);
       }
     );
-  }, [retryTick]);
+  }, [canViewAllCompanies, empresaId, isAuthenticated, retryTick]);
 
   useEffect(() => {
     return () => {

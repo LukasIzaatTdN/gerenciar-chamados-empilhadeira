@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { Manutencao, NovaManutencaoInput } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
@@ -55,8 +55,20 @@ export function useManutencoes(scope: ManutencaoScope) {
       return;
     }
 
+    const manutencoesQuery = scope.canViewAllCompanies
+      ? query(collection(db, MANUTENCOES_COLLECTION))
+      : !scope.canViewAllUnits && scope.supermercadoId
+        ? query(
+            collection(db, MANUTENCOES_COLLECTION),
+            where("supermercado_id", "==", scope.supermercadoId)
+          )
+        : query(
+            collection(db, MANUTENCOES_COLLECTION),
+            where("empresa_id", "==", scope.empresaId)
+          );
+
     return onSnapshot(
-      collection(db, MANUTENCOES_COLLECTION),
+      manutencoesQuery,
       (snapshot) => {
         const remote = snapshot.docs
           .map((snapshotDoc) =>
