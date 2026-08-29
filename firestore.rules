@@ -12,12 +12,9 @@ service cloud.firestore {
     }
 
     function isCurrentUserActive() {
-      return isSignedIn()
+      return hasCurrentUserDoc()
         && (
-          !hasCurrentUserDoc()
-          || !(
-            "status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
-          )
+          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
           || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
         );
     }
@@ -49,72 +46,29 @@ service cloud.firestore {
     }
 
     function currentUserEmpresaId() {
-      return isCurrentUserActive()
-        ? (
-            hasCurrentUserDoc()
-            ? (
-                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id is string
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id.size() > 0
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
-                : (
-                    get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
-                    && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
-                    && exists(
-                      /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
-                    )
-                    ? get(
-                        /databases/$(database)/documents/supermercados/$(get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id)
-                      ).data.empresa_id
-                    : null
-                  )
-              )
-            : (
-                request.auth.token.empresa_id is string
-                && request.auth.token.empresa_id.size() > 0
-                ? request.auth.token.empresa_id
-                : null
-              )
-          )
+      return hasCurrentUserDoc()
+        && "empresa_id" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id is string
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id.size() > 0
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
         : null;
     }
 
     function currentUserSupermercadoId() {
-      return isCurrentUserActive()
-        ? (
-            hasCurrentUserDoc()
-            ? (
-                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
-                : null
-              )
-            : (
-                request.auth.token.supermercado_id is string
-                && request.auth.token.supermercado_id.size() > 0
-                ? request.auth.token.supermercado_id
-                : null
-              )
-          )
+      return hasCurrentUserDoc()
+        && "supermercado_id" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
         : null;
     }
 
     function currentUserPerfil() {
-      return isCurrentUserActive()
-        ? (
-            hasCurrentUserDoc()
-            ? (
-                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil is string
-                && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil.size() > 0
-                ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
-                : null
-              )
-            : (
-                request.auth.token.perfil is string
-                && request.auth.token.perfil.size() > 0
-                ? request.auth.token.perfil
-                : null
-              )
-          )
+      return hasCurrentUserDoc()
+        && "perfil" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil is string
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil.size() > 0
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
         : null;
     }
 
@@ -276,11 +230,8 @@ service cloud.firestore {
     }
 
     function canCreateChamado() {
-      return currentUserPerfil() == "Promotor"
-        || currentUserPerfil() == "Funcionário"
-        || currentUserPerfil() == "Televendas"
-        || isAdminEmpresa()
-        || isAdminGeral();
+      return isCurrentUserActive()
+        && isPerfilValido(currentUserPerfil());
     }
 
     function canManageChamado() {
