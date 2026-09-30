@@ -24,25 +24,17 @@ service cloud.firestore {
         && currentUserPerfil() == "Administrador Geral";
     }
 
-    function isAdminGeralByUserDoc() {
-      return isAdminGeral();
-    }
-
     function isAdminEmpresa() {
       return isCurrentUserActive()
         && currentUserPerfil() == "Administrador da Empresa";
     }
 
-    function isAdminEmpresaByUserDoc() {
-      return isAdminEmpresa();
-    }
-
     function hasAdminManagementAccess() {
-      return isAdminGeral() || isAdminGeralByUserDoc() || isAdminEmpresa() || isAdminEmpresaByUserDoc();
+      return isAdminGeral() || isAdminEmpresa();
     }
 
     function isPlatformAdminAccess() {
-      return isAdminGeral() || isAdminGeralByUserDoc();
+      return isAdminGeral();
     }
 
     function currentUserEmpresaId() {
@@ -212,7 +204,6 @@ service cloud.firestore {
 
     function canAccessEmpresa(empresaId) {
       return isAdminGeral()
-        || isAdminGeralByUserDoc()
         || isAdminEmpresaDaEmpresa(empresaId);
     }
 
@@ -496,8 +487,8 @@ service cloud.firestore {
     match /chamados/{id} {
       allow read: if isSignedIn()
         && (
-          canAccessEmpresa(resource.data.empresa_id)
-          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+          canAccessCurrentSupermercado(resource.data.supermercado_id)
+          || canAccessEmpresa(resource.data.empresa_id)
         );
 
       allow create: if isSignedIn()
@@ -505,19 +496,19 @@ service cloud.firestore {
         && request.resource.data.id == id
         && isCriacaoChamadoValida()
         && (
-          canAccessEmpresa(request.resource.data.empresa_id)
-          || canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+          canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+          || canAccessEmpresa(request.resource.data.empresa_id)
         );
 
       allow update: if isSignedIn()
         && canManageChamado()
         && isAtualizacaoChamadoValida()
         && (
-          canAccessEmpresa(resource.data.empresa_id)
-          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+          canAccessCurrentSupermercado(resource.data.supermercado_id)
+          || canAccessEmpresa(resource.data.empresa_id)
         );
 
-      allow delete: if isAdminGeral() || isAdminGeralByUserDoc();
+      allow delete: if isAdminGeral();
     }
 
     match /empresas/{id} {
