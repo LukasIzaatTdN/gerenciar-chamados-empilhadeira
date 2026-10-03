@@ -63,7 +63,7 @@ import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
 import { normalizeGovernanceMessage } from "./utils/governanceMessages";
-import { getAccessibleSupermercadosForUser } from "./utils/tenant";
+import { getAccessibleSupermercadosForUser, mergeScopedUnitSelection } from "./utils/tenant";
 import { getOperationalAlerts } from "./utils/operationalAlerts";
 import { getOperationalActionPlan } from "./utils/operationalActionPlan";
 import {
@@ -399,6 +399,10 @@ export default function App() {
     {
       empresaId: empresaSelecionadaId,
       supermercadoId: supermercadoSelecionadoId,
+      supermercadoIds:
+        !canViewAllUnits || adminSupermercadoFiltro !== "todos"
+          ? usuarioAtual?.supermercado_ids?.filter(Boolean) ?? (supermercadoId ? [supermercadoId] : [])
+          : [],
       canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
       canViewAllCompanies,
       perfil: perfilAcesso,
@@ -986,6 +990,7 @@ export default function App() {
     perfil: UsuarioSistema["perfil"];
     empresa_id: string | null;
     supermercado_id: string | null;
+    supermercado_ids?: string[];
     invite_token?: string;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
@@ -1038,6 +1043,14 @@ export default function App() {
       const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
       const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
       const supermercadoFinal = invite ? null : input.supermercado_id;
+      const supermercadoIds = Array.from(
+        new Set(
+          (input.supermercado_ids ?? []).filter(
+            (item): item is string => typeof item === "string" && item.trim().length > 0
+          )
+        )
+      );
+      const activeSupermercadoId = supermercadoIds[0] ?? supermercadoFinal ?? null;
 
       await setDoc(
         doc(db, "usuarios", createdUid),
@@ -1046,8 +1059,8 @@ export default function App() {
           nome: input.nome.trim(),
           perfil: perfilFinal,
           empresa_id: empresaFinal,
-          supermercado_id: supermercadoFinal,
-          supermercado_ids: supermercadoFinal ? [supermercadoFinal] : [],
+          supermercado_id: activeSupermercadoId,
+          supermercado_ids: supermercadoIds.length > 0 ? supermercadoIds : supermercadoFinal ? [supermercadoFinal] : [],
           status: "Ativo",
           email: input.email.trim().toLowerCase(),
           criado_em: new Date().toISOString(),
@@ -1097,6 +1110,7 @@ export default function App() {
     perfil: UsuarioSistema["perfil"];
     empresa_id: string | null;
     supermercado_id: string | null;
+    supermercado_ids?: string[];
     invite_token?: string;
   }) {
     if (!auth || !db) throw new Error("Firebase não inicializado");
@@ -1128,6 +1142,14 @@ export default function App() {
       const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
       const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
       const supermercadoFinal = invite ? null : input.supermercado_id;
+      const supermercadoIds = Array.from(
+        new Set(
+          (input.supermercado_ids ?? []).filter(
+            (item): item is string => typeof item === "string" && item.trim().length > 0
+          )
+        )
+      );
+      const activeSupermercadoId = supermercadoIds[0] ?? supermercadoFinal ?? null;
       const nomeFinal =
         input.nome.trim() || credential.user.displayName?.trim() || "Usuário";
       const emailFinal = credential.user.email?.trim().toLowerCase() ?? null;
@@ -1139,8 +1161,8 @@ export default function App() {
           nome: nomeFinal,
           perfil: perfilFinal,
           empresa_id: empresaFinal,
-          supermercado_id: supermercadoFinal,
-          supermercado_ids: supermercadoFinal ? [supermercadoFinal] : [],
+          supermercado_id: activeSupermercadoId,
+          supermercado_ids: supermercadoIds.length > 0 ? supermercadoIds : supermercadoFinal ? [supermercadoFinal] : [],
           status: "Ativo",
           email: emailFinal,
           criado_em: new Date().toISOString(),
@@ -1552,11 +1574,17 @@ export default function App() {
         );
         if (!unidadeAtiva) return;
 
+        const nextSelection = mergeScopedUnitSelection(
+          usuarioAtual.supermercado_id,
+          usuarioAtual.supermercado_ids,
+          nextSupermercadoId
+        );
+
         if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
           await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
             empresa_id: unidadeAtiva.empresa_id,
-            supermercado_id: nextSupermercadoId,
-            supermercado_ids: [nextSupermercadoId],
+            supermercado_id: nextSelection.supermercado_id,
+            supermercado_ids: nextSelection.supermercado_ids,
             atualizado_em: new Date().toISOString(),
           });
         }
@@ -1566,8 +1594,8 @@ export default function App() {
             ? {
                 ...prev,
                 empresa_id: unidadeAtiva.empresa_id,
-                supermercado_id: nextSupermercadoId,
-                supermercado_ids: [nextSupermercadoId],
+                supermercado_id: nextSelection.supermercado_id,
+                supermercado_ids: nextSelection.supermercado_ids,
               }
             : prev
         );

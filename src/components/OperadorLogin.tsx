@@ -13,6 +13,7 @@ interface OperadorLoginProps {
     perfil: PerfilAcesso;
     empresa_id: string | null;
     supermercado_id: string | null;
+    supermercado_ids?: string[];
     invite_token?: string;
   }) => void | Promise<void>;
   onFirebaseRegister?: (input: {
@@ -22,6 +23,7 @@ interface OperadorLoginProps {
     perfil: PerfilAcesso;
     empresa_id: string | null;
     supermercado_id: string | null;
+    supermercado_ids?: string[];
     invite_token?: string;
   }) => void | Promise<void>;
   onCancel: () => void;
@@ -66,6 +68,7 @@ export default function OperadorLogin({
   const [nomeColaborador, setNomeColaborador] = useState("");
   const [empresaId, setEmpresaId] = useState("");
   const [supermercadoId, setSupermercadoId] = useState("");
+  const [supermercadoIds, setSupermercadoIds] = useState<string[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -120,13 +123,42 @@ export default function OperadorLogin({
   useEffect(() => {
     if (!precisaUnidade) {
       setSupermercadoId("");
+      setSupermercadoIds([]);
       return;
     }
 
-    if (!supermercadoId) {
-      setSupermercadoId(supermercadosDisponiveis[0]?.id ?? "");
+    const primeiroDisponivel = supermercadosDisponiveis[0]?.id ?? "";
+    if (!supermercadoId && primeiroDisponivel) {
+      setSupermercadoId(primeiroDisponivel);
     }
-  }, [precisaUnidade, supermercadoId, supermercadosDisponiveis]);
+
+    const validSelections = supermercadoIds.filter((id) =>
+      supermercadosDisponiveis.some((item) => item.id === id)
+    );
+
+    if (perfilEfetivo === "Promotor") {
+      const nextIds = validSelections.length > 0 ? validSelections : primeiroDisponivel ? [primeiroDisponivel] : [];
+      if (nextIds.join("|") !== supermercadoIds.join("|")) {
+        setSupermercadoIds(nextIds);
+      }
+      if (nextIds[0] && supermercadoId !== nextIds[0]) {
+        setSupermercadoId(nextIds[0]);
+      }
+      return;
+    }
+
+    if (supermercadoId) {
+      const fallback = [supermercadoId];
+      if (fallback.join("|") !== supermercadoIds.join("|")) {
+        setSupermercadoIds(fallback);
+      }
+      return;
+    }
+
+    if (!supermercadoIds.length && primeiroDisponivel) {
+      setSupermercadoIds([primeiroDisponivel]);
+    }
+  }, [perfilEfetivo, precisaUnidade, supermercadoId, supermercadoIds, supermercadosDisponiveis]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -171,7 +203,25 @@ export default function OperadorLogin({
     if (!perfilEfetivo) return setError("Selecione um perfil");
     if (usingAdminInvite && !inviteToken.trim()) return setError("Informe o token de convite.");
     if (precisaEmpresa && !empresaId && !usingAdminInvite) return setError("Selecione a empresa");
-    if (precisaUnidade && !supermercadoId) return setError("Selecione a unidade");
+
+    const selectedSupermercadoIds =
+      !precisaUnidade
+        ? []
+        : perfilEfetivo === "Promotor"
+          ? supermercadoIds.length > 0
+            ? supermercadoIds
+            : supermercadoId
+              ? [supermercadoId]
+              : []
+          : supermercadoId
+            ? [supermercadoId]
+            : [];
+
+    if (precisaUnidade && selectedSupermercadoIds.length === 0) {
+      return setError("Selecione pelo menos uma unidade");
+    }
+
+    const activeSupermercadoId = selectedSupermercadoIds[0] ?? null;
 
     if (authMode === "firebase") {
       if (!onFirebaseRegister) return setError("Fluxo de cadastro indisponível");
@@ -183,7 +233,8 @@ export default function OperadorLogin({
           password,
           perfil: perfilEfetivo,
           empresa_id: perfilEfetivo === "Administrador Geral" ? null : empresaId,
-          supermercado_id: precisaUnidade ? supermercadoId : null,
+          supermercado_id: activeSupermercadoId,
+          supermercado_ids: selectedSupermercadoIds,
           invite_token: inviteToken.trim() || undefined,
         });
       } catch (err) {
@@ -193,12 +244,12 @@ export default function OperadorLogin({
     }
 
     const usuario: UsuarioSistema = {
-      id: `session-${perfilEfetivo.toLowerCase().replace(/\s+/g, "-")}-${empresaId || "all"}-${supermercadoId || "all"}`,
+      id: `session-${perfilEfetivo.toLowerCase().replace(/\s+/g, "-")}-${empresaId || "all"}-${activeSupermercadoId || "all"}`,
       nome: nomeFinal,
       perfil: perfilEfetivo,
       empresa_id: isAdminGeral ? null : empresaId,
-      supermercado_id: precisaUnidade ? supermercadoId : null,
-      supermercado_ids: precisaUnidade && supermercadoId ? [supermercadoId] : [],
+      supermercado_id: activeSupermercadoId,
+      supermercado_ids: selectedSupermercadoIds,
     };
 
     await onLogin(usuario);
@@ -210,7 +261,24 @@ export default function OperadorLogin({
     if (!perfilEfetivo) return setError("Selecione um perfil");
     if (usingAdminInvite && !inviteToken.trim()) return setError("Informe o token de convite.");
     if (precisaEmpresa && !empresaId && !usingAdminInvite) return setError("Selecione a empresa");
-    if (precisaUnidade && !supermercadoId) return setError("Selecione a unidade");
+
+    const selectedSupermercadoIds =
+      !precisaUnidade
+        ? []
+        : perfilEfetivo === "Promotor"
+          ? supermercadoIds.length > 0
+            ? supermercadoIds
+            : supermercadoId
+              ? [supermercadoId]
+              : []
+          : supermercadoId
+            ? [supermercadoId]
+            : [];
+
+    if (precisaUnidade && selectedSupermercadoIds.length === 0) {
+      return setError("Selecione pelo menos uma unidade");
+    }
+
     if (!onFirebaseGoogleRegister) return setError("Fluxo de cadastro Google indisponível");
 
     try {
@@ -218,7 +286,8 @@ export default function OperadorLogin({
         nome: nomeFinal,
         perfil: perfilEfetivo,
         empresa_id: perfilEfetivo === "Administrador Geral" ? null : empresaId,
-        supermercado_id: precisaUnidade ? supermercadoId : null,
+        supermercado_id: selectedSupermercadoIds[0] ?? null,
+        supermercado_ids: selectedSupermercadoIds,
         invite_token: inviteToken.trim() || undefined,
       });
     } catch (err) {
@@ -284,22 +353,51 @@ export default function OperadorLogin({
 
         {precisaUnidade && !usingAdminInvite && (
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">Unidade</label>
-            <select
-              value={supermercadoId}
-              onChange={(e) => {
-                setSupermercadoId(e.target.value);
-                setError("");
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900"
-            >
-              <option value="">Selecione a unidade</option>
-              {supermercadosDisponiveis.map((supermercado) => (
-                <option key={supermercado.id} value={supermercado.id}>
-                  {supermercado.nome} ({supermercado.codigo})
-                                  </option>
-              ))}
-            </select>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              {perfilEfetivo === "Promotor" ? "Unidades" : "Unidade"}
+            </label>
+            {perfilEfetivo === "Promotor" ? (
+              <select
+                multiple
+                size={Math.min(Math.max(supermercadosDisponiveis.length, 3), 8)}
+                value={supermercadoIds}
+                onChange={(e) => {
+                  const nextValues = Array.from(e.target.selectedOptions, (option) => option.value);
+                  setSupermercadoIds(nextValues);
+                  setSupermercadoId(nextValues[0] ?? "");
+                  setError("");
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900"
+              >
+                {supermercadosDisponiveis.map((supermercado) => (
+                  <option key={supermercado.id} value={supermercado.id}>
+                    {supermercado.nome} ({supermercado.codigo})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={supermercadoId}
+                onChange={(e) => {
+                  setSupermercadoId(e.target.value);
+                  setSupermercadoIds(e.target.value ? [e.target.value] : []);
+                  setError("");
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900"
+              >
+                <option value="">Selecione a unidade</option>
+                {supermercadosDisponiveis.map((supermercado) => (
+                  <option key={supermercado.id} value={supermercado.id}>
+                    {supermercado.nome} ({supermercado.codigo})
+                  </option>
+                ))}
+              </select>
+            )}
+            {perfilEfetivo === "Promotor" && (
+              <p className="mt-1 text-xs text-slate-500">
+                Segure Ctrl/⌘ para selecionar mais de uma unidade.
+              </p>
+            )}
           </div>
         )}
 

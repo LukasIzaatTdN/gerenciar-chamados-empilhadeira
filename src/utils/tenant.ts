@@ -37,6 +37,19 @@ export function normalizeScopedUnitIds(
   return Array.from(new Set(unidades));
 }
 
+export function mergeScopedUnitSelection(
+  currentSupermercadoId: string | null | undefined,
+  currentSupermercadoIds: unknown,
+  nextSupermercadoId: string
+) {
+  const existingUnits = normalizeScopedUnitIds(currentSupermercadoId, currentSupermercadoIds);
+
+  return {
+    supermercado_id: nextSupermercadoId,
+    supermercado_ids: Array.from(new Set([...existingUnits, nextSupermercadoId.trim()])),
+  };
+}
+
 export function getAccessibleSupermercadosForUser<
   T extends { id: string; empresa_id: string; status: "Ativo" | "Inativo" }
 >(

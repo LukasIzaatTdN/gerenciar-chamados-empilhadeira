@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getAccessibleSupermercadosForUser } from "./tenant.ts";
+import { getAccessibleSupermercadosForUser, mergeScopedUnitSelection } from "./tenant.ts";
 
 test("getAccessibleSupermercadosForUser keeps only active units from the same company", () => {
   const supermercados = [
@@ -58,4 +58,13 @@ test("getAccessibleSupermercadosForUser allows all active units for the global a
   const result = getAccessibleSupermercadosForUser(supermercados, user);
 
   assert.deepEqual(result.map((item) => item.id), ["unit-1", "unit-2"]);
+});
+
+test("mergeScopedUnitSelection preserves all assigned stores while switching the active one", () => {
+  const result = {
+    ...mergeScopedUnitSelection("unit-1", ["unit-1", "unit-2"], "unit-2"),
+  };
+
+  assert.deepEqual(result.supermercado_id, "unit-2");
+  assert.deepEqual(result.supermercado_ids, ["unit-1", "unit-2"]);
 });
