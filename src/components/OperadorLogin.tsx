@@ -297,7 +297,7 @@ export default function OperadorLogin({
               {supermercadosDisponiveis.map((supermercado) => (
                 <option key={supermercado.id} value={supermercado.id}>
                   {supermercado.nome} ({supermercado.codigo})
-                </option>
+                                  </option>
               ))}
             </select>
           </div>

@@ -10,6 +10,7 @@ interface ProfileSettingsProps {
   supermercadoId: string | null;
   supermercadoNome: string | null;
   supermercados: Supermercado[];
+  supermercadosPermitidos?: Supermercado[];
   setorPrincipal: string;
   notificacoesAtivas: boolean;
   somAtivo: boolean;
@@ -85,6 +86,7 @@ export default function ProfileSettings({
   supermercadoId,
   supermercadoNome,
   supermercados,
+  supermercadosPermitidos,
   setorPrincipal,
   notificacoesAtivas,
   somAtivo,
@@ -101,7 +103,9 @@ export default function ProfileSettings({
   onLogout,
 }: ProfileSettingsProps) {
   const isDark = tema === "dark";
-  const supermercadosAtivos = supermercados.filter((item) => item.status === "Ativo");
+  const supermercadosAtivos = (supermercadosPermitidos ?? supermercados).filter(
+    (item) => item.status === "Ativo"
+  );
 
   return (
     <div

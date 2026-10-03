@@ -63,6 +63,7 @@ import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
 import { normalizeGovernanceMessage } from "./utils/governanceMessages";
+import { getAccessibleSupermercadosForUser } from "./utils/tenant";
 import { getOperationalAlerts } from "./utils/operationalAlerts";
 import { getOperationalActionPlan } from "./utils/operationalActionPlan";
 import {
@@ -524,6 +525,10 @@ export default function App() {
       })(),
     }),
     [dashboardChamados]
+  );
+  const supermercadosPermitidos = useMemo(
+    () => getAccessibleSupermercadosForUser(supermercados, usuarioAtual),
+    [supermercados, usuarioAtual]
   );
   const dashboardSetorMaisAcionado = useMemo(() => {
     if (allChamados.length === 0) return "Sem dados";
@@ -1542,7 +1547,7 @@ export default function App() {
         if (!usuarioAtual) return;
         if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
 
-        const unidadeAtiva = supermercados.find(
+        const unidadeAtiva = supermercadosPermitidos.find(
           (item) => item.id === nextSupermercadoId && item.status === "Ativo"
         );
         if (!unidadeAtiva) return;
@@ -1677,6 +1682,7 @@ export default function App() {
           supermercadoId={supermercadoId}
           supermercadoNome={supermercadoNome}
           supermercados={supermercados}
+          supermercadosPermitidos={supermercadosPermitidos}
           setorPrincipal={setorPrincipal}
           notificacoesAtivas={notificacoesAtivas}
           somAtivo={somAtivo}

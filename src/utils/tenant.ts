@@ -36,3 +36,39 @@ export function normalizeScopedUnitIds(
 
   return Array.from(new Set(unidades));
 }
+
+export function getAccessibleSupermercadosForUser<
+  T extends { id: string; empresa_id: string; status: "Ativo" | "Inativo" }
+>(
+  supermercados: ReadonlyArray<T>,
+  usuario: {
+    perfil: string;
+    empresa_id: string | null;
+    supermercado_id?: string | null;
+    supermercado_ids?: string[] | null;
+  } | null
+): T[] {
+  if (!usuario) return [];
+
+  const activeUnits = supermercados.filter((item) => item.status === "Ativo");
+  const empresaId = usuario.empresa_id;
+
+  if (usuario.perfil === "Administrador Geral") {
+    return activeUnits;
+  }
+
+  if (!empresaId) {
+    return [];
+  }
+
+  const allowedSet = new Set<string>([
+    ...(usuario.supermercado_ids ?? []),
+    ...(usuario.supermercado_id ? [usuario.supermercado_id] : []),
+  ].filter((item): item is string => typeof item === "string" && item.trim().length > 0));
+
+  return activeUnits.filter((item) => {
+    if (item.empresa_id !== empresaId) return false;
+    if (allowedSet.size === 0) return true;
+    return allowedSet.has(item.id);
+  });
+}
