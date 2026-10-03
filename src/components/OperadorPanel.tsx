@@ -5,6 +5,7 @@ import type { Empilhadeira } from "../types/empilhadeira";
 import type { Manutencao, ManutencaoPrioridade } from "../types/manutencao";
 import { isEmpilhadeiraCompativelComChamado } from "../types/empilhadeira";
 import type { AppNotification } from "../types/notification";
+import type { PerfilAcesso } from "../types/usuario";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
@@ -25,6 +26,7 @@ import {
 export type OperadorStatus = "Disponível" | "Pausa";
 
 interface OperadorPanelProps {
+  perfilAcesso: PerfilAcesso | null;
   chamados: Chamado[];
   empilhadeiras: Empilhadeira[];
   checklists: ChecklistEmpilhadeira[];
@@ -155,6 +157,7 @@ function isSameOperatorName(a: string | null | undefined, b: string | null | und
 }
 
 export default function OperadorPanel({
+  perfilAcesso,
   chamados,
   empilhadeiras,
   checklists,
@@ -185,7 +188,10 @@ export default function OperadorPanel({
   syncError = null,
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
-  const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">("Todos");
+  const isSeparadorTelevendas = perfilAcesso === "Separador de Televendas";
+  const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">(
+    isSeparadorTelevendas ? "televendas" : "Todos"
+  );
   const [activeTab, setActiveTab] = useState<FilterTab>("pendentes");
   const [activeTechnicalTab, setActiveTechnicalTab] = useState<TechnicalTab>("checklist");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -262,42 +268,60 @@ export default function OperadorPanel({
       Array.from(
         new Set(
           chamados
+            .filter((chamado) => !isSeparadorTelevendas || isTelevendasChamado(chamado))
             .map((c) => (typeof c.setor === "string" ? c.setor.trim() : ""))
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b, "pt-BR"))
         )
       ),
-    [chamados]
+    [chamados, isSeparadorTelevendas]
   );
 
   const pendentes = useMemo(
     () =>
       chamados
-        .filter((c) => c.status === "Aguardando" || c.status === "Aberto" || c.status === "Em separação" || c.status === "Pronto")
+        .filter(
+          (c) =>
+            (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (c.status === "Aguardando" ||
+              c.status === "Aberto" ||
+              c.status === "Em separação" ||
+              c.status === "Pronto")
+        )
         .sort((a, b) => {
           if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados]
+    [chamados, isSeparadorTelevendas]
   );
 
   const pendentesNaoAssumidos = useMemo(
     () =>
       chamados
-        .filter((c) => (c.status === "Aguardando" || c.status === "Aberto") && !c.operador_nome)
+        .filter(
+          (c) =>
+            (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (c.status === "Aguardando" || c.status === "Aberto") &&
+            !c.operador_nome
+        )
         .sort((a, b) => {
           if (a.prioridade === "Urgente" && b.prioridade !== "Urgente") return -1;
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados]
+    [chamados, isSeparadorTelevendas]
   );
 
   const meusChamados = useMemo(
     () =>
       chamados
-        .filter((c) => isSameOperatorName(c.operador_nome, operadorNome) && c.status !== "Finalizado")
+        .filter(
+          (c) =>
+            (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            isSameOperatorName(c.operador_nome, operadorNome) &&
+            c.status !== "Finalizado"
+        )
         .sort((a, b) => {
           if (a.status === "Em atendimento" && b.status !== "Em atendimento") return -1;
           if (a.status !== "Em atendimento" && b.status === "Em atendimento") return 1;
@@ -305,15 +329,20 @@ export default function OperadorPanel({
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados, operadorNome]
+    [chamados, operadorNome, isSeparadorTelevendas]
   );
 
   const finalizados = useMemo(
     () =>
       chamados
-        .filter((c) => isSameOperatorName(c.operador_nome, operadorNome) && c.status === "Finalizado")
+        .filter(
+          (c) =>
+            (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            isSameOperatorName(c.operador_nome, operadorNome) &&
+            c.status === "Finalizado"
+        )
         .sort((a, b) => new Date(b.finalizado_em!).getTime() - new Date(a.finalizado_em!).getTime()),
-    [chamados, operadorNome]
+    [chamados, operadorNome, isSeparadorTelevendas]
   );
 
   const applySetorFilter = (list: Chamado[]) =>
@@ -509,7 +538,9 @@ export default function OperadorPanel({
                 <span className="text-2xl">👷</span>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white sm:text-2xl">Painel do Operador</h1>
+                <h1 className="text-xl font-bold text-white sm:text-2xl">
+                  {isSeparadorTelevendas ? "Painel do Separador de Televendas" : "Painel do Operador"}
+                </h1>
                 <p className="text-xs text-slate-200 sm:text-sm">
                   Olá, <span className="font-semibold text-white">{operadorNome}</span>
                 </p>
@@ -675,10 +706,12 @@ export default function OperadorPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                Status do operador
+                {isSeparadorTelevendas ? "Disponibilidade para chamados" : "Status do operador"}
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Defina rapidamente se você está disponível para assumir novos chamados da sua unidade.
+                {isSeparadorTelevendas
+                  ? "Defina se você está disponível para separar pedidos de Televendas."
+                  : "Defina rapidamente se você está disponível para assumir novos chamados da sua unidade."}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -748,6 +781,7 @@ export default function OperadorPanel({
           ))}
         </div>
 
+        {!isSeparadorTelevendas && (
         <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1011,6 +1045,7 @@ export default function OperadorPanel({
             </div>
           )}
         </div>
+        )}
 
         <div className="mb-4 flex flex-wrap items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)]">
           <span className="text-xs font-medium text-slate-500">Indicadores:</span>
@@ -1054,6 +1089,7 @@ export default function OperadorPanel({
           ))}
         </div>
 
+        {!isSeparadorTelevendas && (
         <div className="mb-4">
           <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
             <span className="shrink-0 text-xs font-medium text-slate-500">Categoria:</span>
@@ -1120,6 +1156,7 @@ export default function OperadorPanel({
             ))}
           </div>
         </div>
+        )}
 
         <SectionErrorBoundary title="A lista de chamados encontrou um erro, mas o painel continua ativo.">
           {currentList.length === 0 ? (
@@ -1503,7 +1540,7 @@ export default function OperadorPanel({
                       </div>
 
                       <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-                        {!isFinalizado && (
+                        {!isFinalizado && !isSeparadorTelevendas && (
                           <div className="w-full sm:w-[220px]">
                             {empilhadeirasDaUnidade.length > 0 ? (
                               <select
@@ -1538,7 +1575,7 @@ export default function OperadorPanel({
                                 onAssumir(
                                   chamado.id,
                                   operadorNome,
-                                  empilhadeiraSelecionada
+                                  !isSeparadorTelevendas && empilhadeiraSelecionada
                                     ? {
                                         id: empilhadeiraSelecionada.id,
                                         identificacao: empilhadeiraSelecionada.identificacao,

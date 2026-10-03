@@ -37,6 +37,7 @@ const PERFIS_LOGIN: PerfilAcesso[] = [
   "Operador",
   "Supervisor",
   "Televendas",
+  "Separador de Televendas",
   "Administrador da Empresa",
   "Administrador Geral",
 ];
@@ -47,6 +48,7 @@ const PERFIS_AUTO_CADASTRO: PerfilAcesso[] = [
   "Operador",
   "Supervisor",
   "Televendas",
+  "Separador de Televendas",
 ];
 
 export default function OperadorLogin({

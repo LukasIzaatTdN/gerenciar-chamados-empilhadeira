@@ -66,7 +66,10 @@ service cloud.firestore {
 
     function isSupervisorDaUnidade(supermercadoId) {
       return isSignedIn()
-        && currentUserPerfil() == "Supervisor"
+        && (
+          currentUserPerfil() == "Supervisor"
+          || currentUserPerfil() == "Separador de Televendas"
+        )
         && currentUserSupermercadoId() != null
         && currentUserSupermercadoId() == supermercadoId;
     }
@@ -84,6 +87,7 @@ service cloud.firestore {
         || perfilInput == "Operador"
         || perfilInput == "Supervisor"
         || perfilInput == "Televendas"
+        || perfilInput == "Separador de Televendas"
         || perfilInput == "Administrador da Empresa"
         || perfilInput == "Administrador Geral";
     }
@@ -93,7 +97,8 @@ service cloud.firestore {
         || perfilInput == "Funcionário"
         || perfilInput == "Operador"
         || perfilInput == "Supervisor"
-        || perfilInput == "Televendas";
+        || perfilInput == "Televendas"
+        || perfilInput == "Separador de Televendas";
     }
 
     function isConviteAdminEmpresaValido(token) {
@@ -228,6 +233,7 @@ service cloud.firestore {
     function canManageChamado() {
       return currentUserPerfil() == "Operador"
         || currentUserPerfil() == "Supervisor"
+        || currentUserPerfil() == "Separador de Televendas"
         || isAdminEmpresa()
         || isAdminGeral();
     }
@@ -332,6 +338,7 @@ service cloud.firestore {
           && (
             currentUserPerfil() == "Operador"
             || currentUserPerfil() == "Supervisor"
+            || currentUserPerfil() == "Separador de Televendas"
           )
           && currentUserSupermercadoId() != null
           && currentUserSupermercadoId() == data.supermercado_id
@@ -509,6 +516,45 @@ service cloud.firestore {
         );
 
       allow delete: if isAdminGeral();
+    }
+
+    match /auditoria/{id} {
+      allow create: if isSignedIn()
+        && isCurrentUserActive()
+        && request.resource.data.keys().hasAll([
+          "action",
+          "actorName",
+          "entityType",
+          "entityId",
+          "details",
+          "occurredAt"
+        ])
+        && request.resource.data.keys().hasOnly([
+          "action",
+          "actorName",
+          "entityType",
+          "entityId",
+          "details",
+          "occurredAt",
+          "metadata"
+        ])
+        && request.resource.data.action is string
+        && request.resource.data.actorName is string
+        && request.resource.data.entityType is string
+        && request.resource.data.entityId is string
+        && request.resource.data.occurredAt is string
+        && request.resource.data.details is map
+        && (
+          isAdminGeral()
+          || (
+            "empresa_id" in request.resource.data.details
+            && canAccessEmpresa(request.resource.data.details.empresa_id)
+          )
+          || (
+            "supermercado_id" in request.resource.data.details
+            && canAccessCurrentSupermercado(request.resource.data.details.supermercado_id)
+          )
+        );
     }
 
     match /empresas/{id} {

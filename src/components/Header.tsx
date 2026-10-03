@@ -82,8 +82,8 @@ export default function Header({
       ? "Fluxo ativo: abertura e acompanhamento dos seus chamados"
       : perfilAcesso === "Operador"
       ? "Fluxo ativo: central operacional da unidade"
-      : perfilAcesso === "Supervisor"
-      ? "Fluxo ativo: gestão consolidada da empresa"
+      : perfilAcesso === "Supervisor" || perfilAcesso === "Separador de Televendas"
+      ? "Fluxo ativo: gestão e separação da fila de chamados"
       : perfilAcesso === "Administrador da Empresa"
       ? "Fluxo ativo: gestão consolidada da empresa"
       : perfilAcesso === "Administrador Geral"
@@ -91,7 +91,11 @@ export default function Header({
       : "Fluxo ativo: acesso ao sistema";
 
   const createActionLabel =
-    perfilAcesso === "Administrador Geral" ? "Abrir chamado" : "Solicitar Empilhadeira";
+    perfilAcesso === "Separador de Televendas"
+      ? "Chamar Operador"
+      : perfilAcesso === "Administrador Geral"
+      ? "Abrir chamado"
+      : "Solicitar Empilhadeira";
   const canShowCreateAction = showCreateAction && perfilAcesso !== "Administrador da Empresa";
   const operatorActionLabel =
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
@@ -112,6 +116,8 @@ export default function Header({
       ? "Painel do Supervisor"
       : perfilAcesso === "Televendas"
       ? "Painel de Televendas"
+      : perfilAcesso === "Separador de Televendas"
+      ? "Painel do Separador de Televendas"
       : perfilAcesso === "Administrador da Empresa"
       ? "Painel do Administrador da Empresa"
       : perfilAcesso === "Administrador Geral"
@@ -189,7 +195,8 @@ export default function Header({
                 hidden={
                   perfilAcesso === "Administrador Geral" ||
                   perfilAcesso === "Administrador da Empresa" ||
-                  perfilAcesso === "Supervisor"
+                  perfilAcesso === "Supervisor" ||
+                  perfilAcesso === "Separador de Televendas"
                 }
               >
                 <span>🔐</span>
@@ -199,7 +206,8 @@ export default function Header({
               {showOperatorAction &&
                 perfilAcesso !== "Administrador Geral" &&
                 perfilAcesso !== "Administrador da Empresa" &&
-                perfilAcesso !== "Supervisor" && (
+                perfilAcesso !== "Supervisor" &&
+                perfilAcesso !== "Separador de Televendas" && (
                 <button
                   onClick={onOperadorPanel}
                   className={getActionClassName(perfilAcesso === "Operador")}
@@ -213,6 +221,7 @@ export default function Header({
                   onClick={onDashboard}
                   className={getActionClassName(
                     perfilAcesso === "Supervisor" ||
+                      perfilAcesso === "Separador de Televendas" ||
                       perfilAcesso === "Administrador da Empresa" ||
                       perfilAcesso === "Administrador Geral"
                   )}
@@ -267,6 +276,7 @@ export default function Header({
                     perfilAcesso === "Promotor" ||
                       perfilAcesso === "Funcionário" ||
                       perfilAcesso === "Televendas" ||
+                      perfilAcesso === "Separador de Televendas" ||
                       (!perfilAcesso && !showOperatorAction && !showDashboardAction)
                   )}
                 >
@@ -315,7 +325,8 @@ export default function Header({
                   hidden={
                     perfilAcesso === "Administrador Geral" ||
                     perfilAcesso === "Administrador da Empresa" ||
-                    perfilAcesso === "Supervisor"
+                    perfilAcesso === "Supervisor" ||
+                    perfilAcesso === "Separador de Televendas"
                   }
                 >
                   <span>🔐</span>
@@ -325,7 +336,8 @@ export default function Header({
                 {showOperatorAction &&
                   perfilAcesso !== "Administrador Geral" &&
                   perfilAcesso !== "Administrador da Empresa" &&
-                  perfilAcesso !== "Supervisor" && (
+                  perfilAcesso !== "Supervisor" &&
+                  perfilAcesso !== "Separador de Televendas" && (
                   <button
                     onClick={onOperadorPanel}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
@@ -343,7 +355,9 @@ export default function Header({
                   <button
                     onClick={onDashboard}
                     className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
-                      perfilAcesso === "Supervisor" || perfilAcesso === "Administrador Geral"
+                      perfilAcesso === "Supervisor" ||
+                      perfilAcesso === "Separador de Televendas" ||
+                      perfilAcesso === "Administrador Geral"
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"
                     }`}
@@ -420,6 +434,7 @@ export default function Header({
                       perfilAcesso === "Promotor" ||
                       perfilAcesso === "Funcionário" ||
                       perfilAcesso === "Televendas" ||
+                      perfilAcesso === "Separador de Televendas" ||
                       (!perfilAcesso && !showOperatorAction && !showDashboardAction)
                         ? "bg-amber-500 text-slate-950"
                         : "border border-white/20 bg-white/10 text-white"

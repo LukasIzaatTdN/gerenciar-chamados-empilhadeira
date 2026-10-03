@@ -16,9 +16,12 @@ export interface AccessPermissions {
 export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
   const isCompanyAdmin = perfil === "Administrador da Empresa";
   const isPlatformAdmin = perfil === "Administrador Geral";
+  const isSupervisor = perfil === "Supervisor";
+  const isSeparator = perfil === "Separador de Televendas";
   const canAccessOperatorPanel =
     perfil === "Operador" ||
-    perfil === "Supervisor" ||
+    isSupervisor ||
+    isSeparator ||
     isCompanyAdmin ||
     isPlatformAdmin;
 
@@ -27,6 +30,7 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
       perfil === "Promotor" ||
       perfil === "Funcionário" ||
       perfil === "Televendas" ||
+      perfil === "Separador de Televendas" ||
       isCompanyAdmin ||
       isPlatformAdmin,
     canTrackOwnChamados:
@@ -34,11 +38,11 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
     canAccessOperatorPanel,
     canManageOperatorQueue: canAccessOperatorPanel,
     canViewUnitDashboard:
-      perfil === "Supervisor" || isCompanyAdmin || isPlatformAdmin,
+      isSupervisor || isCompanyAdmin || isPlatformAdmin,
     canViewUnitQueue:
-      perfil === "Supervisor" || isCompanyAdmin || isPlatformAdmin,
+      isSupervisor || isSeparator || isCompanyAdmin || isPlatformAdmin,
     canViewHistoryAndReports:
-      perfil === "Supervisor" || isCompanyAdmin || isPlatformAdmin,
+      isSupervisor || isCompanyAdmin || isPlatformAdmin,
     canViewAllUnits: isCompanyAdmin || isPlatformAdmin,
     canViewAllCompanies: isPlatformAdmin,
     canManageCompanyAdmin: isCompanyAdmin || isPlatformAdmin,

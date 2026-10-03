@@ -102,13 +102,14 @@ function isPerfilAcesso(value: unknown): value is UsuarioSistema["perfil"] {
     value === "Operador" ||
     value === "Supervisor" ||
     value === "Televendas" ||
+    value === "Separador de Televendas" ||
     value === "Administrador da Empresa" ||
     value === "Administrador Geral"
   );
 }
 
 function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
-  if (perfil === "Operador") return "operador";
+  if (perfil === "Operador" || perfil === "Separador de Televendas") return "operador";
   if (
     perfil === "Supervisor" ||
     perfil === "Administrador da Empresa" ||
@@ -610,7 +611,10 @@ export default function App() {
             if (prev === "perfil") {
               return prev;
             }
-            if (nextUsuario.perfil === "Operador") {
+            if (
+              nextUsuario.perfil === "Operador" ||
+              nextUsuario.perfil === "Separador de Televendas"
+            ) {
               return "operador";
             }
             if (canAccessViewByPerfil(prev, nextUsuario.perfil)) {
@@ -909,7 +913,10 @@ export default function App() {
     setUsuarioAtual(usuarioPersistido);
     setShowLoginModal(false);
 
-    if (usuarioPersistido.perfil === "Operador") {
+    if (
+      usuarioPersistido.perfil === "Operador" ||
+      usuarioPersistido.perfil === "Separador de Televendas"
+    ) {
       setPreviousView(view);
       setView("operador");
       return;
@@ -1634,6 +1641,7 @@ export default function App() {
     return (
       <>
         <OperadorPanel
+          perfilAcesso={perfilAcesso}
           chamados={allChamados}
           empilhadeiras={empilhadeiras}
           checklists={checklists}
@@ -1723,12 +1731,20 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={permissions.canCreateChamado}
           showOperatorAction={!isCompanyAdmin && !isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
+          showManutencoesAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
         />
 
           <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
@@ -1972,12 +1988,20 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
+          showManutencoesAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
         />
         <UnidadesAdmin
           empresas={empresas}
@@ -2019,12 +2043,20 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
+          showManutencoesAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
         />
         <EmpresasAdmin
           empresas={empresas}
@@ -2063,12 +2095,20 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
+          showManutencoesAction={
+            !isPlatformAdmin &&
+            permissions.canAccessOperatorPanel &&
+            perfilAcesso !== "Separador de Televendas"
+          }
         />
         <UsuariosAdmin
           empresas={empresas}
@@ -2124,12 +2164,12 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
         />
         {canViewAllUnits && (
           <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
@@ -2190,12 +2230,12 @@ export default function App() {
           supermercadoNome={supermercadoNome}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
           showUnidadesAction={canViewAllUnits}
           showUsuariosAction={canViewAllUnits}
-          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+          showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
+          showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
         />
         {canViewAllUnits && (
           <div className="app-main px-2 pt-4 sm:px-0 sm:pt-6">
@@ -2254,12 +2294,20 @@ export default function App() {
         supermercadoNome={supermercadoNome}
         showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
         showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-        showDashboardAction={permissions.canViewUnitDashboard || permissions.canViewAllUnits}
+        showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
         showEmpresasAction={canViewAllCompanies}
         showUnidadesAction={canViewAllUnits}
         showUsuariosAction={canViewAllUnits}
-        showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
-        showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
+        showEmpilhadeirasAction={
+          !isPlatformAdmin &&
+          permissions.canAccessOperatorPanel &&
+          perfilAcesso !== "Separador de Televendas"
+        }
+        showManutencoesAction={
+          !isPlatformAdmin &&
+          permissions.canAccessOperatorPanel &&
+          perfilAcesso !== "Separador de Televendas"
+        }
       />
 
       <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
