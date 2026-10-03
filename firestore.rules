@@ -601,6 +601,26 @@ service cloud.firestore {
         || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
     }
 
+    match /operational_escalations/{id} {
+      allow read: if isSignedIn() && isCurrentUserActive();
+      allow create: if isSignedIn()
+        && isCurrentUserActive()
+        && request.resource.data.unitId is string
+        && request.resource.data.unitId.size() > 0
+        && request.resource.data.unitName is string
+        && request.resource.data.unitName.size() > 0
+        && request.resource.data.status in ["active", "resolved"]
+        && request.resource.data.severity in ["critical", "medium", "low"]
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && (
+          request.resource.data.resolvedAt == null
+          || request.resource.data.resolvedAt is string
+        );
+      allow update: if isSignedIn() && isCurrentUserActive();
+      allow delete: if isAdminGeral();
+    }
+
     match /usuarios/{id} {
       allow read: if isSignedIn()
         && (

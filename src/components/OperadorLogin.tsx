@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { normalizeGovernanceMessage } from "../utils/governanceMessages";
 import type { Empresa } from "../types/empresa";
 import type { Supermercado } from "../types/supermercado";
 import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
@@ -159,7 +160,7 @@ export default function OperadorLogin({
         try {
           await onFirebaseLogin({ email: normalizedEmail, password });
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Não foi possível entrar.");
+          setError(normalizeGovernanceMessage(err, "Não foi possível entrar."));
         }
         return;
       }
@@ -186,7 +187,7 @@ export default function OperadorLogin({
           invite_token: inviteToken.trim() || undefined,
         });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
+        setError(normalizeGovernanceMessage(err, "Não foi possível criar a conta."));
       }
       return;
     }
@@ -221,7 +222,7 @@ export default function OperadorLogin({
         invite_token: inviteToken.trim() || undefined,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível criar conta com Google.");
+      setError(normalizeGovernanceMessage(err, "Não foi possível criar conta com Google."));
     }
   }
 
@@ -430,7 +431,11 @@ export default function OperadorLogin({
             </button>
           )}
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && (
+            <div aria-live="polite" className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
           <button type="submit" disabled={shouldDisableSubmit} className={`touch-target flex w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-4 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(15,23,42,0.22)] ${shouldDisableSubmit ? "cursor-not-allowed opacity-60" : "hover:brightness-105"}`}>
             {authMode === "firebase" && authTab === "register" ? "Criar Conta" : "Entrar"}

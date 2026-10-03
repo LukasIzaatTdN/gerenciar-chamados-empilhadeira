@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { addDoc, collection, doc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { auth, db } from "../config/firebase";
 import type { Manutencao, NovaManutencaoInput } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
 import { resolveEmpresaId } from "../utils/tenant";
+import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
 
 const MANUTENCOES_COLLECTION = "manutencoes";
 
@@ -12,6 +13,7 @@ interface ManutencaoScope {
   supermercadoId: string | null;
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
+  perfil?: string | null;
 }
 
 function normalizeManutencao(data: Partial<Manutencao>, fallbackId: string): Manutencao {
@@ -96,19 +98,45 @@ export function useManutencoes(scope: ManutencaoScope) {
         throw new Error("A empilhadeira selecionada não pertence à unidade informada.");
       }
 
-      if (!scope.canViewAllCompanies && scope.empresaId !== input.empresa_id) {
-        throw new Error("Você só pode registrar manutenções da sua própria empresa.");
-      }
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "manage_manutencao",
+      });
 
-      if (!scope.canViewAllUnits && scope.supermercadoId !== input.supermercado_id) {
-        throw new Error("Você só pode registrar manutenções da sua própria unidade.");
-      }
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: input.empresa_id,
+        targetSupermercadoId: input.supermercado_id,
+        entityName: "manutenção",
+      });
 
       const id = db ? doc(collection(db, MANUTENCOES_COLLECTION)).id : createLocalId();
       const nova = normalizeManutencao({ ...input, id }, id);
 
       if (db) {
         await setDoc(doc(db, MANUTENCOES_COLLECTION, id), nova);
+        await addDoc(
+          collection(db, "auditoria"),
+          createAuditEntry({
+            action: "manutencao_criada",
+            actorName: input.criado_por || "Sistema",
+            entityType: "manutencao",
+            entityId: id,
+            details: {
+              empresa_id: nova.empresa_id,
+              supermercado_id: nova.supermercado_id,
+              empilhadeira_id: nova.empilhadeira_id,
+              tipo: nova.tipo,
+              status: nova.status,
+              prioridade: nova.prioridade,
+            },
+          })
+        );
         return;
       }
 
@@ -119,6 +147,17 @@ export function useManutencoes(scope: ManutencaoScope) {
 
   const updateManutencao = useCallback(
     async (id: string, input: Partial<NovaManutencaoInput>) => {
+      const current = manutencoes.find((item) => item.id === id);
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: current?.empresa_id ?? input.empresa_id ?? null,
+        targetSupermercadoId: current?.supermercado_id ?? input.supermercado_id ?? null,
+        entityName: "manutenção",
+      });
+
       const payload = {
         ...input,
         responsavel:
@@ -133,6 +172,21 @@ export function useManutencoes(scope: ManutencaoScope) {
 
       if (db) {
         await updateDoc(doc(db, MANUTENCOES_COLLECTION, id), payload);
+        await addDoc(
+          collection(db, "auditoria"),
+          createAuditEntry({
+            action: "manutencao_atualizada",
+            actorName: current?.criado_por || "Sistema",
+            entityType: "manutencao",
+            entityId: id,
+            details: {
+              empresa_id: payload.empresa_id ?? current?.empresa_id ?? null,
+              supermercado_id: payload.supermercado_id ?? current?.supermercado_id ?? null,
+              statusAnterior: current?.status ?? null,
+              statusAtual: payload.status ?? current?.status ?? null,
+            },
+          })
+        );
         return;
       }
 

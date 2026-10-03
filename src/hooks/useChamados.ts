@@ -19,6 +19,7 @@ import {
   parseProdutoQuantidadeTextToItens,
 } from "../utils/televendasItems";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -35,6 +36,7 @@ import {
   type EmpilhadeiraStatus,
 } from "../types/empilhadeira";
 import { LEGACY_EMPRESA_ID, resolveEmpresaId } from "../utils/tenant";
+import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -310,6 +312,7 @@ interface ChamadoScope {
   supermercadoId: string | null;
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
+  perfil?: string | null;
 }
 
 function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
@@ -456,14 +459,22 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
   const criarChamado = useCallback(
     async (input: NovoChamadoInput) => {
-      if (!scope.canViewAllCompanies) {
-        if (!scope.empresaId) return;
-        if (input.empresa_id !== scope.empresaId) return;
-      }
-      if (!scope.canViewAllUnits) {
-        if (!scope.supermercadoId) return;
-        if (input.supermercado_id !== scope.supermercadoId) return;
-      }
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: input.empresa_id,
+        targetSupermercadoId: input.supermercado_id,
+        entityName: "chamado",
+      });
+
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "create_chamado",
+      });
 
       const itensTelevendas =
         input.categoria === "televendas" ? normalizeItensTelevendas(input.itens ?? []) : [];
@@ -549,6 +560,23 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         try {
           await ensureFirebaseSessionForChamado();
           await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "chamado_criado",
+              actorName: input.solicitante_nome || "Sistema",
+              entityType: "chamado",
+              entityId: novo.id,
+              details: {
+                empresa_id: novo.empresa_id,
+                supermercado_id: novo.supermercado_id,
+                setor: novo.setor,
+                tipo_servico: novo.tipo_servico,
+                prioridade: novo.prioridade,
+                status: novo.status,
+              },
+            })
+          );
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
@@ -579,6 +607,23 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       const equipamentoPayload = getEquipamentoPayload(chamadoAtual, equipamento);
 
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "assume_chamado",
+      });
+
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: chamadoAtual.empresa_id,
+        targetSupermercadoId: chamadoAtual.supermercado_id,
+        entityName: "chamado",
+      });
+
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
@@ -589,6 +634,22 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_em: new Date().toISOString(),
             ...equipamentoPayload,
           });
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "chamado_assumido",
+              actorName: operadorNome,
+              entityType: "chamado",
+              entityId: id,
+              details: {
+                empresa_id: chamadoAtual.empresa_id,
+                supermercado_id: chamadoAtual.supermercado_id,
+                statusAnterior: chamadoAtual.status,
+                statusAtual: isTelevendasChamado(chamadoAtual) ? "Em separação" : "Aguardando",
+                operador_nome: operadorNome,
+              },
+            })
+          );
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
@@ -639,8 +700,25 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       }
       const equipamentoPayload = getEquipamentoPayload(chamadoAtual, equipamento);
 
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "start_chamado",
+      });
+
       const iniciado_em = new Date().toISOString();
       const operador_nome = operadorNome;
+
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: chamadoAtual.empresa_id,
+        targetSupermercadoId: chamadoAtual.supermercado_id,
+        entityName: "chamado",
+      });
 
       if (db) {
         try {
@@ -658,6 +736,22 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_por: operador_nome,
             ...equipamentoPayload,
           });
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "chamado_iniciado",
+              actorName: operadorNome,
+              entityType: "chamado",
+              entityId: id,
+              details: {
+                empresa_id: chamadoAtual.empresa_id,
+                supermercado_id: chamadoAtual.supermercado_id,
+                statusAnterior: chamadoAtual.status,
+                statusAtual: isTelevendasChamado(chamadoAtual) ? "Pronto" : "Em atendimento",
+                operador_nome: operadorNome,
+              },
+            })
+          );
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
@@ -714,6 +808,23 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       const finalizado_em = new Date().toISOString();
       const operador_nome = operadorNome;
 
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "finish_chamado",
+      });
+
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: chamadoAtual.empresa_id,
+        targetSupermercadoId: chamadoAtual.supermercado_id,
+        entityName: "chamado",
+      });
+
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
@@ -725,6 +836,22 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_em: finalizado_em,
             atualizado_por: operador_nome,
           });
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "chamado_finalizado",
+              actorName: operadorNome,
+              entityType: "chamado",
+              entityId: id,
+              details: {
+                empresa_id: chamadoAtual.empresa_id,
+                supermercado_id: chamadoAtual.supermercado_id,
+                statusAnterior: chamadoAtual.status,
+                statusAtual: "Finalizado",
+                operador_nome: operadorNome,
+              },
+            })
+          );
         } catch (error) {
           throw mapFirestoreWriteError(
             error,

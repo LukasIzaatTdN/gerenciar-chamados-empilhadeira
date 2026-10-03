@@ -1,10 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
 import AdminScopeSelector from "./components/AdminScopeSelector";
 import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
+import OperationalAlerts from "./components/OperationalAlerts";
+import OperationalActionPlanPanel from "./components/OperationalActionPlanPanel";
+import OperationalEscalationPanel from "./components/OperationalEscalationPanel";
+import OperationalEscalationHistoryPanel from "./components/OperationalEscalationHistoryPanel";
+import OperationalForecastPanel from "./components/OperationalForecastPanel";
+import OperationalHealthPanel from "./components/OperationalHealthPanel";
+import OperationalReportPanel from "./components/OperationalReportPanel";
 import ChamadoTimeMetricsPanel from "./components/ChamadoTimeMetricsPanel";
 import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
@@ -30,6 +37,8 @@ import { useEmpilhadeiras } from "./hooks/useEmpilhadeiras";
 import { useChecklistsEmpilhadeira } from "./hooks/useChecklistsEmpilhadeira";
 import { useManutencoes } from "./hooks/useManutencoes";
 import { useAdminInvites } from "./hooks/useAdminInvites";
+import { useAuditoria } from "./hooks/useAuditoria";
+import { useOperationalEscalations } from "./hooks/useOperationalEscalations";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -53,6 +62,17 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
+import { normalizeGovernanceMessage } from "./utils/governanceMessages";
+import { getOperationalAlerts } from "./utils/operationalAlerts";
+import { getOperationalActionPlan } from "./utils/operationalActionPlan";
+import {
+  getOperationalEscalationSummary,
+  getOperationalEscalationTransitions,
+} from "./utils/operationalEscalation";
+import { syncOperationalEscalationState } from "./services/operationalEscalation";
+import { getOperationalForecastSummary } from "./utils/operationalForecast";
+import { getOperationalHealthSummary } from "./utils/operationalHealth";
+import { getUnitSlaSummary } from "./utils/operationalReports";
 import type { AdminInvite } from "./types/adminInvite";
 
 type View =
@@ -151,6 +171,7 @@ export default function App() {
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
+  const criticalEscalationUnitIdsRef = useRef(new Set<string>());
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
   const canViewAllCompanies = permissions.canViewAllCompanies;
@@ -164,6 +185,7 @@ export default function App() {
     empresaId: usuarioAtual?.empresa_id ?? null,
     canViewAllCompanies,
     isAuthenticated,
+    perfil: perfilAcesso,
   });
   const {
     unidades: supermercados,
@@ -175,6 +197,7 @@ export default function App() {
     supermercadoId: isAuthenticated ? usuarioAtual?.supermercado_id ?? null : null,
     canViewAllUnits: permissions.canViewAllUnits,
     canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
+    perfil: perfilAcesso,
   });
   const {
     usuarios,
@@ -186,6 +209,7 @@ export default function App() {
     empresaId: usuarioAtual?.empresa_id ?? null,
     canViewAllCompanies,
     canManageCompanyUsers: permissions.canManageCompanyAdmin,
+    perfil: perfilAcesso,
   });
   const operadorId = usuarioAtual?.id ?? null;
   const operadorNome = usuarioAtual?.nome ?? null;
@@ -248,6 +272,7 @@ export default function App() {
     supermercadoId: supermercadoSelecionadoId,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
     canViewAllCompanies,
+    perfil: perfilAcesso,
   });
   const { checklists, createChecklist } = useChecklistsEmpilhadeira({
     empresaId: empresaSelecionadaId,
@@ -260,6 +285,7 @@ export default function App() {
     supermercadoId: supermercadoSelecionadoId,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
     canViewAllCompanies,
+    perfil: perfilAcesso,
   });
 
   // Notification system
@@ -276,6 +302,41 @@ export default function App() {
     enabled: notificacoesAtivas,
     soundEnabled: somAtivo,
   });
+
+  const showGovernanceError = useCallback(
+    (title: string, error: unknown, fallbackMessage = "Não foi possível concluir esta operação.") => {
+      const message = normalizeGovernanceMessage(error, fallbackMessage);
+      notify("erro_perfil", title, message);
+    },
+    [notify]
+  );
+
+  const showGovernanceSuccess = useCallback(
+    (title: string, message: string) => {
+      notify("perfil_atualizado", title, message);
+    },
+    [notify]
+  );
+
+  const runGovernanceAction = useCallback(
+    async <T,>(
+      title: string,
+      action: () => Promise<T>,
+      success?: { title: string; message: string }
+    ): Promise<T | undefined> => {
+      try {
+        const result = await action();
+        if (success) {
+          showGovernanceSuccess(success.title, success.message);
+        }
+        return result;
+      } catch (error) {
+        showGovernanceError(title, error);
+        return undefined;
+      }
+    },
+    [showGovernanceError, showGovernanceSuccess]
+  );
 
   // Notification callbacks for chamado state changes
   const chamadoCallbacks = useMemo(
@@ -339,6 +400,7 @@ export default function App() {
       supermercadoId: supermercadoSelecionadoId,
       canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
       canViewAllCompanies,
+      perfil: perfilAcesso,
     },
     chamadoCallbacks
   );
@@ -362,6 +424,90 @@ export default function App() {
     return allChamados.filter((chamado) => new Date(chamado.criado_em).getTime() >= start.getTime());
   }, [allChamados, dashboardPeriod]);
   const dashboardTimeEstimates = useTimeEstimates(dashboardChamados);
+  const operationalAlerts = useMemo(() => getOperationalAlerts(allChamados), [allChamados]);
+  const operationalActionPlan = useMemo(() => getOperationalActionPlan(allChamados), [allChamados]);
+  const operationalEscalation = useMemo(
+    () => getOperationalEscalationSummary(allChamados, supermercados),
+    [allChamados, supermercados]
+  );
+  const operationalEscalationHistory = useOperationalEscalations();
+  useEffect(() => {
+    const canReceiveOperationalAlerts =
+      authHydrated &&
+      isAuthenticated &&
+      (permissions.canViewUnitDashboard || permissions.canViewAllUnits) &&
+      notificacoesAtivas;
+
+    if (!canReceiveOperationalAlerts) {
+      criticalEscalationUnitIdsRef.current.clear();
+      return;
+    }
+
+    const previousCriticalUnitIds = new Set(criticalEscalationUnitIdsRef.current);
+    const { newCritical } = getOperationalEscalationTransitions(
+      operationalEscalation,
+      previousCriticalUnitIds
+    );
+    criticalEscalationUnitIdsRef.current = new Set(
+      operationalEscalation
+        .filter((item) => item.severity === "critical")
+        .map((item) => item.unitId)
+    );
+
+    if (db) {
+      void syncOperationalEscalationState(operationalEscalation, previousCriticalUnitIds);
+    }
+
+    newCritical.forEach((item) => {
+      const unitSupervisorPhones = usuarios
+        .filter(
+          (usuario) =>
+            usuario.perfil === "Supervisor" &&
+            usuario.supermercado_id === item.unitId &&
+            typeof usuario.telefone === "string" &&
+            usuario.telefone.trim()
+        )
+        .map((usuario) => usuario.telefone!.trim());
+
+      notify(
+        "operational_escalation",
+        `Escalonamento crítico: ${item.unitName}`,
+        `${item.openCalls} abertos, ${item.urgentCalls} urgentes e ${item.delayedCalls} atrasados. ${item.action}`,
+        undefined,
+        {
+          unitId: item.unitId,
+          severity: item.severity,
+          openCalls: String(item.openCalls),
+          urgentCalls: String(item.urgentCalls),
+          delayedCalls: String(item.delayedCalls),
+          supervisorPhones: unitSupervisorPhones.join(","),
+        }
+      );
+    });
+  }, [
+    authHydrated,
+    isAuthenticated,
+    notificacoesAtivas,
+    operationalEscalation,
+    permissions.canViewAllUnits,
+    permissions.canViewUnitDashboard,
+    notify,
+  ]);
+  const operationalForecast = useMemo(
+    () => getOperationalForecastSummary(allChamados, supermercados),
+    [allChamados, supermercados]
+  );
+  const operationalHealth = useMemo(
+    () => getOperationalHealthSummary(allChamados, supermercados),
+    [allChamados, supermercados]
+  );
+  const slaSummary = useMemo(() => getUnitSlaSummary(allChamados, supermercados), [allChamados, supermercados]);
+  const auditoriaRecente = useAuditoria({
+    empresaId: empresaSelecionadaId,
+    supermercadoId: supermercadoSelecionadoId,
+    canViewAllCompanies,
+    canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+  });
   const dashboardStats = useMemo(
     () => ({
       aguardando: dashboardChamados.filter((c) => isPendenteStatus(c.status)).length,
@@ -658,22 +804,24 @@ export default function App() {
             supermercadoSelecionadoId={adminChamadoSupermercadoId}
             onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
             onSubmit={async (data) => {
-              const supermercadoChamadoId = permissions.canViewAllUnits
-                ? adminChamadoSupermercadoId
-                : supermercadoId;
-              const empresaChamadoId =
-                getUnidadeById(supermercadoChamadoId, supermercados)?.empresa_id ?? empresaId;
+              await runGovernanceAction("Não foi possível abrir o chamado", async () => {
+                const supermercadoChamadoId = permissions.canViewAllUnits
+                  ? adminChamadoSupermercadoId
+                  : supermercadoId;
+                const empresaChamadoId =
+                  getUnidadeById(supermercadoChamadoId, supermercados)?.empresa_id ?? empresaId;
 
-              if (!supermercadoChamadoId || !empresaChamadoId) {
-                throw new Error("Empresa ou unidade não definida");
-              }
+                if (!supermercadoChamadoId || !empresaChamadoId) {
+                  throw new Error("Empresa ou unidade não definida");
+                }
 
-              await criarChamado({
-                ...data,
-                empresa_id: empresaChamadoId,
-                supermercado_id: supermercadoChamadoId,
+                await criarChamado({
+                  ...data,
+                  empresa_id: empresaChamadoId,
+                  supermercado_id: supermercadoChamadoId,
+                });
+                setShowForm(false);
               });
-              setShowForm(false);
             }}
             onCancel={() => setShowForm(false)}
           />
@@ -867,8 +1015,10 @@ export default function App() {
         createdUserForRollback = credential.user;
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Não foi possível criar o usuário no Firebase Auth.";
+      const message = normalizeGovernanceMessage(
+        err,
+        "Não foi possível criar o usuário no Firebase Auth."
+      );
       throw new Error(`Falha ao criar autenticação: ${message}`);
     }
 
@@ -909,8 +1059,10 @@ export default function App() {
         });
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
+      const message = normalizeGovernanceMessage(
+        err,
+        "Não foi possível gravar o cadastro do usuário."
+      );
       try {
         if (createdUserForRollback) {
           await deleteUser(createdUserForRollback);
@@ -1000,8 +1152,10 @@ export default function App() {
         });
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Não foi possível gravar o cadastro do usuário.";
+      const message = normalizeGovernanceMessage(
+        err,
+        "Não foi possível gravar o cadastro do usuário."
+      );
       try {
         await deleteUser(credential.user);
       } catch {
@@ -1040,7 +1194,16 @@ export default function App() {
     contrato_inicio?: string | null;
     contrato_fim?: string | null;
   }) {
-    await createEmpresa(input);
+    await runGovernanceAction(
+      "Não foi possível criar a empresa",
+      async () => {
+        await createEmpresa(input);
+      },
+      {
+        title: "Empresa criada",
+        message: "A empresa foi cadastrada com sucesso.",
+      }
+    );
   }
 
   async function handleUpdateEmpresa(
@@ -1059,11 +1222,29 @@ export default function App() {
       contrato_fim?: string | null;
     }
   ) {
-    await updateEmpresa(id, input);
+    await runGovernanceAction(
+      "Não foi possível atualizar a empresa",
+      async () => {
+        await updateEmpresa(id, input);
+      },
+      {
+        title: "Empresa atualizada",
+        message: "Os dados da empresa foram salvos com sucesso.",
+      }
+    );
   }
 
   async function handleToggleEmpresaStatus(id: string) {
-    await toggleEmpresaStatus(id);
+    await runGovernanceAction(
+      "Não foi possível alterar o status da empresa",
+      async () => {
+        await toggleEmpresaStatus(id);
+      },
+      {
+        title: "Status atualizado",
+        message: "O status da empresa foi alterado com sucesso.",
+      }
+    );
   }
 
   async function handleCreateSupermercado(input: {
@@ -1072,32 +1253,59 @@ export default function App() {
     codigo: string;
     endereco: string;
   }) {
-    if (!input.empresa_id?.trim()) {
-      throw new Error("Empresa do administrador não vinculada. Revise o cadastro do usuário.");
-    }
+    await runGovernanceAction(
+      "Não foi possível criar a unidade",
+      async () => {
+        if (!input.empresa_id?.trim()) {
+          throw new Error("Empresa do administrador não vinculada. Revise o cadastro do usuário.");
+        }
 
-    await createSupermercado({
-      empresa_id: input.empresa_id,
-      nome: input.nome.trim(),
-      codigo: input.codigo.trim().toUpperCase(),
-      endereco: input.endereco.trim(),
-    });
+        await createSupermercado({
+          empresa_id: input.empresa_id,
+          nome: input.nome.trim(),
+          codigo: input.codigo.trim().toUpperCase(),
+          endereco: input.endereco.trim(),
+        });
+      },
+      {
+        title: "Unidade criada",
+        message: "A unidade foi cadastrada com sucesso.",
+      }
+    );
   }
 
   async function handleUpdateSupermercado(
     id: string,
     input: { empresa_id: string; nome: string; codigo: string; endereco: string }
   ) {
-    await updateSupermercado(id, {
-      empresa_id: input.empresa_id,
-      nome: input.nome.trim(),
-      codigo: input.codigo.trim().toUpperCase(),
-      endereco: input.endereco.trim(),
-    });
+    await runGovernanceAction(
+      "Não foi possível atualizar a unidade",
+      async () => {
+        await updateSupermercado(id, {
+          empresa_id: input.empresa_id,
+          nome: input.nome.trim(),
+          codigo: input.codigo.trim().toUpperCase(),
+          endereco: input.endereco.trim(),
+        });
+      },
+      {
+        title: "Unidade atualizada",
+        message: "A unidade foi atualizada com sucesso.",
+      }
+    );
   }
 
   async function handleToggleSupermercadoStatus(id: string) {
-    await toggleSupermercadoStatus(id);
+    await runGovernanceAction(
+      "Não foi possível alterar o status da unidade",
+      async () => {
+        await toggleSupermercadoStatus(id);
+      },
+      {
+        title: "Status atualizado",
+        message: "O status da unidade foi alterado com sucesso.",
+      }
+    );
   }
 
   async function handleCreateEmpilhadeira(input: {
@@ -1109,7 +1317,16 @@ export default function App() {
     status: EmpilhadeiraStatus;
     observacoes: string;
   }) {
-    await createEmpilhadeira(input);
+    await runGovernanceAction(
+      "Não foi possível cadastrar a empilhadeira",
+      async () => {
+        await createEmpilhadeira(input);
+      },
+      {
+        title: "Empilhadeira cadastrada",
+        message: "A empilhadeira foi registrada com sucesso.",
+      }
+    );
   }
 
   async function handleUpdateEmpilhadeira(
@@ -1124,14 +1341,32 @@ export default function App() {
       observacoes: string;
     }
   ) {
-    await updateEmpilhadeira(id, input);
+    await runGovernanceAction(
+      "Não foi possível atualizar a empilhadeira",
+      async () => {
+        await updateEmpilhadeira(id, input);
+      },
+      {
+        title: "Empilhadeira atualizada",
+        message: "Os dados da empilhadeira foram salvos com sucesso.",
+      }
+    );
   }
 
   async function handleUpdateEmpilhadeiraStatus(
     id: string,
     status: EmpilhadeiraStatus
   ) {
-    await updateEmpilhadeiraStatus(id, status);
+    await runGovernanceAction(
+      "Não foi possível alterar o status da empilhadeira",
+      async () => {
+        await updateEmpilhadeiraStatus(id, status);
+      },
+      {
+        title: "Status atualizado",
+        message: "O status da empilhadeira foi atualizado com sucesso.",
+      }
+    );
   }
 
   async function handleCreateChecklistEmpilhadeira(input: {
@@ -1148,12 +1383,21 @@ export default function App() {
     sem_avaria: boolean;
     observacoes?: string | null;
   }) {
-    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
-    if (!empilhadeira) {
-      throw new Error("Empilhadeira não encontrada para registrar o checklist.");
-    }
+    await runGovernanceAction(
+      "Não foi possível registrar o checklist",
+      async () => {
+        const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+        if (!empilhadeira) {
+          throw new Error("Empilhadeira não encontrada para registrar o checklist.");
+        }
 
-    await createChecklist(input, empilhadeira);
+        await createChecklist(input, empilhadeira);
+      },
+      {
+        title: "Checklist registrado",
+        message: "A checagem da empilhadeira foi salva com sucesso.",
+      }
+    );
   }
 
   async function handleReportarProblemaEmpilhadeira(input: {
@@ -1162,37 +1406,46 @@ export default function App() {
     prioridade: ManutencaoPrioridade;
     statusEmpilhadeira: "Necessita atenção" | "Em manutenção";
   }) {
-    if (!usuarioAtual) {
-      throw new Error("Faça login novamente para reportar o problema.");
-    }
+    await runGovernanceAction(
+      "Não foi possível reportar o problema",
+      async () => {
+        if (!usuarioAtual) {
+          throw new Error("Faça login novamente para reportar o problema.");
+        }
 
-    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
-    if (!empilhadeira) {
-      throw new Error("Empilhadeira não encontrada.");
-    }
+        const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+        if (!empilhadeira) {
+          throw new Error("Empilhadeira não encontrada.");
+        }
 
-    if (!canViewAllUnits && supermercadoId !== empilhadeira.supermercado_id) {
-      throw new Error("Você só pode reportar problemas da sua própria unidade.");
-    }
+        if (!canViewAllUnits && supermercadoId !== empilhadeira.supermercado_id) {
+          throw new Error("Você só pode reportar problemas da sua própria unidade.");
+        }
 
-    await createManutencao(
-      {
-        empresa_id: empilhadeira.empresa_id,
-        supermercado_id: empilhadeira.supermercado_id,
-        empilhadeira_id: empilhadeira.id,
-        tipo: "Corretiva",
-        descricao: input.descricao,
-        prioridade: input.prioridade,
-        status: "Aberta",
-        responsavel: null,
-        data_abertura: new Date().toISOString(),
-        criado_por: usuarioAtual.nome,
-        observacoes: `Ocorrência aberta via painel do operador. Status sugerido: ${input.statusEmpilhadeira}.`,
+        await createManutencao(
+          {
+            empresa_id: empilhadeira.empresa_id,
+            supermercado_id: empilhadeira.supermercado_id,
+            empilhadeira_id: empilhadeira.id,
+            tipo: "Corretiva",
+            descricao: input.descricao,
+            prioridade: input.prioridade,
+            status: "Aberta",
+            responsavel: null,
+            data_abertura: new Date().toISOString(),
+            criado_por: usuarioAtual.nome,
+            observacoes: `Ocorrência aberta via painel do operador. Status sugerido: ${input.statusEmpilhadeira}.`,
+          },
+          empilhadeira
+        );
+
+        await updateEmpilhadeiraStatus(empilhadeira.id, input.statusEmpilhadeira);
       },
-      empilhadeira
+      {
+        title: "Problema registrado",
+        message: "A ocorrência foi reportada e a empilhadeira foi atualizada com sucesso.",
+      }
     );
-
-    await updateEmpilhadeiraStatus(empilhadeira.id, input.statusEmpilhadeira);
   }
 
   async function handleCreateManutencao(input: {
@@ -1210,19 +1463,37 @@ export default function App() {
     criado_por: string;
     observacoes?: string | null;
   }) {
-    const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
-    if (!empilhadeira) {
-      throw new Error("Empilhadeira não encontrada para abrir a manutenção.");
-    }
+    await runGovernanceAction(
+      "Não foi possível abrir a manutenção",
+      async () => {
+        const empilhadeira = empilhadeiras.find((item) => item.id === input.empilhadeira_id);
+        if (!empilhadeira) {
+          throw new Error("Empilhadeira não encontrada para abrir a manutenção.");
+        }
 
-    await createManutencao(input, empilhadeira);
+        await createManutencao(input, empilhadeira);
+      },
+      {
+        title: "Manutenção aberta",
+        message: "A manutenção foi registrada com sucesso.",
+      }
+    );
   }
 
   async function handleUpdateManutencao(
     id: string,
     input: Partial<NovaManutencaoInput>
   ) {
-    await updateManutencao(id, input);
+    await runGovernanceAction(
+      "Não foi possível atualizar a manutenção",
+      async () => {
+        await updateManutencao(id, input);
+      },
+      {
+        title: "Manutenção atualizada",
+        message: "A manutenção foi atualizada com sucesso.",
+      }
+    );
   }
 
   function handleOpenEmpresasAdmin() {
@@ -1265,46 +1536,44 @@ export default function App() {
   }
 
   async function handleOperadorSupermercadoChange(nextSupermercadoId: string) {
-    if (!usuarioAtual) return;
-    if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
+    await runGovernanceAction(
+      "Não foi possível trocar de unidade",
+      async () => {
+        if (!usuarioAtual) return;
+        if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
 
-    const unidadeAtiva = supermercados.find(
-      (item) => item.id === nextSupermercadoId && item.status === "Ativo"
-    );
-    if (!unidadeAtiva) return;
+        const unidadeAtiva = supermercados.find(
+          (item) => item.id === nextSupermercadoId && item.status === "Ativo"
+        );
+        if (!unidadeAtiva) return;
 
-    try {
-      if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
-        await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
-          empresa_id: unidadeAtiva.empresa_id,
-          supermercado_id: nextSupermercadoId,
-          supermercado_ids: [nextSupermercadoId],
-          atualizado_em: new Date().toISOString(),
-        });
+        if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
+          await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
+            empresa_id: unidadeAtiva.empresa_id,
+            supermercado_id: nextSupermercadoId,
+            supermercado_ids: [nextSupermercadoId],
+            atualizado_em: new Date().toISOString(),
+          });
+        }
+
+        setUsuarioAtual((prev) =>
+          prev
+            ? {
+                ...prev,
+                empresa_id: unidadeAtiva.empresa_id,
+                supermercado_id: nextSupermercadoId,
+                supermercado_ids: [nextSupermercadoId],
+              }
+            : prev
+        );
+      },
+      {
+        title: "Unidade atualizada",
+        message: `Operação alterada para ${
+          supermercados.find((item) => item.id === nextSupermercadoId)?.nome ?? "unidade selecionada"
+        }`,
       }
-
-      setUsuarioAtual((prev) =>
-        prev
-          ? {
-              ...prev,
-              empresa_id: unidadeAtiva.empresa_id,
-              supermercado_id: nextSupermercadoId,
-              supermercado_ids: [nextSupermercadoId],
-            }
-          : prev
-      );
-      notify(
-        "perfil_atualizado",
-        "Unidade atualizada",
-        `Operação alterada para ${unidadeAtiva.nome}`
-      );
-    } catch {
-      notify(
-        "erro_perfil",
-        "Não foi possível trocar unidade",
-        "Verifique login do usuário e regras do Firestore."
-      );
-    }
+    );
   }
 
   async function handleUpdateUsuarioAdmin(
@@ -1315,13 +1584,29 @@ export default function App() {
       supermercado_id: string | null;
     }
   ) {
-    await updateUsuarioAdmin(id, input);
-    notify("perfil_atualizado", "Usuário atualizado", "Perfil, empresa e unidade alterados com sucesso.");
+    await runGovernanceAction(
+      "Não foi possível atualizar o usuário",
+      async () => {
+        await updateUsuarioAdmin(id, input);
+      },
+      {
+        title: "Usuário atualizado",
+        message: "Perfil, empresa e unidade alterados com sucesso.",
+      }
+    );
   }
 
   async function handleToggleUsuarioStatus(id: string) {
-    await toggleUsuarioStatus(id);
-    notify("perfil_atualizado", "Status atualizado", "Status do usuário alterado com sucesso.");
+    await runGovernanceAction(
+      "Não foi possível alterar o status do usuário",
+      async () => {
+        await toggleUsuarioStatus(id);
+      },
+      {
+        title: "Status atualizado",
+        message: "Status do usuário alterado com sucesso.",
+      }
+    );
   }
 
   if (hasFirebaseConfig && !authHydrated) {
@@ -1467,6 +1752,14 @@ export default function App() {
               isConsolidated={adminSupermercadoFiltro === "todos"}
             />
           )}
+
+          <OperationalAlerts alerts={operationalAlerts} recentActivity={auditoriaRecente} />
+          <OperationalHealthPanel healthSummary={operationalHealth} />
+          <OperationalActionPlanPanel actions={operationalActionPlan} />
+          <OperationalEscalationPanel escalationSummary={operationalEscalation} />
+          <OperationalEscalationHistoryPanel escalations={operationalEscalationHistory} />
+          <OperationalForecastPanel forecastSummary={operationalForecast} />
+          <OperationalReportPanel slaSummary={slaSummary} auditRows={auditoriaRecente} />
 
           <div className="professional-panel mb-5 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

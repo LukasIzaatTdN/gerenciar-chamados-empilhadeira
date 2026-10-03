@@ -30,14 +30,26 @@ interface WhatsAppConfig {
   defaultRecipients: string[];
 }
 
+const env =
+  typeof import.meta !== "undefined" && import.meta && "env" in import.meta
+    ? ((import.meta.env as Record<string, string | boolean | undefined>) ?? {})
+    : ({} as Record<string, string | boolean | undefined>);
+
+const parseRecipients = (value: unknown): string[] => {
+  if (typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
 const config: WhatsAppConfig = {
-  enabled: false, // Set to true when API is configured
-  apiUrl: "https://YOUR_WHATSAPP_API_ENDPOINT/send-message",
-  authToken: "YOUR_AUTH_TOKEN_HERE",
-  defaultRecipients: [
-    // Add operator phone numbers here
-    // "+5511999999999",
-  ],
+  enabled: Boolean(env.VITE_WHATSAPP_ENABLED),
+  apiUrl: (env.VITE_WHATSAPP_API_URL as string) ?? "https://YOUR_WHATSAPP_API_ENDPOINT/send-message",
+  authToken: (env.VITE_WHATSAPP_AUTH_TOKEN as string) ?? "YOUR_AUTH_TOKEN_HERE",
+  defaultRecipients: parseRecipients(
+    (env.VITE_WHATSAPP_DEFAULT_RECIPIENTS as string) ?? "+5511999999999"
+  ),
 };
 
 // ─── Message Templates ───────────────────────────────────
@@ -56,6 +68,9 @@ const MESSAGE_TEMPLATES: Record<NotificationType, (notif: AppNotification) => st
 
   atendimento_finalizado: (n) =>
     `✅ *Atendimento Finalizado*\n\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
+
+  operational_escalation: (n) =>
+    `🚨 *Escalonamento Operacional Crítico*\n\n${n.title}\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
 
   perfil_atualizado: (n) =>
     `🏪 *Perfil Atualizado*\n\n${n.message}\n\n⏰ ${new Date(n.timestamp).toLocaleString("pt-BR")}`,
@@ -100,28 +115,90 @@ async function sendWhatsAppMessage(
 
 // ─── Public Dispatch Function ────────────────────────────
 /**
+ * Determines which phone numbers should receive a given notification type.
+ */
+export function resolveNotificationRecipients(
+  type: NotificationType,
+  meta?: Record<string, string>
+): string[] {
+  const seen = new Set<string>();
+  const pushUnique = (phones: string[]) => {
+    phones.forEach((phone) => {
+      const normalized = phone.trim();
+      if (normalized && !seen.has(normalized)) {
+        seen.add(normalized);
+      }
+    });
+  };
+
+  if (meta?.phone) {
+    pushUnique([meta.phone]);
+    return [...seen];
+  }
+
+  const unitSupervisorRecipients = parseRecipients(
+    meta?.supervisorPhones ?? meta?.unitSupervisorPhones ?? meta?.unitSupervisorPhone ?? ""
+  );
+
+  switch (type) {
+    case "chamado_criado":
+      pushUnique(config.defaultRecipients);
+      break;
+
+    case "chamado_assumido":
+    case "atendimento_iniciado":
+    case "operador_proximo":
+      pushUnique(meta?.solicitantePhone ? [meta.solicitantePhone] : []);
+      break;
+
+    case "atendimento_finalizado":
+      pushUnique([
+        ...(meta?.solicitantePhone ? [meta.solicitantePhone] : []),
+        ...(meta?.operadorPhone ? [meta.operadorPhone] : []),
+      ]);
+      break;
+
+    case "operational_escalation":
+      if (unitSupervisorRecipients.length > 0) {
+        pushUnique(unitSupervisorRecipients);
+      } else {
+        pushUnique(config.defaultRecipients);
+      }
+      break;
+
+    case "perfil_atualizado":
+    case "erro_perfil":
+      pushUnique(config.defaultRecipients);
+      break;
+
+    default:
+      pushUnique(config.defaultRecipients);
+      break;
+  }
+
+  return [...seen];
+}
+
+/**
  * Dispatches a notification to WhatsApp.
  * Currently logs to console (disabled). Enable by setting config.enabled = true
  * and providing valid API credentials.
  */
 export function dispatchWhatsApp(notification: AppNotification): void {
   if (!config.enabled) {
-    // Log for development/debugging purposes
     console.debug("[WhatsApp] Integration disabled. Notification queued:", {
       type: notification.type,
       title: notification.title,
       message: notification.message,
+      recipients: resolveNotificationRecipients(notification.type, notification.meta),
     });
     return;
   }
 
   const template = MESSAGE_TEMPLATES[notification.type];
   const formattedMessage = template(notification);
+  const recipients = resolveNotificationRecipients(notification.type, notification.meta);
 
-  // Determine recipients based on notification type
-  const recipients = getRecipientsForType(notification.type, notification.meta);
-
-  // Send to all recipients
   recipients.forEach((phone) => {
     sendWhatsAppMessage(phone, formattedMessage).then((result) => {
       if (result.success) {
@@ -131,46 +208,6 @@ export function dispatchWhatsApp(notification: AppNotification): void {
       }
     });
   });
-}
-
-/**
- * Determines which phone numbers should receive a given notification type.
- */
-function getRecipientsForType(
-  type: NotificationType,
-  meta?: Record<string, string>
-): string[] {
-  // If a specific phone was provided in meta, use it
-  if (meta?.phone) {
-    return [meta.phone];
-  }
-
-  // Route based on type:
-  switch (type) {
-    case "chamado_criado":
-      // Notify all operators about new calls
-      return config.defaultRecipients;
-
-    case "chamado_assumido":
-    case "atendimento_iniciado":
-    case "operador_proximo":
-      // Notify the requesting promoter (would need phone in meta)
-      return meta?.solicitantePhone ? [meta.solicitantePhone] : [];
-
-    case "atendimento_finalizado":
-      // Notify both parties
-      return [
-        ...(meta?.solicitantePhone ? [meta.solicitantePhone] : []),
-        ...(meta?.operadorPhone ? [meta.operadorPhone] : []),
-      ];
-
-    case "perfil_atualizado":
-    case "erro_perfil":
-      return config.defaultRecipients;
-
-    default:
-      return config.defaultRecipients;
-  }
 }
 
 // ─── Utility: Generate WhatsApp deep link ────────────────

@@ -4,6 +4,7 @@ export type NotificationType =
   | "atendimento_iniciado"
   | "operador_proximo"
   | "atendimento_finalizado"
+  | "operational_escalation"
   | "perfil_atualizado"
   | "erro_perfil";
 
@@ -47,6 +48,11 @@ export const NOTIFICATION_CONFIG: Record<
     icon: "✅",
     color: "green",
     sound: "success",
+  },
+  operational_escalation: {
+    icon: "🚨",
+    color: "red",
+    sound: "urgent",
   },
   perfil_atualizado: {
     icon: "🏪",

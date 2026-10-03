@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  addDoc,
   collection,
   doc,
   onSnapshot,
@@ -8,8 +9,9 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 import type { Empilhadeira, EmpilhadeiraStatus } from "../types/empilhadeira";
+import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
 
 const EMPILHADEIRAS_COLLECTION = "empilhadeiras";
 
@@ -18,6 +20,7 @@ interface EmpilhadeiraScope {
   supermercadoId: string | null;
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
+  perfil?: string | null;
 }
 
 function normalizeEmpilhadeira(
@@ -111,6 +114,23 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       status: EmpilhadeiraStatus;
       observacoes: string;
     }) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil: scope.perfil ?? null,
+        requiredAction: "manage_empilhadeira",
+      });
+
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: input.empresa_id,
+        targetSupermercadoId: input.supermercado_id,
+        entityName: "empilhadeira",
+      });
+
       const now = new Date().toISOString();
       const id = db ? doc(collection(db, EMPILHADEIRAS_COLLECTION)).id : createLocalId();
 
@@ -130,6 +150,21 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       try {
         if (db) {
           await setDoc(doc(db, EMPILHADEIRAS_COLLECTION, id), nova);
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "empilhadeira_criada",
+              actorName: "Sistema",
+              entityType: "empilhadeira",
+              entityId: id,
+              details: {
+                empresa_id: nova.empresa_id,
+                supermercado_id: nova.supermercado_id,
+                identificacao: nova.identificacao,
+                status: nova.status,
+              },
+            })
+          );
           return;
         }
       } catch {
@@ -154,6 +189,17 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
         observacoes: string;
       }
     ) => {
+      const current = empilhadeiras.find((item) => item.id === id);
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: current?.empresa_id ?? input.empresa_id,
+        targetSupermercadoId: current?.supermercado_id ?? input.supermercado_id,
+        entityName: "empilhadeira",
+      });
+
       const payload = {
         empresa_id: input.empresa_id.trim(),
         supermercado_id: scope.canViewAllUnits ? input.supermercado_id : scope.supermercadoId ?? input.supermercado_id,
@@ -167,7 +213,24 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
       try {
         if (db) {
+          const previous = empilhadeiras.find((item) => item.id === id);
           await updateDoc(doc(db, EMPILHADEIRAS_COLLECTION, id), payload);
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "empilhadeira_atualizada",
+              actorName: "Sistema",
+              entityType: "empilhadeira",
+              entityId: id,
+              details: {
+                empresa_id: payload.empresa_id,
+                supermercado_id: payload.supermercado_id,
+                statusAnterior: previous?.status ?? null,
+                statusAtual: payload.status,
+                identificacao: payload.identificacao,
+              },
+            })
+          );
           return;
         }
       } catch {
@@ -190,6 +253,17 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
   const updateEmpilhadeiraStatus = useCallback(
     async (id: string, status: EmpilhadeiraStatus) => {
+      const previous = empilhadeiras.find((item) => item.id === id);
+      assertBusinessScope({
+        canViewAllCompanies: scope.canViewAllCompanies,
+        canViewAllUnits: scope.canViewAllUnits,
+        currentCompanyId: scope.empresaId,
+        currentSupermercadoId: scope.supermercadoId,
+        targetCompanyId: previous?.empresa_id ?? scope.empresaId,
+        targetSupermercadoId: previous?.supermercado_id ?? scope.supermercadoId,
+        entityName: "empilhadeira",
+      });
+
       const atualizado_em = new Date().toISOString();
 
       try {
@@ -198,6 +272,21 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
             status,
             atualizado_em,
           });
+          await addDoc(
+            collection(db, "auditoria"),
+            createAuditEntry({
+              action: "empilhadeira_status_alterado",
+              actorName: "Sistema",
+              entityType: "empilhadeira",
+              entityId: id,
+              details: {
+                empresa_id: previous?.empresa_id ?? null,
+                supermercado_id: previous?.supermercado_id ?? null,
+                statusAnterior: previous?.status ?? null,
+                statusAtual: status,
+              },
+            })
+          );
           return;
         }
       } catch {
@@ -216,7 +305,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
         )
       );
     },
-    []
+    [empilhadeiras, scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
 
   return {

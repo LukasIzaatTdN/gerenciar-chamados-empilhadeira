@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts",
     "auth:set-claims": "node scripts/firebase/set-custom-claims.mjs",
     "auth:create-token": "node scripts/firebase/create-custom-token.mjs",
     "auth:approve-user": "node scripts/firebase/approve-user.mjs",

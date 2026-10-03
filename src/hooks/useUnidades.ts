@@ -5,6 +5,7 @@ interface UseUnidadesOptions {
   supermercadoId?: string | null;
   canViewAllUnits?: boolean;
   canViewAllCompanies?: boolean;
+  perfil?: string | null;
 }
 
 export function useUnidades(options: UseUnidadesOptions = {}) {

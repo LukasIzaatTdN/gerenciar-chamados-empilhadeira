@@ -3,6 +3,7 @@ import { collection, doc, documentId, onSnapshot, query, setDoc, updateDoc, wher
 import { auth, db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
 import { normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
+import { assertUserAccess } from "../utils/businessRules";
 
 const USUARIOS_COLLECTION = "usuarios";
 
@@ -63,6 +64,8 @@ function normalizeUsuario(
     ),
     status,
     email: typeof data.email === "string" ? data.email : undefined,
+    telefone:
+      typeof data.telefone === "string" && data.telefone.trim() ? data.telefone.trim() : undefined,
     criado_em: typeof data.criado_em === "string" ? data.criado_em : undefined,
     atualizado_em: typeof data.atualizado_em === "string" ? data.atualizado_em : undefined,
   };
@@ -73,6 +76,7 @@ interface UseUsuariosOptions {
   empresaId?: string | null;
   canViewAllCompanies?: boolean;
   canManageCompanyUsers?: boolean;
+  perfil?: string | null;
 }
 
 export function useUsuarios(options: UseUsuariosOptions = {}) {
@@ -81,6 +85,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
     empresaId = null,
     canViewAllCompanies = false,
     canManageCompanyUsers = false,
+    perfil = null,
   } = options;
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
 
@@ -155,6 +160,13 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
         supermercado_ids?: string[];
       }
     ) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_usuario",
+      });
+
       const supermercado_ids = normalizeScopedUnitIds(
         input.supermercado_id,
         input.supermercado_ids
@@ -190,6 +202,13 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
   );
 
   const toggleUsuarioStatus = useCallback(async (id: string) => {
+    assertUserAccess({
+      isAuthenticated: Boolean(auth?.currentUser),
+      userId: auth?.currentUser?.uid ?? null,
+      perfil,
+      requiredAction: "manage_usuario",
+    });
+
     const current = usuarios.find((u) => u.id === id);
     if (!current) return;
     const nextStatus: UsuarioStatus = current.status === "Inativo" ? "Ativo" : "Inativo";
@@ -213,7 +232,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
           : item
       )
     );
-  }, [usuarios]);
+  }, [perfil, usuarios]);
 
   return {
     usuarios,

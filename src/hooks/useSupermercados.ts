@@ -9,10 +9,11 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 import type { Supermercado } from "../types/supermercado";
 import { resolveEmpresaId } from "../utils/tenant";
 import { SUPERMERCADOS as SUPERMERCADOS_FALLBACK } from "../data/supermercados";
+import { assertUserAccess } from "../utils/businessRules";
 
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
@@ -21,6 +22,7 @@ interface UseSupermercadosOptions {
   supermercadoId?: string | null;
   canViewAllUnits?: boolean;
   canViewAllCompanies?: boolean;
+  perfil?: string | null;
 }
 
 function normalizeIdFromCodigo(codigo: string) {
@@ -54,6 +56,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
     supermercadoId = null,
     canViewAllUnits = false,
     canViewAllCompanies = false,
+    perfil = null,
   } = options;
   const [supermercados, setSupermercados] = useState<Supermercado[]>(
     SUPERMERCADOS_FALLBACK
@@ -115,6 +118,13 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
       codigo: string;
       endereco: string;
     }) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_unidade",
+      });
+
       const codigoNormalizado = input.codigo.trim().toUpperCase();
       const novo: Supermercado = {
         id: normalizeIdFromCodigo(codigoNormalizado),
@@ -145,6 +155,13 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
       id: string,
       input: { empresa_id: string; nome: string; codigo: string; endereco: string }
     ) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_unidade",
+      });
+
       try {
         if (db) {
           await updateDoc(doc(db, SUPERMERCADOS_COLLECTION, id), {
@@ -177,6 +194,13 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
   );
 
   const toggleSupermercadoStatus = useCallback(async (id: string) => {
+    assertUserAccess({
+      isAuthenticated: Boolean(auth?.currentUser),
+      userId: auth?.currentUser?.uid ?? null,
+      perfil,
+      requiredAction: "manage_unidade",
+    });
+
     const supermercadoAtual = supermercados.find((item) => item.id === id);
     if (!supermercadoAtual) return;
 
@@ -198,7 +222,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
         item.id === id ? { ...item, status: nextStatus } : item
       )
     );
-  }, [supermercados]);
+  }, [perfil, supermercados]);
 
   return {
     supermercados,

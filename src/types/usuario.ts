@@ -18,6 +18,7 @@ export interface UsuarioSistema {
   supermercado_ids?: string[];
   status?: UsuarioStatus;
   email?: string;
+  telefone?: string;
   criado_em?: string;
   atualizado_em?: string;
 }

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { collection, doc, documentId, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 import type { Empresa, EmpresaStatus, PlanoCiclo, PlanoStatus } from "../types/empresa";
 import { resolveEmpresaId, sanitizeTenantId } from "../utils/tenant";
 import { EMPRESAS } from "../data/empresas";
+import { assertUserAccess } from "../utils/businessRules";
 
 const EMPRESAS_COLLECTION = "empresas";
 const EMPRESAS_CACHE_KEY = "empresas_cache_v1";
@@ -59,6 +60,7 @@ interface UseEmpresasOptions {
   empresaId?: string | null;
   canViewAllCompanies?: boolean;
   isAuthenticated?: boolean;
+  perfil?: string | null;
 }
 
 export function useEmpresas(options: UseEmpresasOptions = {}) {
@@ -66,6 +68,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
     empresaId = null,
     canViewAllCompanies = false,
     isAuthenticated = false,
+    perfil = null,
   } = options;
   const [empresas, setEmpresas] = useState<Empresa[]>(() => {
     if (typeof window === "undefined") return EMPRESAS;
@@ -161,6 +164,13 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
       contrato_inicio?: string | null;
       contrato_fim?: string | null;
     }) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_empresa",
+      });
+
       const codigo = input.codigo.trim().toUpperCase();
       const empresa: Empresa = {
         id: buildEmpresaId(codigo),
@@ -206,6 +216,13 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
         contrato_fim?: string | null;
       }
     ) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_empresa",
+      });
+
       const payload = {
         nome: input.nome.trim(),
         codigo: input.codigo.trim().toUpperCase(),
@@ -232,6 +249,13 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
 
   const toggleEmpresaStatus = useCallback(
     async (id: string) => {
+      assertUserAccess({
+        isAuthenticated: Boolean(auth?.currentUser),
+        userId: auth?.currentUser?.uid ?? null,
+        perfil,
+        requiredAction: "manage_empresa",
+      });
+
       const current = empresas.find((item) => item.id === id);
       if (!current) return;
       const status: EmpresaStatus = current.status === "Ativa" ? "Inativa" : "Ativa";
@@ -243,7 +267,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
 
       setEmpresas((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
     },
-    [empresas]
+    [empresas, perfil]
   );
 
   return {
