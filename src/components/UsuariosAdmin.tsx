@@ -11,7 +11,12 @@ interface UsuariosAdminProps {
   currentAdminId: string | null;
   onUpdate: (
     id: string,
-    input: { perfil: PerfilAcesso; empresa_id: string | null; supermercado_id: string | null }
+    input: {
+      perfil: PerfilAcesso;
+      empresa_id: string | null;
+      supermercado_id: string | null;
+      supermercado_ids?: string[];
+    }
   ) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
   onCreateAdminInvite?: (input: { empresa_id: string; expiresInDays: number }) => Promise<string>;
@@ -59,6 +64,7 @@ export default function UsuariosAdmin({
   const [editPerfil, setEditPerfil] = useState<PerfilAcesso>("Promotor");
   const [editEmpresaId, setEditEmpresaId] = useState<string>("");
   const [editSupermercadoId, setEditSupermercadoId] = useState<string>("");
+  const [editSupermercadoIds, setEditSupermercadoIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendingSaveId, setPendingSaveId] = useState<string | null>(null);
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
@@ -114,10 +120,17 @@ export default function UsuariosAdmin({
   }, [canSelectEmpresa, currentEmpresaId]);
 
   function startEdit(usuario: UsuarioSistema) {
+    const selectedIds = usuario.supermercado_ids && usuario.supermercado_ids.length > 0
+      ? usuario.supermercado_ids
+      : usuario.supermercado_id
+        ? [usuario.supermercado_id]
+        : [];
+
     setEditingId(usuario.id);
     setEditPerfil(usuario.perfil);
     setEditEmpresaId(usuario.empresa_id ?? "");
     setEditSupermercadoId(usuario.supermercado_id ?? "");
+    setEditSupermercadoIds(selectedIds);
     setError(null);
   }
 
@@ -131,10 +144,21 @@ export default function UsuariosAdmin({
       editPerfil === "Administrador Geral"
         ? null
         : (canSelectEmpresa ? editEmpresaId : currentEmpresaId) || null;
-    const supermercado_id =
+
+    const selectedSupermercadoIds =
       editPerfil === "Administrador Geral" || editPerfil === "Administrador da Empresa"
-        ? null
-        : editSupermercadoId || null;
+        ? []
+        : editPerfil === "Promotor"
+          ? editSupermercadoIds.length > 0
+            ? editSupermercadoIds
+            : editSupermercadoId
+              ? [editSupermercadoId]
+              : []
+          : editSupermercadoId
+            ? [editSupermercadoId]
+            : [];
+
+    const supermercado_id = selectedSupermercadoIds[0] ?? null;
 
     if (editPerfil !== "Administrador Geral" && !empresa_id) {
       setError("Selecione a empresa para este perfil.");
@@ -144,9 +168,9 @@ export default function UsuariosAdmin({
     if (
       editPerfil !== "Administrador Geral" &&
       editPerfil !== "Administrador da Empresa" &&
-      !supermercado_id
+      selectedSupermercadoIds.length === 0
     ) {
-      setError("Selecione uma unidade para este perfil.");
+      setError("Selecione pelo menos uma unidade para este perfil.");
       return;
     }
 
@@ -157,8 +181,11 @@ export default function UsuariosAdmin({
         perfil: editPerfil,
         empresa_id,
         supermercado_id,
+        supermercado_ids: selectedSupermercadoIds,
       });
       setEditingId(null);
+      setEditSupermercadoIds([]);
+      setEditSupermercadoId("");
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -365,9 +392,14 @@ export default function UsuariosAdmin({
                             if (next === "Administrador Geral") {
                               setEditEmpresaId("");
                               setEditSupermercadoId("");
+                              setEditSupermercadoIds([]);
                             }
                             if (next === "Administrador da Empresa") {
                               setEditSupermercadoId("");
+                              setEditSupermercadoIds([]);
+                            }
+                            if (next === "Promotor") {
+                              setEditSupermercadoIds((prev) => prev.length > 0 ? prev : editSupermercadoId ? [editSupermercadoId] : []);
                             }
                           }}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
@@ -390,8 +422,10 @@ export default function UsuariosAdmin({
                           value={editEmpresaId}
                           disabled={!canSelectEmpresa || editPerfil === "Administrador Geral"}
                           onChange={(e) => {
-                            setEditEmpresaId(e.target.value);
+                            const nextEmpresaId = e.target.value;
+                            setEditEmpresaId(nextEmpresaId);
                             setEditSupermercadoId("");
+                            setEditSupermercadoIds([]);
                           }}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
                         >
@@ -417,28 +451,59 @@ export default function UsuariosAdmin({
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Unidade</p>
                       {isEditing ? (
-                        <select
-                          value={editSupermercadoId}
-                          disabled={
-                            editPerfil === "Administrador Geral" ||
-                            editPerfil === "Administrador da Empresa"
-                          }
-                          onChange={(e) => setEditSupermercadoId(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        >
-                          <option value="">
-                            {editPerfil === "Administrador da Empresa"
-                              ? "Todas as unidades da empresa"
-                              : editPerfil === "Administrador Geral"
-                                ? "Todas as unidades"
-                                : "Selecione a unidade"}
-                          </option>
-                          {supermercadosDisponiveis.map((supermercado) => (
-                            <option key={supermercado.id} value={supermercado.id}>
-                              {supermercado.nome} ({supermercado.codigo})
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          {editPerfil === "Promotor" ? (
+                            <>
+                              <select
+                                multiple
+                                size={Math.min(Math.max(supermercadosDisponiveis.length, 3), 8)}
+                                value={editSupermercadoIds}
+                                onChange={(e) => {
+                                  const nextValues = Array.from(e.target.selectedOptions, (option) => option.value);
+                                  setEditSupermercadoIds(nextValues);
+                                  setEditSupermercadoId(nextValues[0] ?? "");
+                                }}
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
+                              >
+                                {supermercadosDisponiveis.map((supermercado) => (
+                                  <option key={supermercado.id} value={supermercado.id}>
+                                    {supermercado.nome} ({supermercado.codigo})
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Mantém todas as lojas selecionadas e usa a primeira como ativa.
+                              </p>
+                            </>
+                          ) : (
+                            <select
+                              value={editSupermercadoId}
+                              disabled={
+                                editPerfil === "Administrador Geral" ||
+                                editPerfil === "Administrador da Empresa"
+                              }
+                              onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setEditSupermercadoId(nextValue);
+                                setEditSupermercadoIds(nextValue ? [nextValue] : []);
+                              }}
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
+                            >
+                              <option value="">
+                                {editPerfil === "Administrador da Empresa"
+                                  ? "Todas as unidades da empresa"
+                                  : editPerfil === "Administrador Geral"
+                                    ? "Todas as unidades"
+                                    : "Selecione a unidade"}
+                              </option>
+                              {supermercadosDisponiveis.map((supermercado) => (
+                                <option key={supermercado.id} value={supermercado.id}>
+                                  {supermercado.nome} ({supermercado.codigo})
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </>
                       ) : (
                         <p className="mt-1 text-sm text-slate-700">
                           {usuario.supermercado_id

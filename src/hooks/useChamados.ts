@@ -310,7 +310,6 @@ interface EquipamentoChamadoInput {
 interface ChamadoScope {
   empresaId: string | null;
   supermercadoId: string | null;
-  supermercadoIds?: string[];
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
   perfil?: string | null;
@@ -321,17 +320,6 @@ function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
   if (!scope.empresaId) return false;
   if (chamado.empresa_id !== scope.empresaId) return false;
   if (scope.canViewAllUnits) return true;
-
-  const allowedSupermercadoIds = new Set(
-    (scope.supermercadoIds ?? []).filter(
-      (id): id is string => typeof id === "string" && id.trim().length > 0
-    )
-  );
-
-  if (allowedSupermercadoIds.size > 0) {
-    return allowedSupermercadoIds.has(chamado.supermercado_id);
-  }
-
   if (!scope.supermercadoId) return false;
   return chamado.supermercado_id === scope.supermercadoId;
 }
@@ -341,17 +329,6 @@ function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
   if (!scope.empresaId) return [];
   const chamadosEmpresa = chamados.filter((c) => c.empresa_id === scope.empresaId);
   if (scope.canViewAllUnits) return chamadosEmpresa;
-
-  const allowedSupermercadoIds = new Set(
-    (scope.supermercadoIds ?? []).filter(
-      (id): id is string => typeof id === "string" && id.trim().length > 0
-    )
-  );
-
-  if (allowedSupermercadoIds.size > 0) {
-    return chamadosEmpresa.filter((c) => allowedSupermercadoIds.has(c.supermercado_id));
-  }
-
   if (!scope.supermercadoId) return [];
   return chamadosEmpresa.filter((c) => c.supermercado_id === scope.supermercadoId);
 }
@@ -422,7 +399,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
       const chamadosQuery = scope.canViewAllCompanies
         ? query(collection(db, CHAMADOS_COLLECTION))
-        : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
+        : !scope.canViewAllUnits && scope.supermercadoId
+          ? query(
+              collection(db, CHAMADOS_COLLECTION),
+              where("supermercado_id", "==", scope.supermercadoId)
+            )
+          : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
 
       return onSnapshot(
         chamadosQuery,
@@ -432,8 +414,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             normalizeChamado(snapshotDoc.data() as Partial<Chamado>, snapshotDoc.id)
           );
 
-          const scoped = applyScope(remoteChamados, scope);
-          setChamados(sortChamados(scoped));
+          setChamados(sortChamados(remoteChamados));
         },
         (error: FirestoreError) => {
           const code = error.code ? ` (${error.code})` : "";
