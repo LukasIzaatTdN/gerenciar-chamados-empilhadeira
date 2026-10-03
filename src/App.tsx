@@ -27,6 +27,7 @@ import OperadorLogin from "./components/OperadorLogin";
 import NotificationToast from "./components/NotificationToast";
 import ProfileSettings from "./components/ProfileSettings";
 import { isEmAtendimentoStatus, isPendenteStatus } from "./utils/chamadoStatus";
+import { getOperatorStatusStorageKey, parseOperatorAvailability } from "./utils/operatorStatus";
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
@@ -89,7 +90,6 @@ type ThemeMode = "light" | "dark";
 type DashboardPeriod = "hoje" | "7d" | "30d";
 
 const USER_SESSION_KEY = "operador_empilhadeira_usuario";
-const OPERADOR_STATUS_KEY = "operador_empilhadeira_status";
 const SETOR_KEY = "operador_empilhadeira_setor_principal";
 const NOTIFICACOES_KEY = "operador_empilhadeira_notificacoes";
 const SOM_KEY = "operador_empilhadeira_som";
@@ -148,9 +148,13 @@ export default function App() {
       return null;
     }
   });
+  const [statusOwnerId, setStatusOwnerId] = useState<string | null>(
+    () => usuarioAtual?.id ?? null
+  );
   const [operadorStatus, setOperadorStatus] = useState<OperadorStatus>(() => {
-    const savedStatus = localStorage.getItem(OPERADOR_STATUS_KEY);
-    return savedStatus === "Pausa" ? "Pausa" : "Disponível";
+    return parseOperatorAvailability(
+      localStorage.getItem(getOperatorStatusStorageKey(usuarioAtual?.id ?? null))
+    );
   });
   const [setorPrincipal, setSetorPrincipal] = useState<string>(() => {
     return localStorage.getItem(SETOR_KEY) || "Estoque";
@@ -716,8 +720,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(OPERADOR_STATUS_KEY, operadorStatus);
-  }, [operadorStatus]);
+    if (statusOwnerId === operadorId) return;
+    setOperadorStatus(
+      parseOperatorAvailability(localStorage.getItem(getOperatorStatusStorageKey(operadorId)))
+    );
+    setStatusOwnerId(operadorId);
+  }, [operadorId, statusOwnerId]);
+
+  useEffect(() => {
+    if (statusOwnerId !== operadorId) return;
+    localStorage.setItem(getOperatorStatusStorageKey(operadorId), operadorStatus);
+  }, [operadorId, operadorStatus, statusOwnerId]);
 
   useEffect(() => {
     localStorage.setItem(SETOR_KEY, setorPrincipal);

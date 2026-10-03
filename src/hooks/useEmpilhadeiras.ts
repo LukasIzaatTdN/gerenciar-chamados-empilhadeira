@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  addDoc,
   collection,
   doc,
   onSnapshot,
   query,
-  setDoc,
-  updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { Empilhadeira, EmpilhadeiraStatus } from "../types/empilhadeira";
@@ -149,11 +147,13 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
       try {
         if (db) {
-          await setDoc(doc(db, EMPILHADEIRAS_COLLECTION, id), nova);
-          await addDoc(
-            collection(db, "auditoria"),
+          const batch = writeBatch(db);
+          batch.set(doc(db, EMPILHADEIRAS_COLLECTION, id), nova);
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "empilhadeira_criada",
+              actorUid: auth?.currentUser?.uid,
               actorName: "Sistema",
               entityType: "empilhadeira",
               entityId: id,
@@ -165,6 +165,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
               },
             })
           );
+          await batch.commit();
           return;
         }
       } catch {
@@ -214,11 +215,13 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
       try {
         if (db) {
           const previous = empilhadeiras.find((item) => item.id === id);
-          await updateDoc(doc(db, EMPILHADEIRAS_COLLECTION, id), payload);
-          await addDoc(
-            collection(db, "auditoria"),
+          const batch = writeBatch(db);
+          batch.update(doc(db, EMPILHADEIRAS_COLLECTION, id), payload);
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "empilhadeira_atualizada",
+              actorUid: auth?.currentUser?.uid,
               actorName: "Sistema",
               entityType: "empilhadeira",
               entityId: id,
@@ -231,6 +234,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
               },
             })
           );
+          await batch.commit();
           return;
         }
       } catch {
@@ -268,14 +272,16 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
       try {
         if (db) {
-          await updateDoc(doc(db, EMPILHADEIRAS_COLLECTION, id), {
+          const batch = writeBatch(db);
+          batch.update(doc(db, EMPILHADEIRAS_COLLECTION, id), {
             status,
             atualizado_em,
           });
-          await addDoc(
-            collection(db, "auditoria"),
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "empilhadeira_status_alterado",
+              actorUid: auth?.currentUser?.uid,
               actorName: "Sistema",
               entityType: "empilhadeira",
               entityId: id,
@@ -287,6 +293,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
               },
             })
           );
+          await batch.commit();
           return;
         }
       } catch {

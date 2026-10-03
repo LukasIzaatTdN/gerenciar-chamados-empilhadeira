@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresa_id", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "supermercado_id", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

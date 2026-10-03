@@ -19,16 +19,15 @@ import {
   parseProdutoQuantidadeTextToItens,
 } from "../utils/televendasItems";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   type FirestoreError,
   onSnapshot,
   query,
-  setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import {
@@ -559,11 +558,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
-          await setDoc(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
-          await addDoc(
-            collection(db, "auditoria"),
+          const batch = writeBatch(db);
+          batch.set(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "chamado_criado",
+              actorUid: auth?.currentUser?.uid,
               actorName: input.solicitante_nome || "Sistema",
               entityType: "chamado",
               entityId: novo.id,
@@ -577,10 +578,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
               },
             })
           );
+          await batch.commit();
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao abrir chamado. Verifique perfil e unidade."
+            "Não foi possível abrir o chamado."
           );
         }
       } else {
@@ -627,17 +629,19 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
-          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          const batch = writeBatch(db);
+          batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: isTelevendasChamado(chamadoAtual) ? ("Em separação" as Status) : ("Aguardando" as Status),
             operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
             ...equipamentoPayload,
           });
-          await addDoc(
-            collection(db, "auditoria"),
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "chamado_assumido",
+              actorUid: auth?.currentUser?.uid,
               actorName: operadorNome,
               entityType: "chamado",
               entityId: id,
@@ -650,10 +654,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
               },
             })
           );
+          await batch.commit();
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao assumir chamado. Verifique login e unidade."
+            "Não foi possível assumir o chamado."
           );
         }
         callbacks?.onAssumido?.(
@@ -723,7 +728,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
-          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          const batch = writeBatch(db);
+          batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: isTelevendasChamado(chamadoAtual) ? ("Pronto" as Status) : ("Em atendimento" as Status),
             iniciado_em,
             operador_nome,
@@ -736,10 +742,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_por: operador_nome,
             ...equipamentoPayload,
           });
-          await addDoc(
-            collection(db, "auditoria"),
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "chamado_iniciado",
+              actorUid: auth?.currentUser?.uid,
               actorName: operadorNome,
               entityType: "chamado",
               entityId: id,
@@ -752,10 +759,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
               },
             })
           );
+          await batch.commit();
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao iniciar atendimento. Verifique login e unidade."
+            "Não foi possível iniciar o atendimento."
           );
         }
         callbacks?.onIniciado?.({
@@ -828,7 +836,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
-          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), {
+          const batch = writeBatch(db);
+          batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
             operador_nome,
@@ -836,10 +845,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_em: finalizado_em,
             atualizado_por: operador_nome,
           });
-          await addDoc(
-            collection(db, "auditoria"),
+          batch.set(
+            doc(collection(db, "auditoria")),
             createAuditEntry({
               action: "chamado_finalizado",
+              actorUid: auth?.currentUser?.uid,
               actorName: operadorNome,
               entityType: "chamado",
               entityId: id,
@@ -852,10 +862,11 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
               },
             })
           );
+          await batch.commit();
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao finalizar chamado. Verifique login e unidade."
+            "Não foi possível finalizar o chamado."
           );
         }
         callbacks?.onFinalizado?.({
@@ -929,7 +940,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao marcar deslocamento. Verifique login e unidade."
+            "Não foi possível marcar deslocamento."
           );
         }
         return;
@@ -975,7 +986,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao registrar chegada. Verifique login e unidade."
+            "Não foi possível registrar a chegada."
           );
         }
         return;
@@ -1045,7 +1056,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
-            "Permissão negada ao atualizar pedido de televendas. Verifique login e unidade."
+            "Não foi possível atualizar o pedido de Televendas."
           );
         }
         return;
@@ -1101,13 +1112,19 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
   function mapFirestoreWriteError(error: unknown, fallback: string): Error {
     const firestoreError = error as FirestoreError | undefined;
     if (firestoreError?.code === "permission-denied") {
-      return new Error(`${fallback} (permission-denied)`);
+      return new Error(`${fallback} Verifique seu perfil e o vínculo com a unidade. (permission-denied)`);
     }
     if (firestoreError?.code === "unauthenticated") {
-      return new Error(`${fallback} (sessão expirada)`);
+      return new Error(`${fallback} Faça login novamente. (unauthenticated)`);
     }
     if (firestoreError?.code === "unavailable") {
-      return new Error(`${fallback} (Firebase indisponível)`);
+      return new Error(`${fallback} Verifique sua conexão e tente novamente. (unavailable)`);
     }
-    return new Error(fallback);
+    const details = [
+      firestoreError?.code,
+      error instanceof Error ? error.message : null,
+    ]
+      .filter(Boolean)
+      .join(": ");
+    return new Error(details ? `${fallback} (${details})` : fallback);
   }

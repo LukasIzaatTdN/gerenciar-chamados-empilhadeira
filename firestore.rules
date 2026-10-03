@@ -519,10 +519,24 @@ service cloud.firestore {
     }
 
     match /auditoria/{id} {
+      allow read: if isCurrentUserActive()
+        && (
+          isAdminGeral()
+          || (
+            "empresa_id" in resource.data
+            && canAccessEmpresa(resource.data.empresa_id)
+          )
+          || (
+            "supermercado_id" in resource.data
+            && canAccessCurrentSupermercado(resource.data.supermercado_id)
+          )
+        );
+
       allow create: if isSignedIn()
         && isCurrentUserActive()
         && request.resource.data.keys().hasAll([
           "action",
+          "actorUid",
           "actorName",
           "entityType",
           "entityId",
@@ -531,28 +545,56 @@ service cloud.firestore {
         ])
         && request.resource.data.keys().hasOnly([
           "action",
+          "actorUid",
           "actorName",
           "entityType",
           "entityId",
           "details",
           "occurredAt",
+          "empresa_id",
+          "supermercado_id",
           "metadata"
         ])
-        && request.resource.data.action is string
+        && request.resource.data.action in [
+          "chamado_criado",
+          "chamado_assumido",
+          "chamado_iniciado",
+          "chamado_finalizado",
+          "empilhadeira_criada",
+          "empilhadeira_atualizada",
+          "empilhadeira_status_alterado",
+          "manutencao_criada",
+          "manutencao_atualizada"
+        ]
+        && request.resource.data.actorUid == request.auth.uid
         && request.resource.data.actorName is string
         && request.resource.data.entityType is string
         && request.resource.data.entityId is string
         && request.resource.data.occurredAt is string
         && request.resource.data.details is map
         && (
+          !("empresa_id" in request.resource.data)
+          || (
+            request.resource.data.empresa_id is string
+            && request.resource.data.details.empresa_id == request.resource.data.empresa_id
+          )
+        )
+        && (
+          !("supermercado_id" in request.resource.data)
+          || (
+            request.resource.data.supermercado_id is string
+            && request.resource.data.details.supermercado_id == request.resource.data.supermercado_id
+          )
+        )
+        && (
           isAdminGeral()
           || (
-            "empresa_id" in request.resource.data.details
-            && canAccessEmpresa(request.resource.data.details.empresa_id)
+            "empresa_id" in request.resource.data
+            && canAccessEmpresa(request.resource.data.empresa_id)
           )
           || (
-            "supermercado_id" in request.resource.data.details
-            && canAccessCurrentSupermercado(request.resource.data.details.supermercado_id)
+            "supermercado_id" in request.resource.data
+            && canAccessCurrentSupermercado(request.resource.data.supermercado_id)
           )
         );
     }

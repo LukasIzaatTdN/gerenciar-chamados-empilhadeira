@@ -30,11 +30,14 @@ export interface UserAccessInput {
 
 export interface AuditEntry {
   action: string;
+  actorUid?: string;
   actorName: string;
   entityType: string;
   entityId: string;
   details: Record<string, unknown>;
   occurredAt: string;
+  empresa_id?: string;
+  supermercado_id?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -149,6 +152,7 @@ export function assertPermissionForAction(action: BusinessAction, perfil: string
 
 export function createAuditEntry({
   action,
+  actorUid,
   actorName,
   entityType,
   entityId,
@@ -156,6 +160,7 @@ export function createAuditEntry({
   metadata,
 }: {
   action: string;
+  actorUid?: string | null;
   actorName: string;
   entityType: string;
   entityId: string;
@@ -164,11 +169,16 @@ export function createAuditEntry({
 }): AuditEntry {
   return {
     action,
+    ...(actorUid ? { actorUid } : {}),
     actorName: actorName.trim() || "Sistema",
     entityType,
     entityId,
     details,
     occurredAt: new Date().toISOString(),
-    metadata,
+    ...(typeof details.empresa_id === "string" ? { empresa_id: details.empresa_id } : {}),
+    ...(typeof details.supermercado_id === "string"
+      ? { supermercado_id: details.supermercado_id }
+      : {}),
+    ...(metadata ? { metadata } : {}),
   };
 }

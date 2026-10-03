@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { Manutencao, NovaManutencaoInput } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
@@ -119,11 +119,13 @@ export function useManutencoes(scope: ManutencaoScope) {
       const nova = normalizeManutencao({ ...input, id }, id);
 
       if (db) {
-        await setDoc(doc(db, MANUTENCOES_COLLECTION, id), nova);
-        await addDoc(
-          collection(db, "auditoria"),
+        const batch = writeBatch(db);
+        batch.set(doc(db, MANUTENCOES_COLLECTION, id), nova);
+        batch.set(
+          doc(collection(db, "auditoria")),
           createAuditEntry({
             action: "manutencao_criada",
+            actorUid: auth?.currentUser?.uid,
             actorName: input.criado_por || "Sistema",
             entityType: "manutencao",
             entityId: id,
@@ -137,6 +139,7 @@ export function useManutencoes(scope: ManutencaoScope) {
             },
           })
         );
+        await batch.commit();
         return;
       }
 
@@ -171,11 +174,13 @@ export function useManutencoes(scope: ManutencaoScope) {
       };
 
       if (db) {
-        await updateDoc(doc(db, MANUTENCOES_COLLECTION, id), payload);
-        await addDoc(
-          collection(db, "auditoria"),
+        const batch = writeBatch(db);
+        batch.update(doc(db, MANUTENCOES_COLLECTION, id), payload);
+        batch.set(
+          doc(collection(db, "auditoria")),
           createAuditEntry({
             action: "manutencao_atualizada",
+            actorUid: auth?.currentUser?.uid,
             actorName: current?.criado_por || "Sistema",
             entityType: "manutencao",
             entityId: id,
@@ -187,6 +192,7 @@ export function useManutencoes(scope: ManutencaoScope) {
             },
           })
         );
+        await batch.commit();
         return;
       }
 
