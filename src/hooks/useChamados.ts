@@ -36,6 +36,7 @@ import {
 } from "../types/empilhadeira";
 import { LEGACY_EMPRESA_ID, resolveEmpresaId } from "../utils/tenant";
 import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
+import { runCallbackSafely } from "../utils/runCallbackSafely";
 
 const STORAGE_KEY = "chamados_empilhadeira";
 const CHAMADOS_COLLECTION = "chamados";
@@ -589,7 +590,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         setChamados((prev) => [...prev, novo]);
       }
 
-      callbacks?.onCriado?.(novo);
+      runCallbackSafely(() => callbacks?.onCriado?.(novo), "chamado creation");
     },
     [callbacks, scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
@@ -661,9 +662,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             "Não foi possível assumir o chamado."
           );
         }
-        callbacks?.onAssumido?.(
-          { ...chamadoAtual, operador_nome: operadorNome },
-          operadorNome
+        runCallbackSafely(
+          () => callbacks?.onAssumido?.(
+            { ...chamadoAtual, operador_nome: operadorNome },
+            operadorNome
+          ),
+          "chamado assignment"
         );
         return;
       }
@@ -682,7 +686,10 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         );
         const chamado = updated.find((c) => c.id === id);
         if (chamado) {
-          setTimeout(() => callbacks?.onAssumido?.(chamado, operadorNome), 0);
+          setTimeout(
+            () => runCallbackSafely(() => callbacks?.onAssumido?.(chamado, operadorNome), "chamado assignment"),
+            0
+          );
         }
         return updated;
       });
@@ -766,12 +773,15 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             "Não foi possível iniciar o atendimento."
           );
         }
-        callbacks?.onIniciado?.({
-          ...chamadoAtual,
-          status: isTelevendasChamado(chamadoAtual) ? "Pronto" : "Em atendimento",
-          iniciado_em,
-          operador_nome,
-        });
+        runCallbackSafely(
+          () => callbacks?.onIniciado?.({
+            ...chamadoAtual,
+            status: isTelevendasChamado(chamadoAtual) ? "Pronto" : "Em atendimento",
+            iniciado_em,
+            operador_nome,
+          }),
+          "chamado start"
+        );
         return;
       }
 
@@ -795,7 +805,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         );
         const chamado = updated.find((c) => c.id === id);
         if (chamado) {
-          setTimeout(() => callbacks?.onIniciado?.(chamado), 0);
+          setTimeout(() => runCallbackSafely(() => callbacks?.onIniciado?.(chamado), "chamado start"), 0);
         }
         return updated;
       });
@@ -869,12 +879,15 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             "Não foi possível finalizar o chamado."
           );
         }
-        callbacks?.onFinalizado?.({
-          ...chamadoAtual,
-          status: "Finalizado",
-          finalizado_em,
-          operador_nome,
-        });
+        runCallbackSafely(
+          () => callbacks?.onFinalizado?.({
+            ...chamadoAtual,
+            status: "Finalizado",
+            finalizado_em,
+            operador_nome,
+          }),
+          "chamado completion"
+        );
         return;
       }
 
@@ -894,7 +907,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         );
         const chamado = updated.find((c) => c.id === id);
         if (chamado) {
-          setTimeout(() => callbacks?.onFinalizado?.(chamado), 0);
+          setTimeout(() => runCallbackSafely(() => callbacks?.onFinalizado?.(chamado), "chamado completion"), 0);
         }
         return updated;
       });
