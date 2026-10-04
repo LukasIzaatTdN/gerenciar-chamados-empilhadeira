@@ -20,6 +20,7 @@ export interface UsuarioSistema {
   status?: UsuarioStatus;
   email?: string;
   telefone?: string;
+  convite_token?: string | null;
   criado_em?: string;
   atualizado_em?: string;
 }

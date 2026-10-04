@@ -33,10 +33,6 @@ service cloud.firestore {
       return isAdminGeral() || isAdminEmpresa();
     }
 
-    function isPlatformAdminAccess() {
-      return isAdminGeral();
-    }
-
     function currentUserEmpresaId() {
       return hasCurrentUserDoc()
         && "empresa_id" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
@@ -608,17 +604,11 @@ service cloud.firestore {
       allow read: if !isSignedIn()
         || canAccessEmpresa(resource.data.empresa_id)
         || canAccessCurrentSupermercado(id);
-      allow create: if hasAdminManagementAccess()
-        && canAccessEmpresa(request.resource.data.empresa_id);
-      allow update: if hasAdminManagementAccess()
-        && canAccessEmpresa(resource.data.empresa_id)
-        && canAccessEmpresa(request.resource.data.empresa_id)
-        && (
-          isPlatformAdminAccess()
-          || request.resource.data.empresa_id == resource.data.empresa_id
-        );
-      allow delete: if hasAdminManagementAccess()
-        && canAccessEmpresa(resource.data.empresa_id);
+      allow create: if isAdminEmpresaDaEmpresa(request.resource.data.empresa_id);
+      allow update: if isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+        && isAdminEmpresaDaEmpresa(request.resource.data.empresa_id)
+        && request.resource.data.empresa_id == resource.data.empresa_id;
+      allow delete: if isAdminEmpresaDaEmpresa(resource.data.empresa_id);
     }
 
     match /empilhadeiras/{id} {
@@ -713,7 +703,13 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (
           request.auth.uid == id
-          || canAccessEmpresa(resource.data.empresa_id)
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+          || (
+            isAdminGeral()
+            && resource.data.perfil == "Administrador da Empresa"
+            && resource.data.convite_token is string
+            && resource.data.convite_token.size() > 0
+          )
         );
 
       allow create: if isSignedIn()
@@ -737,6 +733,12 @@ service cloud.firestore {
 
       allow update: if (
           isAdminGeral()
+          && resource.data.perfil == "Administrador da Empresa"
+          && resource.data.convite_token is string
+          && resource.data.convite_token.size() > 0
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.convite_token == resource.data.convite_token
           && isUsuarioVinculoValido(request.resource.data)
           && hasOnlyUserManagementChanges(resource.data, request.resource.data)
         )

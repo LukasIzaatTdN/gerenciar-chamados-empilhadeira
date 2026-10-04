@@ -25,6 +25,7 @@ interface UsuariosAdminProps {
   onVoltar: () => void;
   canSelectEmpresa?: boolean;
   currentEmpresaId?: string | null;
+  isPlatformAdminView?: boolean;
 }
 
 const PERFIS: PerfilAcesso[] = [
@@ -60,6 +61,7 @@ export default function UsuariosAdmin({
   onVoltar,
   canSelectEmpresa = false,
   currentEmpresaId = null,
+  isPlatformAdminView = false,
 }: UsuariosAdminProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPerfil, setEditPerfil] = useState<PerfilAcesso>("Promotor");
@@ -352,7 +354,7 @@ export default function UsuariosAdmin({
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-            Usuários cadastrados
+            {isPlatformAdminView ? "Gerentes cadastrados por convite" : "Usuários da empresa"}
           </h2>
 
           {error && (
@@ -370,6 +372,7 @@ export default function UsuariosAdmin({
               usuariosOrdenados.map((usuario) => {
                 const isEditing = editingId === usuario.id;
                 const isSelf = currentAdminId === usuario.id;
+                const canEditUser = !isPlatformAdminView;
 
                 return (
                   <div
@@ -539,9 +542,11 @@ export default function UsuariosAdmin({
                         </>
                       ) : (
                         <>
-                          <button type="button" onClick={() => startEdit(usuario)} disabled={isSelf} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
-                            Editar
-                          </button>
+                          {canEditUser && (
+                            <button type="button" onClick={() => startEdit(usuario)} disabled={isSelf} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+                              Editar
+                            </button>
+                          )}
                           <button type="button" onClick={() => { void handleToggleStatus(usuario.id); }} disabled={pendingStatusId === usuario.id || isSelf} className={`rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${usuario.status === "Inativo" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                             {pendingStatusId === usuario.id ? "Atualizando..." : usuario.status === "Inativo" ? "Reativar" : "Inativar"}
                           </button>

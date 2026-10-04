@@ -67,6 +67,10 @@ function normalizeUsuario(
     email: typeof data.email === "string" ? data.email : undefined,
     telefone:
       typeof data.telefone === "string" && data.telefone.trim() ? data.telefone.trim() : undefined,
+    convite_token:
+      typeof data.convite_token === "string" && data.convite_token.trim()
+        ? data.convite_token.trim()
+        : null,
     criado_em: typeof data.criado_em === "string" ? data.criado_em : undefined,
     atualizado_em: typeof data.atualizado_em === "string" ? data.atualizado_em : undefined,
   };
@@ -102,7 +106,11 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
     }
 
     const usuariosQuery = canViewAllCompanies
-      ? collection(db, USUARIOS_COLLECTION)
+      ? query(
+          collection(db, USUARIOS_COLLECTION),
+          where("perfil", "==", "Administrador da Empresa"),
+          where("convite_token", "!=", null)
+        )
       : canManageCompanyUsers && empresaId
         ? query(collection(db, USUARIOS_COLLECTION), where("empresa_id", "==", empresaId))
         : query(collection(db, USUARIOS_COLLECTION), where(documentId(), "==", currentUserId));

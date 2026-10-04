@@ -96,7 +96,10 @@ export default function Header({
       : perfilAcesso === "Administrador Geral"
       ? "Abrir chamado"
       : "Solicitar Empilhadeira";
-  const canShowCreateAction = showCreateAction && perfilAcesso !== "Administrador da Empresa";
+  const canShowCreateAction =
+    showCreateAction &&
+    perfilAcesso !== "Administrador da Empresa" &&
+    perfilAcesso !== "Administrador Geral";
   const operatorActionLabel =
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
   const dashboardActionLabel =

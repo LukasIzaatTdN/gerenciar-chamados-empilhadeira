@@ -9,6 +9,7 @@ export interface AccessPermissions {
   canViewUnitQueue: boolean;
   canViewHistoryAndReports: boolean;
   canViewAllUnits: boolean;
+  canManageUnits: boolean;
   canViewAllCompanies: boolean;
   canManageCompanyAdmin: boolean;
 }
@@ -44,6 +45,7 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
     canViewHistoryAndReports:
       isSupervisor || isCompanyAdmin || isPlatformAdmin,
     canViewAllUnits: isCompanyAdmin || isPlatformAdmin,
+    canManageUnits: isCompanyAdmin,
     canViewAllCompanies: isPlatformAdmin,
     canManageCompanyAdmin: isCompanyAdmin || isPlatformAdmin,
   };

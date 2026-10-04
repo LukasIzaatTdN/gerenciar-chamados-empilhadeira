@@ -63,6 +63,7 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
+import { isInvitedCompanyAdmin } from "./utils/invitedCompanyAdmin";
 import { normalizeGovernanceMessage } from "./utils/governanceMessages";
 import { getOperationalAlerts } from "./utils/operationalAlerts";
 import { getOperationalActionPlan } from "./utils/operationalActionPlan";
@@ -124,7 +125,7 @@ function canAccessViewByPerfil(view: View, perfil: UsuarioSistema["perfil"]) {
   const nextPermissions = getPermissions(perfil);
 
   if (view === "empresas") return nextPermissions.canViewAllCompanies;
-  if (view === "unidades") return nextPermissions.canViewAllUnits;
+  if (view === "unidades") return nextPermissions.canManageUnits;
   if (view === "usuarios") return nextPermissions.canViewAllUnits;
   if (view === "dashboard") {
     return nextPermissions.canViewUnitDashboard || nextPermissions.canViewAllUnits;
@@ -1523,7 +1524,7 @@ export default function App() {
   }
 
   function handleOpenUnidadesAdmin() {
-    if (permissions.canViewAllUnits) {
+    if (permissions.canManageUnits) {
       navigateTo("unidades");
     }
   }
@@ -1709,7 +1710,7 @@ export default function App() {
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"
-          showManageUnidadesAction={canViewAllUnits}
+          showManageUnidadesAction={permissions.canManageUnits}
           onManageUnidades={handleOpenUnidadesAdmin}
           onLogout={handleLogoutToLogin}
         />
@@ -1742,11 +1743,11 @@ export default function App() {
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
           supermercadoNome={supermercadoNome}
-          showCreateAction={permissions.canCreateChamado}
+          showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isCompanyAdmin && !isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={
             !isPlatformAdmin &&
@@ -1910,6 +1911,7 @@ export default function App() {
                     type="button"
                     onClick={handleOpenUnidadesAdmin}
                     className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:bg-slate-100"
+                    hidden={!permissions.canManageUnits}
                   >
                     <span>
                       <span className="block text-sm font-bold text-slate-900">Unidades</span>
@@ -1976,7 +1978,7 @@ export default function App() {
     );
   }
 
-  if (view === "unidades" && permissions.canViewAllUnits) {
+  if (view === "unidades" && permissions.canManageUnits) {
     return (
       <>
         <Header
@@ -2003,7 +2005,7 @@ export default function App() {
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={
             !isPlatformAdmin &&
@@ -2058,7 +2060,7 @@ export default function App() {
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={
             !isPlatformAdmin &&
@@ -2110,7 +2112,7 @@ export default function App() {
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={
             !isPlatformAdmin &&
@@ -2127,7 +2129,7 @@ export default function App() {
           empresas={empresas}
           usuarios={
             canViewAllCompanies
-              ? usuarios
+              ? usuarios.filter(isInvitedCompanyAdmin)
               : usuarios.filter((usuario) => usuario.empresa_id === empresaSelecionadaId)
           }
           supermercados={supermercadosDoEscopo}
@@ -2143,6 +2145,7 @@ export default function App() {
           }
           adminInvites={adminInvites}
           canCreateAdminInvite={canViewAllCompanies}
+          isPlatformAdminView={canViewAllCompanies}
           onVoltar={goBackToPreviousView}
           canSelectEmpresa={canViewAllCompanies}
           currentEmpresaId={empresaSelecionadaId}
@@ -2179,7 +2182,7 @@ export default function App() {
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
@@ -2245,7 +2248,7 @@ export default function App() {
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
           showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={canViewAllUnits}
+          showUnidadesAction={permissions.canManageUnits}
           showUsuariosAction={canViewAllUnits}
           showEmpilhadeirasAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
           showManutencoesAction={!isPlatformAdmin && permissions.canAccessOperatorPanel && perfilAcesso !== "Separador de Televendas"}
@@ -2309,7 +2312,7 @@ export default function App() {
         showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
         showEmpresasAction={canViewAllCompanies}
-        showUnidadesAction={canViewAllUnits}
+        showUnidadesAction={permissions.canManageUnits}
         showUsuariosAction={canViewAllUnits}
         showEmpilhadeirasAction={
           !isPlatformAdmin &&
@@ -2455,14 +2458,14 @@ export default function App() {
                   <span>Gerenciar Empresas</span>
                 </button>
               )}
-              <button
+              {permissions.canManageUnits && <button
                 type="button"
                 onClick={handleOpenUnidadesAdmin}
                 className="touch-target inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
               >
                 <span>🏬</span>
                 <span>Gerenciar Unidades</span>
-              </button>
+              </button>}
               {!isPlatformAdmin && (
                 <button
                   type="button"
@@ -2605,7 +2608,7 @@ export default function App() {
             <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
             {isAuthenticated ? "Conta" : "Entrar"}
           </button>
-          {permissions.canCreateChamado && (
+          {!isPlatformAdmin && permissions.canCreateChamado && (
             <button
               onClick={handleNovoChamadoAccess}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(249,115,22,0.32)]"
