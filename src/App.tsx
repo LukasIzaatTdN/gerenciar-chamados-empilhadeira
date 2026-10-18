@@ -16,6 +16,7 @@ import ChamadoTimeMetricsPanel from "./components/ChamadoTimeMetricsPanel";
 import Stats from "./components/Stats";
 import SupermercadoComparison from "./components/SupermercadoComparison";
 import EmpresasAdmin from "./components/EmpresasAdmin";
+import AssinaturasAdmin from "./components/AssinaturasAdmin";
 import UnidadesAdmin from "./components/UnidadesAdmin";
 import UsuariosAdmin from "./components/UsuariosAdmin";
 import EmpilhadeirasAdmin from "./components/EmpilhadeirasAdmin";
@@ -83,6 +84,7 @@ type View =
   | "perfil"
   | "dashboard"
   | "empresas"
+  | "assinaturas"
   | "unidades"
   | "usuarios"
   | "empilhadeiras"
@@ -125,6 +127,7 @@ function canAccessViewByPerfil(view: View, perfil: UsuarioSistema["perfil"]) {
   const nextPermissions = getPermissions(perfil);
 
   if (view === "empresas") return nextPermissions.canViewAllCompanies;
+  if (view === "assinaturas") return nextPermissions.canViewAllCompanies;
   if (view === "unidades") return nextPermissions.canManageUnits;
   if (view === "usuarios") return nextPermissions.canViewAllUnits;
   if (view === "dashboard") {
@@ -2079,10 +2082,15 @@ export default function App() {
           onUpdate={handleUpdateEmpresa}
           onToggleStatus={handleToggleEmpresaStatus}
           onVoltar={goBackToPreviousView}
+          onOpenSubscriptions={() => navigateTo("assinaturas")}
         />
         {renderGlobalOverlays()}
       </>
     );
+  }
+
+  if (view === "assinaturas" && permissions.canViewAllCompanies && perfilAcesso === "Administrador Geral") {
+    return <><AssinaturasAdmin empresas={empresas} actorName={operadorNome ?? "Administrador da Plataforma"} onBack={goBackToPreviousView} />{renderGlobalOverlays()}</>;
   }
 
   if (view === "usuarios" && permissions.canViewAllUnits) {

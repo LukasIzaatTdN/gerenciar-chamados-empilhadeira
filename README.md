@@ -300,6 +300,28 @@ Fluxo implementado para onboarding seguro de cliente:
 - consumo de token com uso único
 - bloqueio em regra para impedir auto-cadastro admin sem convite válido
 
+### Assinaturas SaaS — Etapa 5.1
+
+O gerenciamento SaaS foi adaptado para o plano Firebase Spark: as operações administrativas do painel Web usam transações do Firestore, autorizadas e validadas pelas regras. O fluxo não usa Cloud Functions em produção, não processa pagamentos e não bloqueia empresas por vencimento.
+
+Estrutura de dados:
+
+- `planos/{planoId}`: catálogo de planos, com preços em centavos e ciclos mensal, trimestral, semestral ou anual
+- `empresas/{empresaId}/assinaturas/atual`: assinatura canônica única da empresa, sem duplicação por filial
+- `empresas/{empresaId}/historico_assinatura/{operationId}`: eventos imutáveis de vínculo, ativação e renovação
+- `auditoria_assinaturas/{operationId}`: auditoria de criação e edição de planos
+- `assinatura_operacoes/{operationId}`: registro de idempotência para repetição segura das operações
+
+Permissões e comportamento:
+
+- somente `Administrador Geral` com status exatamente `Ativo` pode criar/editar planos, vincular planos e ativar ou renovar assinaturas
+- `Administrador da Empresa` ativo pode ler somente a assinatura e o histórico da própria empresa
+- clientes e usuários comuns não podem alterar planos, assinaturas, histórico ou auditoria SaaS
+- cada operação grava o estado, histórico e registro de idempotência de forma atômica
+- ativação e renovação são manuais; atribuir um plano não ativa a assinatura
+- empresas sem assinatura continuam no fluxo legado; não há migração automática
+- a interface SaaS e as novas regras ainda precisam de revisão/publicação autorizada para funcionarem em produção
+
 ### Painel do Operador
 
 - fila por unidade
@@ -369,6 +391,8 @@ Regras já aplicadas no app e refletidas nas coleções:
 - Firebase Auth
 - Cloud Firestore
 
+O fluxo SaaS de produção é compatível com Firebase Spark e não depende de Cloud Functions. O código callable legado em `functions/` permanece separado do fluxo Web atual.
+
 ## Estrutura do Projeto
 
 ```text
@@ -387,18 +411,17 @@ firebase.json
 
 Arquivos centrais:
 
-- [`src/App.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/App.tsx)
-- [`src/components/OperadorPanel.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/OperadorPanel.tsx)
-- [`src/components/ChamadoForm.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ChamadoForm.tsx)
-- [`src/components/EmpilhadeirasAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/EmpilhadeirasAdmin.tsx)
-- [`src/components/ManutencoesAdmin.tsx`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/components/ManutencoesAdmin.tsx)
-- [`src/hooks/useChamados.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useChamados.ts)
-- [`src/hooks/useEmpilhadeiras.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useEmpilhadeiras.ts)
-- [`src/hooks/useChecklistsEmpilhadeira.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useChecklistsEmpilhadeira.ts)
-- [`src/hooks/useManutencoes.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/hooks/useManutencoes.ts)
-- [`src/utils/empilhadeiraStatus.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/empilhadeiraStatus.ts)
-- [`src/utils/televendasItems.ts`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/src/utils/televendasItems.ts)
-- [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
+- `src/App.tsx`
+- `src/components/OperadorPanel.tsx`
+- `src/components/ChamadoForm.tsx`
+- `src/components/EmpilhadeirasAdmin.tsx`
+- `src/components/ManutencoesAdmin.tsx`
+- `src/components/AssinaturasAdmin.tsx`
+- `src/hooks/`
+- `src/services/subscriptions.ts`
+- `src/utils/subscriptionOperationId.ts`
+- `src/utils/subscriptionErrors.ts`
+- `firestore.rules`
 
 ## Requisitos
 
@@ -427,6 +450,8 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
+Para desenvolver conectado exclusivamente aos emuladores, copie `.env.emulator.example` para `.env.emulator`. O modo Emulator exige um ID de projeto com prefixo `demo-` e rejeita outra configuração.
+
 ### Desenvolvimento
 
 ```bash
@@ -444,6 +469,33 @@ npm run build
 ```bash
 npm run preview
 ```
+
+### Firebase Emulator
+
+Inicie Auth e Firestore localmente em um terminal:
+
+```bash
+firebase emulators:start --config firebase.emulator.local.json --only auth,firestore --project demo-patio-pro-log
+```
+
+Em outro terminal, inicie o Web conectado a esses emuladores:
+
+```bash
+npm run dev:emulator
+```
+
+O modo local usa Auth Emulator em `127.0.0.1:19099` e Firestore Emulator em `127.0.0.1:18080`. Não use credenciais ou dados reais nesse ambiente.
+
+### Testes e validação
+
+```bash
+npm test
+npm run test:rules
+npx tsc --noEmit
+npm run build
+```
+
+`npm run test:rules` inicia temporariamente o Firestore Emulator no projeto fictício `demo-patio-pro-log` e executa testes de regras, autorização SaaS, isolamento, autoelevação e idempotência concorrente. O comando não publica regras nem acessa produção.
 
 ## Scripts Firebase
 
@@ -465,37 +517,6 @@ npm run auth:check-access -- \
   --service-account "/caminho/serviceAccountKey.json"
 ```
 
-## Firestore Rules
-
-As regras ficam em:
-
-- [`firestore.rules`](/home/lucas/Área%20de%20trabalho/Projetos%20vscode/gerenciar-chamados-empilhadeira/firestore.rules)
-
-Deploy:
-
-```bash
-firebase deploy --only firestore:rules
-```
-
-Importante:
-
-- várias correções recentes de permissão e isolamento dependem do deploy atualizado de `firestore.rules`
-- sem deploy, o comportamento no ambiente pode permanecer com erros antigos de `permission-denied`
-
-## Validação Técnica
-
-Verificação de tipos:
-
-```bash
-npx tsc --noEmit
-```
-
-Build:
-
-```bash
-npm run build
-```
-
 ## Estado Atual
 
 Base já funcional para:
@@ -515,27 +536,15 @@ Base já funcional para:
 - falhas operacionais
 - manutenções
 - histórico técnico por máquina
+- planos e assinaturas SaaS manuais com auditoria e idempotência
 
-## O Que Foi Atualizado Recentemente
+## Pendências Conhecidas
 
-- isolamento por `empresa_id` + `supermercado_id` no app e nas regras
-- correções de leitura por escopo nos hooks (`chamados`, `empilhadeiras`, `checklists`)
-- correções de permissão em fluxos de iniciar atendimento e checklist
-- melhorias no painel do operador para seleção de empilhadeira compatível
-- mensagens de erro mais claras para falhas de checklist
-- bloqueio de auto-cadastro com perfil administrativo
-- novo fluxo de convite para `Administrador da Empresa` com expiração e uso único
-- ajustes de navegação do Admin Geral para exibir acesso a `Usuários`
-
-## O Que Falta Arrumar
-
--  a leitura pública de `revisar e reduzirempresas` e `supermercados` para evitar exposição desnecessária pré-login
-- validar ponta a ponta no ambiente publicado se todas as regras novas já foram aplicadas (`firebase deploy --only firestore:rules`)
-- criar testes automatizados para regras e fluxos críticos de cadastro por convite
-- criar testes automatizados para iniciar atendimento com empilhadeira
-- criar testes automatizados para checklist antes do turno
-- padronizar telemetria e logs de erro para diagnóstico em produção
-- documentar fluxo operacional para cliente final (Admin Empresa, Supervisor e Operador)
+- comparar e revisar as regras locais com a cópia atualmente publicada antes de qualquer publicação
+- realizar validação visual e operacional no ambiente publicado após autorização de implantação
+- ampliar a suíte de testes para cadastro por convite, início de atendimento com empilhadeira e checklist antes do turno
+- revisar a exposição pública dos documentos de `empresas` e `supermercados` antes do login
+- documentar os procedimentos operacionais para `Administrador da Empresa`, `Supervisor` e `Operador`
 
 ## Próximos Passos Recomendados
 

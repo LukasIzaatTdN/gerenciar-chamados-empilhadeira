@@ -34,6 +34,7 @@ interface EmpresasAdminProps {
   ) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
   onVoltar: () => void;
+  onOpenSubscriptions?: () => void;
 }
 
 type FormState = {
@@ -99,6 +100,7 @@ export default function EmpresasAdmin({
   onUpdate,
   onToggleStatus,
   onVoltar,
+  onOpenSubscriptions,
 }: EmpresasAdminProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -218,14 +220,10 @@ export default function EmpresasAdmin({
               Cadastre clientes, contrato ativo e limites básicos do plano comercial.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onVoltar}
-            className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-          >
-            <span>←</span>
-            Voltar ao painel
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {onOpenSubscriptions && <button type="button" onClick={onOpenSubscriptions} className="touch-target rounded-2xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white">Planos e assinaturas</button>}
+            <button type="button" onClick={onVoltar} className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"><span>←</span>Voltar ao painel</button>
+          </div>
         </div>
 
         <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">

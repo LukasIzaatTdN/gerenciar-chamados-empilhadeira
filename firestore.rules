@@ -24,6 +24,144 @@ service cloud.firestore {
         && currentUserPerfil() == "Administrador Geral";
     }
 
+    // SaaS privilege is intentionally stricter than the shared operational helper:
+    // a missing user status must never grant platform subscription management.
+    function isActiveSaasPlatformAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador Geral"
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo";
+    }
+
+    function isActiveSaasCompanyAdmin(empresaId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador da Empresa"
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id == empresaId;
+    }
+
+    function isSaasPlanValid(planId, data) {
+      return data.keys().hasOnly([
+          "id", "nome", "descricao", "valor_centavos", "ciclo", "limite_usuarios",
+          "limite_filiais", "status", "criado_em", "atualizado_em", "ultima_operacao_id"
+        ])
+        && data.id == planId
+        && data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 80
+        && data.descricao is string && data.descricao.size() <= 500
+        && data.valor_centavos is int && data.valor_centavos >= 0 && data.valor_centavos <= 100000000
+        && data.ciclo in ["Mensal", "Trimestral", "Semestral", "Anual"]
+        && (data.limite_usuarios == null || (data.limite_usuarios is int && data.limite_usuarios >= 1 && data.limite_usuarios <= 100000))
+        && (data.limite_filiais == null || (data.limite_filiais is int && data.limite_filiais >= 1 && data.limite_filiais <= 100000))
+        && data.status in ["Ativo", "Inativo"]
+        && data.criado_em is timestamp && data.atualizado_em == request.time
+        && data.ultima_operacao_id is string;
+    }
+
+    function saasHistoryPath(empresaId, operationId) {
+      return /databases/$(database)/documents/empresas/$(empresaId)/historico_assinatura/$(operationId);
+    }
+
+    function saasAuditPath(operationId) {
+      return /databases/$(database)/documents/auditoria_assinaturas/$(operationId);
+    }
+
+    function saasOperationPath(operationId) {
+      return /databases/$(database)/documents/assinatura_operacoes/$(operationId);
+    }
+
+    function isSaasSubscriptionValid(empresaId, data, oldData, operationId, action) {
+      let planPath = /databases/$(database)/documents/planos/$(data.plano_id);
+      let plan = get(planPath).data;
+      let companyPath = /databases/$(database)/documents/empresas/$(empresaId);
+      let event = getAfter(saasHistoryPath(empresaId, operationId)).data;
+      let priorStatus = "status" in oldData ? oldData.status : null;
+      let allowedTransition = action == "assignPlan"
+          ? (priorStatus == null ? data.status == "Pendente" : priorStatus in ["Pendente", "Ativa", "Expirada"] && data.status == priorStatus)
+          : action == "activate"
+            ? priorStatus == "Pendente" && data.status == "Ativa"
+            : action == "renew" && priorStatus in ["Ativa", "Expirada"] && data.status == "Ativa";
+      return exists(companyPath) && exists(planPath)
+        && plan.status == "Ativo"
+        && data.keys().hasOnly([
+          "empresa_id", "plano_id", "plano_nome", "status", "ciclo", "valor_centavos",
+          "inicio_em", "vence_em", "renovacao_manual", "cobranca_automatica", "provedor_pagamento",
+          "criado_em", "atualizado_em", "atualizado_por", "ultima_operacao_id"
+        ])
+        && data.empresa_id == empresaId
+        && data.plano_id is string && data.plano_nome == plan.nome
+        && data.ciclo == plan.ciclo && data.valor_centavos == plan.valor_centavos
+        && data.status in ["Pendente", "Ativa", "Expirada"]
+        && data.renovacao_manual == true && data.cobranca_automatica == false && data.provedor_pagamento == null
+        && data.criado_em is timestamp && data.atualizado_em == request.time
+        && data.atualizado_por == request.auth.uid && data.ultima_operacao_id == operationId
+        && allowedTransition
+        && (
+          action == "assignPlan"
+            ? data.inicio_em == ("inicio_em" in oldData ? oldData.inicio_em : null)
+              && data.vence_em == ("vence_em" in oldData ? oldData.vence_em : null)
+            : data.inicio_em is timestamp && data.vence_em is timestamp
+              && event.detalhes.inicio_em is timestamp
+              && event.detalhes.vence_em is timestamp
+              && data.vence_em > event.detalhes.inicio_em
+              && event.detalhes.vence_em == data.vence_em
+              && (
+                action == "activate"
+                  ? data.inicio_em == request.time && event.detalhes.inicio_em == request.time
+                  : data.inicio_em == oldData.inicio_em
+                    && (
+                      oldData.vence_em is timestamp && oldData.vence_em > request.time
+                        ? event.detalhes.inicio_em == oldData.vence_em
+                        : event.detalhes.inicio_em == request.time
+                    )
+              )
+              && (
+                plan.ciclo == "Mensal" ? data.vence_em - event.detalhes.inicio_em >= duration.value(27, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(32, "d")
+                  : plan.ciclo == "Trimestral" ? data.vence_em - event.detalhes.inicio_em >= duration.value(88, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(93, "d")
+                  : plan.ciclo == "Semestral" ? data.vence_em - event.detalhes.inicio_em >= duration.value(180, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(185, "d")
+                  : plan.ciclo == "Anual" && data.vence_em - event.detalhes.inicio_em >= duration.value(364, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(367, "d")
+              )
+        )
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.operation_id == operationId
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.empresa_id == empresaId
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.plano_id == data.plano_id
+        && (
+          action == "assignPlan" ? getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "plano_vinculado"
+            : action == "activate" ? getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "assinatura_ativada"
+            : getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "assinatura_renovada"
+        );
+    }
+
+    function isSaasHistoryValid(empresaId, operationId, data) {
+      let op = getAfter(saasOperationPath(operationId)).data;
+      return data.keys().hasOnly(["acao", "empresa_id", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+        && data.empresa_id == empresaId && data.plano_id is string
+        && data.operation_id == operationId && data.ator_uid == request.auth.uid
+        && data.ator_nome is string && data.ocorrido_em == request.time
+        && data.acao in ["plano_vinculado", "assinatura_ativada", "assinatura_renovada"]
+        && data.detalhes is map
+        && op.target_id == empresaId && op.action in ["assignPlan", "activate", "renew"]
+        && op.actor_uid == request.auth.uid
+        && op.request_data.empresaId == empresaId
+        && op.request_data.planId == data.plano_id
+        && (
+          data.acao == "plano_vinculado"
+            ? op.action == "assignPlan" && data.detalhes.plano_nome is string
+            : data.acao == "assinatura_ativada"
+              ? op.action == "activate"
+              : op.action == "renew"
+        );
+    }
+
+    function isSaasOperationValid(operationId, data) {
+      return data.keys().hasOnly(["operation_id", "actor_uid", "action", "request_data", "target_id", "result", "processed_at"])
+        && data.operation_id == operationId && data.actor_uid == request.auth.uid
+        && data.action in ["savePlan", "assignPlan", "activate", "renew"]
+        && data.request_data is map && data.result is map && data.processed_at == request.time
+        && data.target_id is string
+        && (data.action == "savePlan" ? data.request_data.plan is map : data.request_data.empresaId == data.target_id && data.request_data.planId is string);
+    }
+
     function isAdminEmpresa() {
       return isCurrentUserActive()
         && currentUserPerfil() == "Administrador da Empresa";
@@ -598,6 +736,65 @@ service cloud.firestore {
     match /empresas/{id} {
       allow read: if !isSignedIn() || canAccessEmpresa(id) || belongsToEmpresa(id);
       allow write: if isAdminGeral();
+
+      match /assinaturas/{assinaturaId} {
+        allow read: if isActiveSaasPlatformAdmin() || isActiveSaasCompanyAdmin(id);
+        allow create, update: if assinaturaId == "atual"
+          && isActiveSaasPlatformAdmin()
+          && request.resource.data.ultima_operacao_id is string
+          && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == id
+          && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action in ["assignPlan", "activate", "renew"]
+          && isSaasSubscriptionValid(
+            id,
+            request.resource.data,
+            resource == null ? {} : resource.data,
+            request.resource.data.ultima_operacao_id,
+            getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action
+          );
+        allow delete: if false;
+      }
+
+      match /historico_assinatura/{eventoId} {
+        allow read: if isActiveSaasPlatformAdmin() || isActiveSaasCompanyAdmin(id);
+        allow create: if isActiveSaasPlatformAdmin() && isSaasHistoryValid(id, eventoId, request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+
+    match /planos/{planoId} {
+      allow read: if isActiveSaasPlatformAdmin();
+      allow create, update: if isActiveSaasPlatformAdmin()
+        && isSaasPlanValid(planoId, request.resource.data)
+        && request.resource.data.ultima_operacao_id is string
+        && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action == "savePlan"
+        && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == planoId
+        && getAfter(saasAuditPath(request.resource.data.ultima_operacao_id)).data.plano_id == planoId
+        && (resource == null || request.resource.data.criado_em == resource.data.criado_em);
+      allow delete: if false;
+    }
+
+    match /auditoria_assinaturas/{eventoId} {
+      allow read: if isActiveSaasPlatformAdmin();
+      allow create: if isActiveSaasPlatformAdmin()
+        && request.resource.data.keys().hasOnly(["acao", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+        && request.resource.data.operation_id == eventoId
+        && request.resource.data.ator_uid == request.auth.uid
+        && request.resource.data.ator_nome is string
+        && request.resource.data.ocorrido_em == request.time
+        && request.resource.data.acao in ["plano_criado", "plano_editado"]
+        && request.resource.data.detalhes is map
+        && getAfter(saasOperationPath(eventoId)).data.action == "savePlan"
+        && getAfter(saasOperationPath(eventoId)).data.target_id == request.resource.data.plano_id
+        && getAfter(saasOperationPath(eventoId)).data.actor_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /assinatura_operacoes/{operationId} {
+      // The platform admin must read a prior operation to return its original result on retry.
+      allow get: if isActiveSaasPlatformAdmin();
+      allow list: if false;
+      allow create: if isActiveSaasPlatformAdmin() && isSaasOperationValid(operationId, request.resource.data);
+      allow update, delete: if false;
     }
 
     match /supermercados/{id} {
