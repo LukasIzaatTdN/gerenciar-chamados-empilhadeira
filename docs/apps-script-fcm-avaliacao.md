@@ -46,3 +46,13 @@ Se acesso ao Firestore não estiver disponível, interromper e revisar permissõ
 - Cada tentativa assinada gera nonce único, mas isso **não substitui** a idempotência por evento de chamado (`push_delivery_events`) nem a validação de empresa e auditoria. Em caso de falha após reserva, não reprocessar automaticamente sem reconciliação.
 - Atenção: coleção `push_gateway_nonces` acumulará documentos. Não habilitar em produção sem política de retenção/limpeza compatível com Spark, quotas e revisão de custo. TTL automático não foi configurado.
 - Os arquivos são isolados: não há `doPost`, integração com rota pública, segredo configurado, envio FCM, nem gravação real executada.
+
+
+## Etapa 6.7 — Identidade por evento de chamado (somente contrato e testes)
+
+- `push-worker/src/call-event-identity.js`: função pura de identificação de eventos por SHA-256 de `empresa + unidade + chamado + ação + ID da auditoria`; suporta `chamado_criado`, `chamado_atualizado`, `chamado_assumido`, `chamado_iniciado`, `chamado_finalizado`.
+- `push-worker/tests/call-event-identity.test.js`: seis testes novos para identidade estável, atualizações distintas, isolamento de escopo e rejeição de dados inválidos. **Pendente execução local**.
+- **Não integrar à rota de envio ainda.** O Worker existente usa `stableEventKey(action, call)` com timestamps de estado, não aceita `chamado_atualizado` e tem testes de recuperação ligados à chave legada. Migrar sem plano pode permitir reenvio de eventos antigos ou quebrar reconciliação.
+- Para ativar atualizações genéricas, primeiro localizar a geração real de `auditoria` no Web e Android e verificar se existe um registro imutável para **cada** atualização, com ator, empresa, unidade, chamado e tipo. Não fabricar eventos a partir de campos do cliente.
+- A identidade calculada **não é autorização**: somente após validação da auditoria canônica, do usuário autenticado e da empresa/unidade ela poderá ser usada para `push_delivery_events` com create atômico.
+- A arquitetura Worker → Apps Script continua experimental, sem `doPost`, sem segredo compartilhado configurado e sem deploy. Nenhuma notificação foi enviada.
