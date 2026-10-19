@@ -36,3 +36,13 @@ Se acesso ao Firestore não estiver disponível, interromper e revisar permissõ
 - HMAC autentica o Worker para o Apps Script, **não** autentica o usuário final nem comprova que o evento/empresa/destinatário está autorizado. Antes de habilitar o transporte, preservar validação Firebase e verificações canônicas no Firestore.
 - O Worker atual ainda requer Google OAuth diretamente para consultas; portanto, a arquitetura de duas camadas **ainda não está funcional**. Precisamos mover cuidadosamente todas as operações privilegiadas ao backend Google ou validar uma outra fonte de identidade.
 - Não conectar `doPost`, não definir segredo, não adicionar IAM e não implantar até aprovação de threat model, teste de concorrência e verificação de quotas.
+
+
+## Etapa 6.6 — Reserva durável de nonce (protótipo, sem deploy)
+
+- `apps-script-fcm/gateway-nonce-claim.gs` reserva um UUID v4 na coleção `push_gateway_nonces` por meio de Firestore REST `POST .../documents/push_gateway_nonces?documentId=<nonce>`.
+- O primeiro create (HTTP 200/201) permite seguir; `409` é repetição e retorna `false`; outros códigos ou falhas de rede interrompem a operação. A reserva precisa ocorrer **depois** da validação HMAC e **antes** de qualquer ação privilegiada.
+- `push-worker/tests/gateway-nonce-claim.test.js` simula Apps Script via VM e Firestore mock, incluindo duplicação, falhas e assinatura interoperável. **Os testes foram adicionados, mas precisam ser executados pelo usuário.**
+- Cada tentativa assinada gera nonce único, mas isso **não substitui** a idempotência por evento de chamado (`push_delivery_events`) nem a validação de empresa e auditoria. Em caso de falha após reserva, não reprocessar automaticamente sem reconciliação.
+- Atenção: coleção `push_gateway_nonces` acumulará documentos. Não habilitar em produção sem política de retenção/limpeza compatível com Spark, quotas e revisão de custo. TTL automático não foi configurado.
+- Os arquivos são isolados: não há `doPost`, integração com rota pública, segredo configurado, envio FCM, nem gravação real executada.
