@@ -117,3 +117,12 @@ Commit de regras: `bfc3406`. A atualização do chamado Televendas com marcador 
 Commit de testes: `13e46c2`. O antigo teste de caracterização `KNOWN GAP` passou a exigir `assertFails` e ausência de alteração no chamado; adicionado teste de auditoria com entidade divergente. Esperados **27 testes** de regras.
 
 **Ainda não testado no Emulator.** A nova verificação `existsAfter/getAfter` pode ultrapassar o orçamento de expressões em commits válidos. Não interpretar a aprovação de testes negativos com mensagens de `maximum of 1000 expressions` como validação de isolamento. Executar `npm run test:rules`, `npm test` e `npm run build` localmente. Não publicar regras, não habilitar push, não alterar produção.
+
+
+## Etapa 6.10.3 — Redução de avaliações e controles de isolamento (aguardando Emulator)
+
+Ajustado o caminho dedicado de atualização auditada de Televendas para rejeitar diferenças de identidade/campos antes das leituras de usuário e validar o perfil ativo e o vínculo empresa/unidade diretamente a partir de `usuarios/{uid}`. O caminho legado agora testa escopo antes do validador geral de chamado, evitando avaliação desnecessária para outras empresas. Alterações apenas na branch de desenvolvimento, sem deploy.
+
+Adicionados controles: atualização **válida** da empresa B com auditoria atômica, e tentativa **inválida** de lote completo por operador inativo. A suíte de regras deve ter **29 testes**.
+
+**Pontos de atenção:** a mudança de ordem pode alterar comportamentos de perfis com documentos antigos/incompletos. Validar positivos e negativos no Emulator. Os erros `maximum of 1000 expressions` e `evaluation error` em testes negativos ainda precisam ser observados: um `assertFails` que passa devido ao orçamento de regras **não** comprova que a validação de segurança foi aplicada. Executar `npm run test:rules`, `npm test`, `npm run build`; enviar os logs completos antes de considerar a etapa aprovada. Não publicar regras, não habilitar push.
