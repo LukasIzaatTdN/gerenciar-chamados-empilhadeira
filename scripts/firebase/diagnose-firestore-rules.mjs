@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 
 const project = "demo-patio-pro-log";
 const port = Number(process.env.PATIO_FIRESTORE_EMULATOR_PORT || "28080");
-const prefix = process.env.PATIO_RULES_REPORT_PREFIX || "/tmp/patio-rules-6107";
+const prefix = process.env.PATIO_RULES_REPORT_PREFIX || "/tmp/patio-rules-6108";
 const suites = [
   "functions/tests/firestore/subscriptions.rules.test.mjs",
   "functions/tests/firestore/subscriptions.client.test.mjs",
@@ -40,15 +40,24 @@ const summary = {
   evaluationErrorMentions: errors.length,
   expressionBudgetMentions: budgets.length,
   byRule,
+  byCategory: {
+    chamados: (byRule["L714 update"] || 0),
+    auditoria: (byRule["L793 create"] || 0),
+    usuarios: (byRule["L1081 update"] || 0),
+    demais: errors.length - (byRule["L714 update"] || 0) - (byRule["L793 create"] || 0) - (byRule["L1081 update"] || 0),
+  },
   log: prefix + ".log",
 };
 for (const extension of ["json", "html"]) {
-  const url = "http://127.0.0.1:" + port + "/emulator/v1/projects/" + project + ":ruleCoverage." + extension;
+  // The JSON endpoint has no extension; only the HTML endpoint ends in .html.
+  const url = "http://127.0.0.1:" + port + "/emulator/v1/projects/" + project + ":ruleCoverage" + (extension === "html" ? ".html" : "");
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw new Error("HTTP " + response.status);
     const path = prefix + "-coverage." + extension;
-    await writeFile(path, await response.text());
+    const body = await response.text();
+    if (extension === "json") JSON.parse(body);
+    await writeFile(path, body);
     summary["coverage_" + extension] = path;
   } catch (error) {
     summary["coverage_" + extension + "_error"] = String(error);
