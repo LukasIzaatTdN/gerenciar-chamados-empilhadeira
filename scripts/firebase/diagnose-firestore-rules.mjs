@@ -66,9 +66,17 @@ function categoryForLine(line) {
   })[name] || "outras";
 }
 const byCategory = {};
+const budgetByCategory = {};
+const budgetByRule = {};
 for (const match of errors) {
   const category = categoryForLine(Number(match[1]));
   byCategory[category] = (byCategory[category] || 0) + 1;
+}
+for (const match of output.matchAll(/maximum of 1000 expressions to evaluate has been reached\. for \'(\w+)\' @ L(\d+)/g)) {
+  const rule = "L" + match[2] + " " + match[1];
+  budgetByRule[rule] = (budgetByRule[rule] || 0) + 1;
+  const category = categoryForLine(Number(match[2]));
+  budgetByCategory[category] = (budgetByCategory[category] || 0) + 1;
 }
 const summary = {
   focus,
@@ -77,6 +85,8 @@ const summary = {
   expressionBudgetMentions: budgets.length,
   byRule,
   byCategory,
+  budgetByRule,
+  budgetByCategory,
   log: prefix + ".log",
 };
 for (const extension of ["json", "html"]) {
