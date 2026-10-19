@@ -9,7 +9,7 @@ function encodeHex(bytes) {
 }
 
 function signingInput(timestamp, nonce, payload) {
-  return `${GATEWAY_VERSION}\\n${timestamp}\\n${nonce}\\n${payload}`;
+  return `${GATEWAY_VERSION}\n${timestamp}\n${nonce}\n${payload}`;
 }
 
 export async function signGatewayEnvelope({ secret, payload, now = Date.now(), nonce = crypto.randomUUID() }) {
