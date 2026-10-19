@@ -151,3 +151,15 @@ Comandos: `git pull --ff-only origin fix/push-worker-security-reliability`, `npm
 ## Etapa 6.10.6 — Validação pendente
 
 Regras alteradas na branch de desenvolvimento: pré-validação de campos obrigatórios de auditoria de Televendas, isolamento da alternativa genérica para ações diferentes de `chamado_atualizado`, e filtros baratos antes dos caminhos administrativos de atualização de usuários. A implementação não foi validada no Emulator. Executar `npm run test:rules 2>&1 | tee /tmp/patio-rules-6106.log`, `npm test` e `npm run build`; inspecionar erros `evaluation error` e `maximum of 1000 expressions`, sobretudo em chamadas, auditoria e usuários. Não publicar regras ou habilitar push.
+
+
+## Etapa 6.10.7 — Cobertura diagnóstica das regras (sem deploy)
+
+Criado `scripts/firebase/diagnose-firestore-rules.mjs` e comando `npm run test:rules:diagnose`. O comando executa os três arquivos de testes dentro do Firestore Emulator e, **antes de o Emulator encerrar**, salva:
+- `/tmp/patio-rules-6107.log` — saída completa dos testes;
+- `/tmp/patio-rules-6107-summary.json` — código de saída, contagens de `evaluation error` e `maximum of 1000 expressions`, com agrupamento por linha e operação;
+- `/tmp/patio-rules-6107-coverage.html` e `/tmp/patio-rules-6107-coverage.json` — relatórios do endpoint oficial de cobertura do Emulator, se disponíveis.
+
+Adicionados dois testes de auditoria malformada (detalhes ausentes/incompletos), total esperado de **35 testes de regras**. O diagnóstico **não afirma que rejeições com `assertFails` são rejeições seguras**; os erros continuam sendo contabilizados. Para exigir saída não zero diante de qualquer erro de avaliação: `PATIO_RULES_STRICT=1 npm run test:rules:diagnose` (espera-se que falhe no estado atual, útil como meta futura). O comando padrão só falha se os testes falharem.
+
+Executar `git pull --ff-only origin fix/push-worker-security-reliability`, `npm run test:rules:diagnose`, `npm test`, `npm run build`. Enviar o arquivo `/tmp/patio-rules-6107-summary.json` e, para diagnóstico detalhado, o HTML/JSON de cobertura e log. Sem publicação de regras, sem produção, sem push ativo, sem serviços pagos.
