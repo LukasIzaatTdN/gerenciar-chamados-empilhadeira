@@ -1,5 +1,5 @@
 function claimGatewayNonceFirestore_(nonce, timestamp) {
-  if (!/^[0-9a-f-]{36}$/i.test(nonce) || !Number.isSafeInteger(timestamp)) throw Error('Invalid nonce');
+  if (typeof nonce !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nonce) || !Number.isSafeInteger(timestamp) || timestamp < 0) throw Error('Invalid nonce');
   var url = 'https://firestore.googleapis.com/v1/projects/painel-772bf/databases/(default)/documents/push_gateway_nonces?documentId=' + encodeURIComponent(nonce);
   var response = UrlFetchApp.fetch(url, {
     method: 'post', contentType: 'application/json',
