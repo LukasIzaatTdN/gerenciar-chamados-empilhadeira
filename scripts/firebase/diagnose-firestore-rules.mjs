@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const project = "demo-patio-pro-log";
 const port = Number(process.env.PATIO_FIRESTORE_EMULATOR_PORT || "28080");
-const prefix = process.env.PATIO_RULES_REPORT_PREFIX || "/tmp/patio-rules-6108";
+const prefix = process.env.PATIO_RULES_REPORT_PREFIX || "/tmp/patio-rules-61010";
 const suiteGroups = {
   all: [
     "functions/tests/firestore/subscriptions.rules.test.mjs",
@@ -47,18 +47,36 @@ for (const match of errors) {
   const key = "L" + match[1] + " " + match[2];
   byRule[key] = (byRule[key] || 0) + 1;
 }
+// Categorize by source match blocks instead of hard-coded rule line numbers.
+const rulesLines = (await readFile("firestore.rules", "utf8")).split("\n");
+const matchBlocks = rulesLines.flatMap((line, index) => {
+  const match = line.match(/^\s*match\s+\/([^ {]+)(?:\/\{[^}]+\})?\s*\{/);
+  return match ? [{ line: index + 1, path: match[1] }] : [];
+});
+function categoryForLine(line) {
+  const block = matchBlocks.filter(item => item.line <= line).at(-1);
+  if (!block) return "outras";
+  const name = block.path.split("/")[0];
+  return ({
+    chamados: "chamados", auditoria: "auditoria", assinaturas: "assinaturas",
+    historico_assinatura: "historico_assinatura", planos: "planos",
+    auditoria_assinaturas: "auditoria_assinaturas",
+    assinatura_operacoes: "assinatura_operacoes",
+    usuarios: "usuarios", push_tokens: "push_tokens",
+  })[name] || "outras";
+}
+const byCategory = {};
+for (const match of errors) {
+  const category = categoryForLine(Number(match[1]));
+  byCategory[category] = (byCategory[category] || 0) + 1;
+}
 const summary = {
   focus,
   testExitCode: exitCode,
   evaluationErrorMentions: errors.length,
   expressionBudgetMentions: budgets.length,
   byRule,
-  byCategory: {
-    chamados: (byRule["L714 update"] || 0),
-    auditoria: (byRule["L793 create"] || 0),
-    usuarios: (byRule["L1081 update"] || 0),
-    demais: errors.length - (byRule["L714 update"] || 0) - (byRule["L793 create"] || 0) - (byRule["L1081 update"] || 0),
-  },
+  byCategory,
   log: prefix + ".log",
 };
 for (const extension of ["json", "html"]) {
