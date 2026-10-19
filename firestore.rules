@@ -747,6 +747,31 @@ service cloud.firestore {
       allow delete: if isAdminGeral();
     }
 
+    // Use a single user-document lookup for Televendas audit actor scope.
+    function isTelevendasAuditActorInScope(data) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      return exists(userPath)
+        && isTelevendasAuditActorInScopeForUser(data, get(userPath).data);
+    }
+
+    function isTelevendasAuditActorInScopeForUser(data, user) {
+      return user.get("status", null) == "Ativo"
+        && user.get("perfil", null) in [
+          "Operador", "Supervisor", "Separador de Televendas",
+          "Administrador da Empresa", "Administrador Geral"
+        ]
+        && (
+          user.perfil == "Administrador Geral"
+          || (
+            user.get("empresa_id", null) == data.empresa_id
+            && (
+              user.perfil == "Administrador da Empresa"
+              || user.get("supermercado_id", null) == data.supermercado_id
+            )
+          )
+        );
+    }
+
     // Require a new audit marker on the call in this atomic commit.
     // Keep this path deliberately small: the general call update rule is already
     // expensive and Firestore enforces a 1,000-expression evaluation limit.
@@ -814,7 +839,6 @@ service cloud.firestore {
           "details", "occurredAt", "empresa_id", "supermercado_id"
         ])
         && request.resource.data.action == "chamado_atualizado"
-        && isCurrentUserActive()
         && request.resource.data.actorUid == request.auth.uid
         && request.resource.data.actorName is string
         && request.resource.data.details is map
@@ -826,10 +850,7 @@ service cloud.firestore {
           "action", "actorUid", "actorName", "entityType", "entityId",
           "details", "occurredAt", "empresa_id", "supermercado_id", "metadata"
         ])
-        && (
-          canAccessCurrentSupermercado(request.resource.data.supermercado_id)
-          || canAccessEmpresa(request.resource.data.empresa_id)
-        )
+        && isTelevendasAuditActorInScope(request.resource.data)
         && isTelevendasUpdateAuditAuthentic(id, request.resource.data);
 
       allow create: if isSignedIn()
