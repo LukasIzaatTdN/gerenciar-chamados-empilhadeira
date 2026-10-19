@@ -56,3 +56,27 @@ Se acesso ao Firestore não estiver disponível, interromper e revisar permissõ
 - Para ativar atualizações genéricas, primeiro localizar a geração real de `auditoria` no Web e Android e verificar se existe um registro imutável para **cada** atualização, com ator, empresa, unidade, chamado e tipo. Não fabricar eventos a partir de campos do cliente.
 - A identidade calculada **não é autorização**: somente após validação da auditoria canônica, do usuário autenticado e da empresa/unidade ela poderá ser usada para `push_delivery_events` com create atômico.
 - A arquitetura Worker → Apps Script continua experimental, sem `doPost`, sem segredo compartilhado configurado e sem deploy. Nenhuma notificação foi enviada.
+
+
+## Etapa 6.8 — Levantamento real do fluxo Web e primeira integração (somente branch de desenvolvimento)
+
+**Constatações do código Web:**
+- `src/hooks/useChamados.ts` já cria registros `auditoria` no mesmo `writeBatch` de `chamado_criado`, `chamado_assumido`, `chamado_iniciado` e `chamado_finalizado`; os callbacks recebem o ID da auditoria.
+- `src/App.tsx` chama `requestPushDelivery(auditId)` para esses quatro eventos. `src/services/pushNotifications.ts` envia o Firebase ID token do usuário à rota `/api/notify` quando há Worker configurado.
+- Antes desta etapa, `atualizarItensTelevendas` fazia apenas `updateDoc`, sem registro de auditoria e sem callback. `marcarACaminho` e `marcarChegada` também usam `updateDoc` sem auditoria. Outros fluxos de atualização e Android precisam ser inventariados separadamente.
+- `firestore.rules` e `push-worker/src/index.js` não aceitavam `chamado_atualizado`; a interface também não tinha esse tipo de notificação.
+
+**Alterações preparadas, não publicadas:**
+- `atualizarItensTelevendas` agora escreve alteração e auditoria `chamado_atualizado` no mesmo batch, com escopo da empresa/unidade, ator e dados mínimos do evento. Callback `onAtualizado` é disparado após commit.
+- `firestore.rules` permite criar auditoria com ação `chamado_atualizado`, mantendo as demais validações existentes; **regras não foram publicadas**. É necessário testar no Firebase Emulator as regras e o batch antes de qualquer deploy.
+- `src/types/notification.ts` e `src/App.tsx` passam a reconhecer e exibir a notificação **local/foreground** da atualização. **Não há chamada `requestPushDelivery` para `chamado_atualizado`**: o Worker ainda rejeita essa ação; não afirmar push em segundo plano.
+- O backend continua com `stableEventKey` legado e OAuth não resolvido; a chave de auditoria da etapa 6.7 ainda não está ligada ao Worker.
+
+**Pendências críticas antes de habilitar push para atualizações:**
+1. Revisar a segurança das regras de auditoria: validar a vinculação atômica entre o evento e a alteração canônica (inclusive concorrência, estado e ator). O registro de auditoria é produzido pelo cliente e não deve ser aceito cegamente pelo backend.
+2. Confirmar que cada alteração relevante (inclusive deslocamento/chegada, se desejado) gera evento apropriado e que alterações Android seguem o mesmo contrato.
+3. Criar testes do Firebase Emulator para batch + isolamento entre empresas, e testes de UI/build; testes `push-worker` isolados não validam essas mudanças.
+4. Definir estratégia de envio quando o cliente que atualiza fica offline/fecha antes de requisitar push; Firebase Spark não oferece trigger Cloud Functions gratuito.
+5. Avaliar quotas, retenção de `push_gateway_nonces`, Apps Script e Firestore antes de ativação.
+
+**Segurança operacional:** nenhuma publicação, deploy, IAM, cobrança, segredo ou escrita de produção nesta etapa.
