@@ -657,6 +657,42 @@ service cloud.firestore {
       allow delete: if isAdminGeral();
     }
 
+    // A client-generated update event is valid only if the SAME commit advances
+    // the call's audit marker and the persisted values match the audit payload.
+    // get() is the pre-commit state; getAfter() is the post-commit state.
+    function isTelevendasUpdateAuditAuthentic(auditId, data) {
+      let callPath = /databases/$(database)/documents/chamados/$(data.entityId);
+      let before = get(callPath).data;
+      let afterCall = getAfter(callPath).data;
+      return data.entityType == "chamado"
+        && data.entityId is string
+        && exists(callPath)
+        && before.categoria == "televendas"
+        && afterCall.categoria == "televendas"
+        && before.empresa_id == data.empresa_id
+        && before.supermercado_id == data.supermercado_id
+        && afterCall.empresa_id == data.empresa_id
+        && afterCall.supermercado_id == data.supermercado_id
+        && afterCall.id == data.entityId
+        && (!("ultima_auditoria_atualizacao_id" in before)
+          || before.ultima_auditoria_atualizacao_id != auditId)
+        && afterCall.ultima_auditoria_atualizacao_id == auditId
+        && data.details.categoria == "televendas"
+        && data.details.statusAnterior == before.status
+        && data.details.statusAtual == afterCall.status
+        && data.details.atualizado_em == afterCall.atualizado_em
+        && data.details.operador_nome == afterCall.operador_nome
+        && afterCall.atualizado_por == data.actorName
+        && afterCall.atualizado_em is string
+        && afterCall.atualizado_em != before.atualizado_em
+        && (
+          afterCall.status != before.status
+          || afterCall.itens != before.itens
+          || afterCall.observacao_operador != before.observacao_operador
+          || afterCall.motivo_incompleto != before.motivo_incompleto
+        );
+    }
+
     match /auditoria/{id} {
       allow read: if isCurrentUserActive()
         && (
@@ -712,6 +748,10 @@ service cloud.firestore {
         && request.resource.data.entityId is string
         && request.resource.data.occurredAt is string
         && request.resource.data.details is map
+        && (
+          request.resource.data.action != "chamado_atualizado"
+          || isTelevendasUpdateAuditAuthentic(id, request.resource.data)
+        )
         && (
           !("empresa_id" in request.resource.data)
           || (
