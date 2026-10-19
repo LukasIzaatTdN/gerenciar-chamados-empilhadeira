@@ -240,3 +240,42 @@ test("a scoped operator cannot attach a foreign call's audit to its marker", asy
   await assertFails(batch.commit());
   assert.equal((await getDoc(doc(db, "chamados/tv-gap"))).data().status, "Em separação");
 });
+
+
+test("active operator from company B can update its own Televendas call with an atomic audit", async () => {
+  const db = environment.authenticatedContext("operator-b").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-b"), {
+    status: "Pronto", atualizado_em: "2026-10-19T10:09:00.000Z",
+    atualizado_por: "Operador B", operador_nome: "Operador B",
+    ultima_auditoria_atualizacao_id: "tv-company-b-ok",
+  });
+  batch.set(doc(db, "auditoria/tv-company-b-ok"), audit("tv-b", {
+    actorUid: "operator-b", actorName: "Operador B",
+    empresa_id: "empresa-b", supermercado_id: "loja-b",
+    occurredAt: "2026-10-19T10:09:00.000Z",
+    details: {
+      ...audit("tv-b").details,
+      empresa_id: "empresa-b", supermercado_id: "loja-b",
+      statusAtual: "Pronto", operador_nome: "Operador B",
+      atualizado_em: "2026-10-19T10:09:00.000Z",
+    },
+  }));
+  await assertSucceeds(batch.commit());
+  assert.equal((await getDoc(doc(db, "chamados/tv-b"))).data().status, "Pronto");
+});
+
+test("inactive operator cannot bypass restrictions using a complete Televendas audit batch", async () => {
+  const db = environment.authenticatedContext("inactive-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-gap"), {
+    ...update, atualizado_por: "Inativo A", operador_nome: "Inativo A",
+    ultima_auditoria_atualizacao_id: "tv-inactive-batch",
+  });
+  batch.set(doc(db, "auditoria/tv-inactive-batch"), audit("tv-gap", {
+    actorUid: "inactive-a", actorName: "Inativo A",
+    details: { ...audit("tv-gap").details, operador_nome: "Inativo A" },
+  }));
+  await assertFails(batch.commit());
+  assert.equal((await getDoc(doc(environment.authenticatedContext("operator-a").firestore(), "chamados/tv-gap"))).data().status, "Em separação");
+});
