@@ -80,3 +80,12 @@ Se acesso ao Firestore não estiver disponível, interromper e revisar permissõ
 5. Avaliar quotas, retenção de `push_gateway_nonces`, Apps Script e Firestore antes de ativação.
 
 **Segurança operacional:** nenhuma publicação, deploy, IAM, cobrança, segredo ou escrita de produção nesta etapa.
+
+
+## Etapa 6.9 — Testes específicos de atualização de chamados (pendentes de execução)
+
+Criado `functions/tests/firestore/chamados-update.rules.test.mjs` e incluído no comando `npm run test:rules`. São sete testes novos no Firestore Emulator: atualização + auditoria no mesmo batch; operador de outra empresa sem acesso; tentativa de forjar escopo; rollback do batch com auditoria inválida; operador inativo; imutabilidade da auditoria; e caracterização explícita de falha de autenticidade.
+
+**Lacuna de segurança conhecida e bloqueadora de produção:** as regras atuais permitem que um operador ativo da própria empresa crie uma auditoria `chamado_atualizado` isoladamente, sem alterar o chamado. O teste `KNOWN GAP` documenta que a operação **atualmente é aceita**; passar nesse teste NÃO demonstra segurança. Antes de ativar o push é obrigatório endurecer as regras e exigir vínculo atômico e verificável entre evento e alteração canônica, inclusive impedir falsificação de detalhes. O Worker também precisa conferir a auditoria e o estado persistido.
+
+Os sete testes são novos e **não foram executados pelo assistente**. Resultado esperado: 18 testes de regras (11 existentes + 7 novos), se todos passarem; além dos 19 testes Web e build já relatados na etapa anterior. Nenhum deploy ou publicação de regras.
