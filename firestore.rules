@@ -733,10 +733,17 @@ service cloud.firestore {
     // Keep this path deliberately small: the general call update rule is already
     // expensive and Firestore enforces a 1,000-expression evaluation limit.
     function isTelevendasUpdateAuditAuthentic(auditId, data) {
-      return data.entityType == "chamado"
+      return data.keys().hasAll([
+          "entityType", "entityId", "details", "empresa_id", "supermercado_id"
+        ])
+        && data.entityType == "chamado"
         && data.entityId is string
         && data.entityId.size() > 0
         && data.details is map
+        && data.details.keys().hasAll([
+          "categoria", "statusAnterior", "statusAtual", "atualizado_em",
+          "operador_nome", "empresa_id", "supermercado_id"
+        ])
         && isTelevendasUpdateAuditAgainstCall(auditId, data);
     }
 
@@ -784,6 +791,10 @@ service cloud.firestore {
       // Separate short-circuit branch prevents the generic audit validator
       // from exhausting the rules expression budget for atomic call updates.
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll([
+          "action", "actorUid", "actorName", "entityType", "entityId",
+          "details", "occurredAt", "empresa_id", "supermercado_id"
+        ])
         && request.resource.data.action == "chamado_atualizado"
         && isCurrentUserActive()
         && request.resource.data.actorUid == request.auth.uid
@@ -804,8 +815,6 @@ service cloud.firestore {
         && isTelevendasUpdateAuditAuthentic(id, request.resource.data);
 
       allow create: if isSignedIn()
-        && isCurrentUserActive()
-        && request.resource.data.action != "chamado_atualizado"
         && request.resource.data.keys().hasAll([
           "action",
           "actorUid",
@@ -815,6 +824,8 @@ service cloud.firestore {
           "details",
           "occurredAt"
         ])
+        && request.resource.data.action != "chamado_atualizado"
+        && isCurrentUserActive()
         && request.resource.data.keys().hasOnly([
           "action",
           "actorUid",
@@ -829,7 +840,6 @@ service cloud.firestore {
         ])
         && request.resource.data.action in [
           "chamado_criado",
-          "chamado_atualizado",
           "chamado_assumido",
           "chamado_iniciado",
           "chamado_finalizado",
@@ -845,10 +855,6 @@ service cloud.firestore {
         && request.resource.data.entityId is string
         && request.resource.data.occurredAt is string
         && request.resource.data.details is map
-        && (
-          request.resource.data.action != "chamado_atualizado"
-          || isTelevendasUpdateAuditAuthentic(id, request.resource.data)
-        )
         && (
           !("empresa_id" in request.resource.data)
           || (
@@ -1096,8 +1102,11 @@ service cloud.firestore {
           )
         )
         || (
-          isAdminGeral()
-          && resource.data.perfil == "Administrador da Empresa"
+          resource.data.perfil == "Administrador da Empresa"
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+          && isAdminGeral()
           && resource.data.convite_token is string
           && resource.data.convite_token.size() > 0
           && request.resource.data.perfil == resource.data.perfil
@@ -1107,8 +1116,10 @@ service cloud.firestore {
           && hasOnlyUserManagementChanges(resource.data, request.resource.data)
         )
         || (
-          canAdminEmpresaManageUser(resource.data, request.resource.data)
+          resource.data.perfil != "Administrador Geral"
+          && request.resource.data.perfil != "Administrador Geral"
           && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+          && canAdminEmpresaManageUser(resource.data, request.resource.data)
         );
 
       allow delete: if isAdminGeral()
