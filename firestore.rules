@@ -769,21 +769,16 @@ service cloud.firestore {
       let callPath = /databases/$(database)/documents/chamados/$(data.entityId);
       let previous = get(callPath).data;
       let current = getAfter(callPath).data;
-      // Reject standalone, replayed and nonexistent-call audits before
-      // evaluating the expensive cross-document details.
       return data.entityType == "chamado"
         && data.entityId is string
-        && data.entityId.size() > 0
         && data.empresa_id is string
         && data.supermercado_id is string
-        && exists(callPath)
-        && existsAfter(callPath)
-        && current.get("ultima_auditoria_atualizacao_id", null) == auditId
-        && previous.get("ultima_auditoria_atualizacao_id", null) != auditId
+        && data.details.categoria == "televendas"
         && current.categoria == "televendas"
         && current.empresa_id == data.empresa_id
         && current.supermercado_id == data.supermercado_id
-        && data.details.categoria == "televendas"
+        && current.ultima_auditoria_atualizacao_id == auditId
+        && previous.get("ultima_auditoria_atualizacao_id", null) != auditId
         && data.details.statusAnterior == previous.status
         && data.details.statusAtual == current.status
         && data.details.atualizado_em == current.atualizado_em
