@@ -11,6 +11,8 @@ const suiteGroups = {
     "functions/tests/firestore/chamados-update.rules.test.mjs",
   ],
   chamados: ["functions/tests/firestore/chamados-update.rules.test.mjs"],
+  // Isolate the existing security regression without modifying Firestore rules.
+  usuarios: ["functions/tests/firestore/subscriptions.rules.test.mjs"],
   assinaturas: [
     "functions/tests/firestore/subscriptions.rules.test.mjs",
     "functions/tests/firestore/subscriptions.client.test.mjs",
@@ -18,11 +20,15 @@ const suiteGroups = {
 };
 const focus = process.env.PATIO_RULES_FOCUS || "all";
 if (!Object.hasOwn(suiteGroups, focus)) {
-  throw new Error("PATIO_RULES_FOCUS must be all, chamados or assinaturas");
+  throw new Error("PATIO_RULES_FOCUS must be all, chamados, usuarios or assinaturas");
 }
 const suites = suiteGroups[focus];
 
-const runner = spawn(process.execPath, ["--experimental-strip-types", "--test", ...suites], {
+const testArgs = ["--experimental-strip-types", "--test"];
+if (focus === "usuarios") {
+  testArgs.push("--test-name-pattern", "a user cannot self-register or promote their profile to platform admin");
+}
+const runner = spawn(process.execPath, [...testArgs, ...suites], {
   stdio: ["inherit", "pipe", "pipe"],
   env: process.env,
 });
