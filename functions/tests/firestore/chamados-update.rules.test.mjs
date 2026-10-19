@@ -223,6 +223,10 @@ test("KNOWN GAP: same-tenant marker update without audit is currently allowed", 
     ultima_auditoria_atualizacao_id: "tv-no-audit",
   }));
   assert.equal((await getDoc(doc(db, "chamados/tv-gap"))).data().ultima_auditoria_atualizacao_id, "tv-no-audit");
-  const auditSnapshot = await getDoc(doc(db, "auditoria/tv-no-audit"));
-  assert.equal(auditSnapshot.exists(), false);
+  // Inspect absence with rules disabled; the application user is not allowed
+  // to read a missing audit document under the current read policy.
+  await environment.withSecurityRulesDisabled(async context => {
+    const auditSnapshot = await getDoc(doc(context.firestore(), "auditoria/tv-no-audit"));
+    assert.equal(auditSnapshot.exists(), false);
+  });
 });
