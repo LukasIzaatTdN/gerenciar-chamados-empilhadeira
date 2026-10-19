@@ -157,6 +157,13 @@ async function claimDelivery(env, eventKey, auditId) {
   }
 }
 
+export function reconciliationStatus(record, auditId) {
+  if (!record || record.audit_id !== auditId) return { httpStatus: 409, error: "Registro de entrega incompatível." };
+  if (record.state === "sent") return { httpStatus: 200, state: "sent", requiresReview: false, recipientCount: record.recipient_count ?? null, failureCount: 0 };
+  if (record.state === "partial" || record.state === "claimed") return { httpStatus: 200, state: record.state, requiresReview: true, recipientCount: record.recipient_count ?? null, failureCount: record.failure_count ?? null };
+  return { httpStatus: 409, error: "Estado de entrega desconhecido." };
+}
+
 export function deliveryOutcome(recipientCount, failureCount) {
   if (!Number.isInteger(recipientCount) || recipientCount < 0 || !Number.isInteger(failureCount) || failureCount < 0 || failureCount > recipientCount) throw new Error("Contagem de entrega inválida.");
   return failureCount === 0
@@ -250,6 +257,18 @@ async function handleNotify(request, env) {
     if (["chamado_assumido", "chamado_iniciado", "chamado_finalizado"].includes(audit.action) && !["Operador", "Supervisor", "Separador de Televendas", "Administrador da Empresa", "Administrador Geral"].includes(actor.perfil)) return json({ error: "Perfil sem permissão para esta movimentação." }, 403);
     if (!eventMatchesCurrentCall(audit.action, details, call)) return json({ error: "O evento não corresponde ao estado atual do chamado." }, 409);
     const eventKey = await stableEventKey(audit.action, call);
+    if (body.operation === "status") {
+      let record;
+      try {
+        record = fields(await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`));
+      } catch (error) {
+        if (String(error).includes("HTTP 404")) return json({ state: "not_found", requiresReview: true }, 404);
+        throw error;
+      }
+      const result = reconciliationStatus(record, auditId);
+      return json(result.error ? { error: result.error } : { state: result.state, requiresReview: result.requiresReview, recipientCount: result.recipientCount, failureCount: result.failureCount }, result.httpStatus);
+    }
+    if (body.operation != null && body.operation !== "notify") return json({ error: "Operação inválida." }, 400);
     if (!(await claimDelivery(env, eventKey, auditId))) {
       const prior = fields(await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`));
       if (prior.audit_id !== auditId) return json({ error: "Evento já associado a outra auditoria." }, 409);
