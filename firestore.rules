@@ -630,6 +630,37 @@ service cloud.firestore {
         && isEmpilhadeiraCompativelComChamado(request.resource.data);
     }
 
+    // Dedicated, bounded update path for Televendas audit batches. The
+    // general call validator is expensive and cannot be combined with getAfter.
+    function isScopedTelevendasAuditUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return isCurrentUserActive()
+        && canManageChamado()
+        && resource.data.categoria == "televendas"
+        && request.resource.data.categoria == "televendas"
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.empresa_id == resource.data.empresa_id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && (
+          canAccessCurrentSupermercado(resource.data.supermercado_id)
+          || canAccessEmpresa(resource.data.empresa_id)
+        )
+        && changed.hasOnly([
+          "itens", "produto", "quantidade", "total_solicitado",
+          "total_encontrado", "percentual_atendido", "status",
+          "motivo_incompleto", "observacao_operador", "atualizado_em",
+          "atualizado_por", "operador_nome", "cancelado_em",
+          "ultima_auditoria_atualizacao_id"
+        ])
+        && changed.hasAll(["ultima_auditoria_atualizacao_id", "atualizado_em"])
+        && request.resource.data.ultima_auditoria_atualizacao_id is string
+        && request.resource.data.ultima_auditoria_atualizacao_id.size() > 0
+        && isStatusChamadoValido(request.resource.data.status)
+        && request.resource.data.atualizado_em is string
+        && request.resource.data.operador_nome is string
+        && request.resource.data.atualizado_por == request.resource.data.operador_nome;
+    }
+
     match /chamados/{id} {
       allow read: if isSignedIn()
         && (
@@ -647,11 +678,18 @@ service cloud.firestore {
         );
 
       allow update: if isSignedIn()
-        && canManageChamado()
-        && isAtualizacaoChamadoValida()
         && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
+          isScopedTelevendasAuditUpdate()
+          || (
+            canManageChamado()
+            && isAtualizacaoChamadoValida()
+            && (
+              canAccessCurrentSupermercado(resource.data.supermercado_id)
+              || canAccessEmpresa(resource.data.empresa_id)
+            )
+            && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(["ultima_auditoria_atualizacao_id"])
+          )
         );
 
       allow delete: if isAdminGeral();
@@ -701,8 +739,31 @@ service cloud.firestore {
           )
         );
 
+      // Separate short-circuit branch prevents the generic audit validator
+      // from exhausting the rules expression budget for atomic call updates.
+      allow create: if isSignedIn()
+        && request.resource.data.action == "chamado_atualizado"
+        && isCurrentUserActive()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName is string
+        && request.resource.data.details is map
+        && request.resource.data.empresa_id is string
+        && request.resource.data.supermercado_id is string
+        && request.resource.data.details.empresa_id == request.resource.data.empresa_id
+        && request.resource.data.details.supermercado_id == request.resource.data.supermercado_id
+        && request.resource.data.keys().hasOnly([
+          "action", "actorUid", "actorName", "entityType", "entityId",
+          "details", "occurredAt", "empresa_id", "supermercado_id", "metadata"
+        ])
+        && (
+          canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+          || canAccessEmpresa(request.resource.data.empresa_id)
+        )
+        && isTelevendasUpdateAuditAuthentic(id, request.resource.data);
+
       allow create: if isSignedIn()
         && isCurrentUserActive()
+        && request.resource.data.action != "chamado_atualizado"
         && request.resource.data.keys().hasAll([
           "action",
           "actorUid",
