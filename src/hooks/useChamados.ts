@@ -289,6 +289,7 @@ export interface ChamadoCallbacks {
   onAssumido?: (chamado: Chamado, operadorNome: string, auditId?: string) => void;
   onIniciado?: (chamado: Chamado, auditId?: string) => void;
   onFinalizado?: (chamado: Chamado, auditId?: string) => void;
+  onAtualizado?: (chamado: Chamado, auditId?: string) => void;
 }
 
 interface AtualizacaoItensTelevendasInput {
@@ -1079,7 +1080,30 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
-          await updateDoc(doc(db, CHAMADOS_COLLECTION, id), payload);
+          const batch = writeBatch(db);
+          const auditRef = doc(collection(db, "auditoria"));
+          batch.update(doc(db, CHAMADOS_COLLECTION, id), payload);
+          batch.set(auditRef, createAuditEntry({
+            action: "chamado_atualizado",
+            actorUid: auth?.currentUser?.uid,
+            actorName: input.operadorNome,
+            entityType: "chamado",
+            entityId: id,
+            details: {
+              empresa_id: chamadoAtual.empresa_id,
+              supermercado_id: chamadoAtual.supermercado_id,
+              statusAnterior: chamadoAtual.status,
+              statusAtual: statusFinal,
+              operador_nome: input.operadorNome,
+              atualizado_em: atualizadoEm,
+              categoria: "televendas",
+            },
+          }));
+          await batch.commit();
+          runCallbackSafely(
+            () => callbacks?.onAtualizado?.({ ...chamadoAtual, ...payload }, auditRef.id),
+            "televendas update"
+          );
         } catch (error) {
           throw mapFirestoreWriteError(
             error,
@@ -1093,7 +1117,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         prev.map((chamado) => (chamado.id === id ? { ...chamado, ...payload } : chamado))
       );
     },
-    [chamados, scope]
+    [callbacks, chamados, scope]
   );
 
   const chamadosEscopo = applyScope(chamados, scope);
