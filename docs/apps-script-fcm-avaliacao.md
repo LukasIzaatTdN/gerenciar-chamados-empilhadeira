@@ -199,3 +199,23 @@ npm run build
 ```
 
 Comparar `/tmp/patio-rules-6109-summary.json` e `/tmp/patio-rules-6109.log` com a base 6.10.8: total de testes de regras esperado **36** (35 anteriores + 1 novo), contagem de erros de avaliação e de limite de 1.000 expressões; conferir que os fluxos SaaS válidos e os testes de isolamento multiempresa seguem aprovados. **Não considerar a etapa concluída até os testes locais e a revisão do log.** Sem publicar regras, sem escrita em produção, sem serviços pagos ou push ativo.
+
+
+## Etapa 6.10.10 — Diagnóstico por bloco de regras e limite de expressões
+
+Base observada na execução 6.10.9: 36/36 testes de regras aprovados, 43 menções a `evaluation error`, 12 menções ao limite de 1.000 expressões. O relatório anterior categorizava incorretamente os erros porque dependia de números fixos de linhas.
+
+O script `scripts/firebase/diagnose-firestore-rules.mjs` agora identifica as linhas `match` diretamente de `firestore.rules`, categoriza cada ocorrência e acrescenta `budgetByRule` e `budgetByCategory`. O prefixo padrão passou a ser `/tmp/patio-rules-61010`. Esta etapa altera **somente o diagnóstico**, não altera `firestore.rules`; a contagem de erros ainda precisa ser reduzida em correções posteriores, orientadas pelo relatório de cobertura.
+
+Comandos locais, **exclusivamente Firebase Emulator**:
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61010 npm run test:rules:diagnose
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61010-chamados npm run test:rules:diagnose
+PATIO_RULES_FOCUS=assinaturas PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61010-assinaturas npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Compartilhar os arquivos `/tmp/patio-rules-61010-summary.json`, `/tmp/patio-rules-61010-chamados-summary.json`, `/tmp/patio-rules-61010-assinaturas-summary.json` e `/tmp/patio-rules-61010-coverage.json`. Testes `assertFails` aprovados não comprovam negação limpa; conferir `evaluationErrorMentions` e `expressionBudgetMentions`. Nenhum deploy, publicação de regras, alteração em produção, serviço pago ou push real.
