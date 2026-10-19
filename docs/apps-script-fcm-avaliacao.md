@@ -183,3 +183,19 @@ npm run build
 ```
 
 Compartilhar os três arquivos `*-summary.json` e o `*-coverage.json` de cada execução. A correção do endpoint e a divisão de testes **não corrigem automaticamente** os erros de segurança: `assertFails` pode aprovar um erro interno. Sem deploy, publicação de regras, escrita em produção ou ativação de push.
+
+
+## Etapa 6.10.9 — Guardas SaaS para campos e documentos ausentes (aguardando validação)
+
+No ramo `fix/push-worker-security-reliability`, o commit `9591db2` adicionou `keys().hasAll` a validações de plano, histórico, operações e auditoria SaaS; substituiu leituras opcionais de limites de plano por `get("campo", null)`; adicionou `existsAfter` para operações, histórico e auditoria relacionadas antes das verificações; e exigiu `ultima_operacao_id`/`plano_id` antes da validação de assinatura. O commit `d70c070` acrescentou um teste com cinco documentos SaaS malformados. Os testes negativos ainda usam `assertFails`, que pode passar em erros de avaliação; o diagnóstico estrito continua necessário.
+
+Validação **local, sem deploy**:
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-6109 npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Comparar `/tmp/patio-rules-6109-summary.json` e `/tmp/patio-rules-6109.log` com a base 6.10.8: total de testes de regras esperado **36** (35 anteriores + 1 novo), contagem de erros de avaliação e de limite de 1.000 expressões; conferir que os fluxos SaaS válidos e os testes de isolamento multiempresa seguem aprovados. **Não considerar a etapa concluída até os testes locais e a revisão do log.** Sem publicar regras, sem escrita em produção, sem serviços pagos ou push ativo.
