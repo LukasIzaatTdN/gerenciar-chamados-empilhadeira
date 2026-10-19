@@ -64,7 +64,7 @@ test("authenticated lifecycle events are scoped and sent at most once without re
   const audit = { actorUid: "actor-1", action: "chamado_criado", entityType: "chamado", entityId: "call-1", empresa_id: "company-a", supermercado_id: "store-a", details: { empresa_id: "company-a", supermercado_id: "store-a", status: "Aguardando" } };
   const actor = { status: "Ativo", perfil: "Promotor", empresa_id: "company-a", supermercado_id: "store-a" };
   const recipient = { status: "Ativo", perfil: "Operador", empresa_id: "company-a", supermercado_id: "store-a" };
-  const deliveryClaims = new Set();
+  const deliveryClaims = new Map();
   let fcmSends = 0;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
@@ -85,11 +85,21 @@ test("authenticated lifecycle events are scoped and sent at most once without re
     if (url.includes("push_delivery_events?documentId=")) {
       const eventKey = new URL(url).searchParams.get("documentId");
       if (deliveryClaims.has(eventKey)) return new Response("already exists", { status: 409 });
-      deliveryClaims.add(eventKey);
+      deliveryClaims.set(eventKey, { audit_id: "audit-event-1", state: "claimed" });
       return Response.json({ name: url });
     }
     if (url.includes("/messages:send")) { fcmSends += 1; return Response.json({ name: "projects/demo/messages/1" }); }
-    if (url.includes("/push_delivery_events/")) return Response.json({ name: url });
+    if (url.includes("/push_delivery_events/")) {
+      const eventKey = decodeURIComponent(url.split("/push_delivery_events/")[1].split("?")[0]);
+      const prior = deliveryClaims.get(eventKey);
+      if (!prior) return new Response("not found", { status: 404 });
+      if (init.method === "PATCH") {
+        const state = JSON.parse(init.body).fields.state.stringValue;
+        prior.state = state;
+        return Response.json({ name: url });
+      }
+      return Response.json({ fields: firestoreFields(prior) });
+    }
     throw new Error(`Unexpected mocked request: ${url} ${init.method || "GET"}`);
   };
 
@@ -108,6 +118,12 @@ test("authenticated lifecycle events are scoped and sent at most once without re
     assert.equal(replayResponse.status, 200);
     assert.equal((await replayResponse.json()).duplicate, true);
     assert.equal(fcmSends, 1);
+    const [claimedKey] = deliveryClaims.keys();
+    deliveryClaims.get(claimedKey).state = "claimed";
+    const pendingResponse = await worker.fetch(makeRequest(), testEnv);
+    assert.equal(pendingResponse.status, 409, "A claimed delivery must not be acknowledged as sent.");
+    assert.equal(fcmSends, 1);
+    deliveryClaims.get(claimedKey).state = "sent";
     call.empresa_id = "company-b";
     const crossCompanyResponse = await worker.fetch(makeRequest(), testEnv);
     assert.equal(crossCompanyResponse.status, 403);
