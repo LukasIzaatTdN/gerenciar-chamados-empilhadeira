@@ -798,6 +798,9 @@ service cloud.firestore {
         && data.entityId is string
         && data.empresa_id is string
         && data.supermercado_id is string
+        // A missing call must be denied before dereferencing get().data.
+        // Avoid adding existsAfter here until its expression cost is measured.
+        && exists(callPath)
         && data.details.categoria == "televendas"
         && current.categoria == "televendas"
         && current.empresa_id == data.empresa_id
