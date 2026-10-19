@@ -126,3 +126,12 @@ Ajustado o caminho dedicado de atualização auditada de Televendas para rejeita
 Adicionados controles: atualização **válida** da empresa B com auditoria atômica, e tentativa **inválida** de lote completo por operador inativo. A suíte de regras deve ter **29 testes**.
 
 **Pontos de atenção:** a mudança de ordem pode alterar comportamentos de perfis com documentos antigos/incompletos. Validar positivos e negativos no Emulator. Os erros `maximum of 1000 expressions` e `evaluation error` em testes negativos ainda precisam ser observados: um `assertFails` que passa devido ao orçamento de regras **não** comprova que a validação de segurança foi aplicada. Executar `npm run test:rules`, `npm test`, `npm run build`; enviar os logs completos antes de considerar a etapa aprovada. Não publicar regras, não habilitar push.
+
+
+## Etapa 6.10.4 — Diagnóstico do orçamento de expressões (aguardando testes)
+
+No Emulator da 6.10.3, 29/29 testes de regras, 19/19 JavaScript e build passaram, porém vários testes negativos tiveram `maximum of 1000 expressions` na regra de atualização de chamados. O operador ternário na regra `allow update` agora separa **antes** da avaliação as escritas que alteram `ultima_auditoria_atualizacao_id` das escritas legadas. Isso impede que o fallback legado seja avaliado após falha da validação auditada. Adicionados dois testes de regressão (31 testes de regras esperados).
+
+**Critério de aceite:** os testes negativos do fluxo auditado devem rejeitar sem erro de orçamento na linha de `chamados` e os positivos devem continuar passando. Erros de avaliação em outras coleções (SaaS, usuários e auditoria) devem ser investigados separadamente, não escondidos. Testes `assertFails` não verificam motivo do erro; conferir log do Emulator e, se necessário, a cobertura de regras.
+
+Executar `npm run test:rules 2>&1 | tee /tmp/patio-rules-6104.log`, `npm test` e `npm run build`. Não publicar regras, não habilitar push, não modificar `main` ou produção.
