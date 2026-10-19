@@ -62,6 +62,8 @@ before(async () => {
       await setDoc(doc(db, "supermercados", store), { empresa_id: company, status: "Ativo", nome: store });
     }
     await setDoc(doc(db, "chamados/tv-a"), initial);
+    await setDoc(doc(db, "chamados/tv-regression"), { ...initial, id: "tv-regression" });
+    await setDoc(doc(db, "chamados/tv-gap"), { ...initial, id: "tv-gap" });
     await setDoc(doc(db, "chamados/tv-b"), {
       ...initial, id: "tv-b", empresa_id: "empresa-b", supermercado_id: "loja-b",
     });
@@ -160,4 +162,67 @@ test("an old audit ID cannot be reused for a later update", async () => {
   });
   batch.set(doc(db, "auditoria/tv-update-1"), audit("tv-a"));
   await assertFails(batch.commit());
+});
+
+
+// Stage 6.10.1: explicit positive controls and regression probes.
+// Keep these isolated from tv-a, whose state changes in the original suite.
+test("a valid second same-company update and matching audit succeed", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-regression"), {
+    ...update, ultima_auditoria_atualizacao_id: "tv-regression-audit",
+  });
+  batch.set(doc(db, "auditoria/tv-regression-audit"), audit("tv-regression"));
+  await assertSucceeds(batch.commit());
+  assert.equal((await getDoc(doc(db, "chamados/tv-regression"))).data().ultima_auditoria_atualizacao_id, "tv-regression-audit");
+});
+
+test("foreign-company operator cannot submit a complete valid-shaped update batch", async () => {
+  const db = environment.authenticatedContext("operator-b").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-regression"), {
+    ...update, atualizado_em: "2026-10-19T10:05:00.000Z",
+    ultima_auditoria_atualizacao_id: "tv-cross-company-batch",
+  });
+  batch.set(doc(db, "auditoria/tv-cross-company-batch"), audit("tv-regression", {
+    actorUid: "operator-b",
+    occurredAt: "2026-10-19T10:05:00.000Z",
+    details: { ...audit("tv-regression").details, statusAnterior: "Pronto", statusAtual: "Incompleto", atualizado_em: "2026-10-19T10:05:00.000Z" },
+  }));
+  await assertFails(batch.commit());
+  assert.equal((await getDoc(environment.authenticatedContext("operator-a").firestore(), "chamados/tv-regression")).data().ultima_auditoria_atualizacao_id, "tv-regression-audit");
+});
+
+test("Televendas scoped update rejects immutable identity and tenant changes", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(updateDoc(doc(db, "chamados/tv-regression"), {
+    empresa_id: "empresa-b", atualizado_em: "2026-10-19T10:06:00.000Z",
+    ultima_auditoria_atualizacao_id: "tv-illegal-company",
+  }));
+  await assertFails(updateDoc(doc(db, "chamados/tv-regression"), {
+    id: "another-id", atualizado_em: "2026-10-19T10:06:00.000Z",
+    ultima_auditoria_atualizacao_id: "tv-illegal-id",
+  }));
+});
+
+test("a standalone audit cannot reuse the latest committed marker", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(setDoc(doc(db, "auditoria/tv-audit-replay"), audit("tv-regression", {
+    details: { ...audit("tv-regression").details, statusAnterior: "Pronto" },
+  })));
+});
+
+// Known gap: the scoped call-update rule does not require a matching audit
+// document. This characterization MUST NOT be mistaken for a security success.
+test("KNOWN GAP: same-tenant marker update without audit is currently allowed", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertSucceeds(updateDoc(doc(db, "chamados/tv-gap"), {
+    status: "Pronto", atualizado_em: "2026-10-19T10:07:00.000Z",
+    atualizado_por: "Operador A", operador_nome: "Operador A",
+    ultima_auditoria_atualizacao_id: "tv-no-audit",
+  }));
+  assert.equal((await getDoc(db, "chamados/tv-gap")).data().ultima_auditoria_atualizacao_id, "tv-no-audit");
+  const auditSnapshot = await getDoc(doc(db, "auditoria/tv-no-audit"));
+  assert.equal(auditSnapshot.exists(), false);
 });
