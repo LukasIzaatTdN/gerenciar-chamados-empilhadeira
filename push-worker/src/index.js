@@ -157,6 +157,13 @@ async function claimDelivery(env, eventKey, auditId) {
   }
 }
 
+export function deliveryOutcome(recipientCount, failureCount) {
+  if (!Number.isInteger(recipientCount) || recipientCount < 0 || !Number.isInteger(failureCount) || failureCount < 0 || failureCount > recipientCount) throw new Error("Contagem de entrega inválida.");
+  return failureCount === 0
+    ? { state: "sent", httpStatus: 200, requiresReview: false }
+    : { state: "partial", httpStatus: 503, requiresReview: true };
+}
+
 export function actorCanNotify(actor, companyId, supermarketId) {
   if (actor.status !== "Ativo") return false;
   if (actor.perfil === "Administrador Geral") return true;
@@ -253,11 +260,12 @@ async function handleNotify(request, env) {
     const data = eventCopy(audit.action, call, auditId);
     const results = await Promise.allSettled(recipients.map(({ token }) => sendFcm(env, token, data)));
     const failures = results.filter((result) => result.status === "rejected").length;
+    const outcome = deliveryOutcome(recipients.length, failures);
     await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`, {
       method: "PATCH",
-      body: JSON.stringify({ fields: { audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey }, state: { stringValue: failures ? "partial" : "sent" }, recipient_count: { integerValue: String(recipients.length) }, failure_count: { integerValue: String(failures) }, completed_at: { timestampValue: new Date().toISOString() } } }),
+      body: JSON.stringify({ fields: { audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey }, state: { stringValue: outcome.state }, recipient_count: { integerValue: String(recipients.length) }, failure_count: { integerValue: String(failures) }, completed_at: { timestampValue: new Date().toISOString() } } }),
     });
-    return json({ ok: true, recipientCount: recipients.length, failureCount: failures });
+    return json({ ok: !outcome.requiresReview, recipientCount: recipients.length, failureCount: failures, requiresReview: outcome.requiresReview }, outcome.httpStatus);
   } catch (error) {
     console.error("Falha na entrega de push", error instanceof Error ? error.message : "erro desconhecido");
     return json({ error: "Não foi possível processar a notificação. Consulte os logs protegidos do Worker." }, 502);
