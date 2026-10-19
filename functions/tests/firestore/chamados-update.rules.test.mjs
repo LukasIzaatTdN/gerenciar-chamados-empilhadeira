@@ -301,3 +301,18 @@ test("legacy same-tenant update without changing audit marker remains available"
     "Revisão operacional sem novo marcador"
   );
 });
+
+
+test("audit without entityId is rejected before any call lookup", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const malformed = audit("tv-gap");
+  delete malformed.entityId;
+  await assertFails(setDoc(doc(db, "auditoria/tv-no-entity-id"), malformed));
+});
+
+test("audit with non-string entityId is rejected before any call lookup", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(setDoc(doc(db, "auditoria/tv-numeric-entity-id"), {
+    ...audit("tv-gap"), entityId: 123,
+  }));
+});
