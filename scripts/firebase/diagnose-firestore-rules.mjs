@@ -4,11 +4,23 @@ import { writeFile } from "node:fs/promises";
 const project = "demo-patio-pro-log";
 const port = Number(process.env.PATIO_FIRESTORE_EMULATOR_PORT || "28080");
 const prefix = process.env.PATIO_RULES_REPORT_PREFIX || "/tmp/patio-rules-6108";
-const suites = [
-  "functions/tests/firestore/subscriptions.rules.test.mjs",
-  "functions/tests/firestore/subscriptions.client.test.mjs",
-  "functions/tests/firestore/chamados-update.rules.test.mjs",
-];
+const suiteGroups = {
+  all: [
+    "functions/tests/firestore/subscriptions.rules.test.mjs",
+    "functions/tests/firestore/subscriptions.client.test.mjs",
+    "functions/tests/firestore/chamados-update.rules.test.mjs",
+  ],
+  chamados: ["functions/tests/firestore/chamados-update.rules.test.mjs"],
+  assinaturas: [
+    "functions/tests/firestore/subscriptions.rules.test.mjs",
+    "functions/tests/firestore/subscriptions.client.test.mjs",
+  ],
+};
+const focus = process.env.PATIO_RULES_FOCUS || "all";
+if (!Object.hasOwn(suiteGroups, focus)) {
+  throw new Error("PATIO_RULES_FOCUS must be all, chamados or assinaturas");
+}
+const suites = suiteGroups[focus];
 
 const runner = spawn(process.execPath, ["--experimental-strip-types", "--test", ...suites], {
   stdio: ["inherit", "pipe", "pipe"],
@@ -36,6 +48,7 @@ for (const match of errors) {
   byRule[key] = (byRule[key] || 0) + 1;
 }
 const summary = {
+  focus,
   testExitCode: exitCode,
   evaluationErrorMentions: errors.length,
   expressionBudgetMentions: budgets.length,
