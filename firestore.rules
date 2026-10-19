@@ -709,14 +709,15 @@ service cloud.firestore {
           || canAccessEmpresa(request.resource.data.empresa_id)
         );
 
+      // Partition marker writes from legacy writes BEFORE evaluating either
+      // branch. An invalid marker must not trigger the expensive legacy rule.
       allow update: if isSignedIn()
         && (
-          isScopedTelevendasAuditUpdate()
-          || (
-            // Reject marker changes before invoking the expensive legacy validator.
-            !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(["ultima_auditoria_atualizacao_id"])
-            && (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(["ultima_auditoria_atualizacao_id"])
+          ? isScopedTelevendasAuditUpdate()
+          : (
+            (
               canAccessCurrentSupermercado(resource.data.supermercado_id)
               || canAccessEmpresa(resource.data.empresa_id)
             )
