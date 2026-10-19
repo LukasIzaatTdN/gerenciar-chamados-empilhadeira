@@ -66,6 +66,7 @@ test("authenticated lifecycle events are scoped and sent at most once without re
   const recipient = { status: "Ativo", perfil: "Operador", empresa_id: "company-a", supermercado_id: "store-a" };
   const deliveryClaims = new Map();
   let fcmSends = 0;
+  let failDeliveryPatch = false;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
     if (url.includes("securetoken@system.gserviceaccount.com")) return Response.json({ keys: [jwk] });
@@ -94,6 +95,7 @@ test("authenticated lifecycle events are scoped and sent at most once without re
       const prior = deliveryClaims.get(eventKey);
       if (!prior) return new Response("not found", { status: 404 });
       if (init.method === "PATCH") {
+        if (failDeliveryPatch) return new Response("simulated Firestore persistence failure", { status: 503 });
         const state = JSON.parse(init.body).fields.state.stringValue;
         prior.state = state;
         return Response.json({ name: url });
@@ -124,10 +126,21 @@ test("authenticated lifecycle events are scoped and sent at most once without re
     assert.equal(pendingResponse.status, 409, "A claimed delivery must not be acknowledged as sent.");
     assert.equal(fcmSends, 1);
     deliveryClaims.get(claimedKey).state = "sent";
+    // A second transition is sent to FCM, but its Firestore completion update fails.
+    // The next request must not send a second notification to the same device.
+    call.criado_em = "2026-10-18T10:01:00.000Z";
+    failDeliveryPatch = true;
+    const failedPersistenceResponse = await worker.fetch(makeRequest(), testEnv);
+    assert.equal(failedPersistenceResponse.status, 502);
+    assert.equal(fcmSends, 2);
+    failDeliveryPatch = false;
+    const replayAfterPersistenceFailure = await worker.fetch(makeRequest(), testEnv);
+    assert.equal(replayAfterPersistenceFailure.status, 409);
+    assert.equal(fcmSends, 2, "A failed Firestore PATCH must not trigger duplicate FCM sends.");
     call.empresa_id = "company-b";
     const crossCompanyResponse = await worker.fetch(makeRequest(), testEnv);
     assert.equal(crossCompanyResponse.status, 403);
-    assert.equal(fcmSends, 1);
+    assert.equal(fcmSends, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }
