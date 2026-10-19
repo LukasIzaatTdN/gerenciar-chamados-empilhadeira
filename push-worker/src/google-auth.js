@@ -26,7 +26,7 @@ async function signJwt(payload, privateKeyPem) {
 }
 
 async function getServiceAccountAccessToken(env) {
-  if (oauthCache && oauthCache.expiresAt > Date.now() + 60_000) return oauthCache.token;
+  if (oauthCache?.mode === "service_account_json" && oauthCache.expiresAt > Date.now() + 60_000) return oauthCache.token;
   const serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
   if (!serviceAccount.client_email || !serviceAccount.private_key) throw new Error("Credencial de serviço ausente no Worker.");
   if (serviceAccount.project_id && serviceAccount.project_id !== env.FIREBASE_PROJECT_ID) throw new Error("A credencial configurada pertence a outro projeto Firebase.");
@@ -39,7 +39,7 @@ async function getServiceAccountAccessToken(env) {
   });
   const result = await response.json();
   if (!response.ok || !result.access_token) throw new Error(`Falha de autenticação Google: HTTP ${response.status}`);
-  oauthCache = { token: result.access_token, expiresAt: Date.now() + Number(result.expires_in || 3600) * 1000 };
+  oauthCache = { mode: "service_account_json", token: result.access_token, expiresAt: Date.now() + Number(result.expires_in || 3600) * 1000 };
   return oauthCache.token;
 }
 
