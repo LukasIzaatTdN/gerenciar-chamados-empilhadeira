@@ -17,7 +17,7 @@ function verifyGatewayEnvelope_(envelope, claimNonce, nowMillis) {
   if (typeof envelope.signature !== "string" || !/^[0-9a-f]{64}$/.test(envelope.signature)) throw Error("Assinatura inválida.");
   const secret = PropertiesService.getScriptProperties().getProperty("PUSH_GATEWAY_HMAC_SECRET");
   if (!secret || secret.length < 32) throw Error("Segredo HMAC não configurado.");
-  const message = envelope.version + "\\n" + envelope.timestamp + "\\n" + envelope.nonce + "\\n" + envelope.payload;
+  const message = envelope.version + "\n" + envelope.timestamp + "\n" + envelope.nonce + "\n" + envelope.payload;
   const mac = Utilities.computeHmacSha256Signature(message, secret, Utilities.Charset.UTF_8);
   const actual = mac.map(function(byte) { return ("0" + (byte & 255).toString(16)).slice(-2); }).join("");
   // Fixed-length, constant-work comparison; never log signatures or secret.
