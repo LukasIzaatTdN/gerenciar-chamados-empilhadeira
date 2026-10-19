@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, recoveryPlan, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, recipientIdentityKey, recoveryPlan, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -202,4 +202,13 @@ test("recovery preview never authorizes uncertain or inconsistent deliveries", (
   assert.equal(recoveryPlan({ ...base, recipient_results: { a: { status: "accepted" } } }, "audit-1").allowed, false);
   assert.equal(recoveryPlan({ ...base, state: "claimed" }, "audit-1").allowed, false);
   assert.equal(recoveryPlan(base, "audit-other").allowed, false);
+});
+
+
+test("recovery identities are stable and separate devices belonging to the same user", async () => {
+  const first = await recipientIdentityKey({ uid: "user-a", token: "device-a" });
+  assert.equal(first, await recipientIdentityKey({ uid: "user-a", token: "device-a" }));
+  assert.notEqual(first, await recipientIdentityKey({ uid: "user-a", token: "device-b" }));
+  assert.notEqual(first, await recipientIdentityKey({ uid: "user-b", token: "device-a" }));
+  assert.match(first, /^r_[a-f0-9]{64}$/);
 });
