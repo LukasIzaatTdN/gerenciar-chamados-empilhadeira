@@ -652,17 +652,13 @@ service cloud.firestore {
     // general call validator is expensive and cannot be combined with getAfter.
     function isScopedTelevendasAuditUpdate() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return isCurrentUserActive()
-        && canManageChamado()
-        && resource.data.categoria == "televendas"
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      return resource.data.categoria == "televendas"
         && request.resource.data.categoria == "televendas"
         && request.resource.data.id == resource.data.id
         && request.resource.data.empresa_id == resource.data.empresa_id
         && request.resource.data.supermercado_id == resource.data.supermercado_id
-        && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
-        )
+        // Reject malformed or unrelated changes before any user-document reads.
         && changed.hasOnly([
           "itens", "produto", "quantidade", "total_solicitado",
           "total_encontrado", "percentual_atendido", "status",
@@ -671,6 +667,23 @@ service cloud.firestore {
           "ultima_auditoria_atualizacao_id"
         ])
         && changed.hasAll(["ultima_auditoria_atualizacao_id", "atualizado_em"])
+        && exists(userPath)
+        && get(userPath).data.get("status", null) == "Ativo"
+        && get(userPath).data.perfil in [
+          "Operador", "Supervisor", "Separador de Televendas",
+          "Administrador da Empresa", "Administrador Geral"
+        ]
+        && (
+          get(userPath).data.perfil == "Administrador Geral"
+          || (
+            get(userPath).data.perfil == "Administrador da Empresa"
+            && get(userPath).data.empresa_id == resource.data.empresa_id
+          )
+          || (
+            get(userPath).data.supermercado_id == resource.data.supermercado_id
+            && get(userPath).data.empresa_id == resource.data.empresa_id
+          )
+        )
         && request.resource.data.ultima_auditoria_atualizacao_id is string
         && request.resource.data.ultima_auditoria_atualizacao_id.size() > 0
         && isStatusChamadoValido(request.resource.data.status)
@@ -703,12 +716,12 @@ service cloud.firestore {
             // Reject marker changes before invoking the expensive legacy validator.
             !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(["ultima_auditoria_atualizacao_id"])
-            && canManageChamado()
-            && isAtualizacaoChamadoValida()
             && (
               canAccessCurrentSupermercado(resource.data.supermercado_id)
               || canAccessEmpresa(resource.data.empresa_id)
             )
+            && canManageChamado()
+            && isAtualizacaoChamadoValida()
           )
         );
 
