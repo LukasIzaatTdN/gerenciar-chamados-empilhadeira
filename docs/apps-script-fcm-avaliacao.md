@@ -268,3 +268,24 @@ npm run build
 Arquivos para comparar: `/tmp/patio-rules-610111-chamados-summary.json`, `/tmp/patio-rules-610111-chamados.log`, `/tmp/patio-rules-610111-summary.json`. Esperado: 25/25 no foco, 37/37 geral, e retorno aproximado à linha de base 6.10.10 (24 erros/11 estouros no foco; 43/12 no geral). Como dois testes novos continuam na suíte, as contagens podem ficar maiores mesmo com a função restaurada. Registrar as diferenças por teste, não somente os totais.
 
 Nenhuma alteração de produção, deploy, publicação de regras, push real, serviço pago ou modificação na branch `main`.
+
+
+## Etapa 6.10.12 — Escopo do ator da auditoria Televendas
+
+Baseline confirmado após reversão 6.10.11.1: 37/37 testes gerais, 25/25 chamados; 45 menções a erro de avaliação, 14 estouros (26/13 no foco chamados). As duas negativas novas continuam contribuindo para as contagens.
+
+A regra `allow create` especializada para `action == "chamado_atualizado"` passa a usar `isTelevendasAuditActorInScope` para ler o documento do ator uma única vez, validar `status == "Ativo"`, perfil permitido e o vínculo da empresa/unidade. `Administrador Geral` pode operar globalmente; `Administrador da Empresa` apenas na sua empresa; perfis operacionais somente na empresa e unidade correspondentes. A verificação de marcador, chamado antes/depois e detalhes de auditoria continua inalterada. O caminho genérico de outras ações de auditoria não foi modificado.
+
+Dois testes adicionais: autorização positiva de administrador da empresa na própria empresa e negativa de auditoria em outra empresa. A suíte de chamados deverá conter **27** testes; total geral **39**, se todas as suítes anteriores forem preservadas.
+
+### Validação local obrigatória
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61012-chamados npm run test:rules:diagnose
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61012 npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-61012-chamados-summary.json`, `/tmp/patio-rules-61012-chamados.log` e `/tmp/patio-rules-61012-summary.json`. Avaliar **testExitCode**, testes positivos, rejeições negativas, `evaluationErrorMentions` e `expressionBudgetMentions`. Não assumir melhora sem os relatórios. Se testes positivos falharem ou orçamento piorar, interromper e reverter apenas esta otimização. Nenhum deploy, publicação de regras, push real, cobrança ou mudança em produção.
