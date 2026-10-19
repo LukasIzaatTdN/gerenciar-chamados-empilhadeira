@@ -108,3 +108,12 @@ Acrescentados cinco testes ao arquivo `functions/tests/firestore/chamados-update
 **KNOWN GAP:** a regra de atualização de `chamados` ainda aceita que um operador autorizado atualize `ultima_auditoria_atualizacao_id` sem criar `auditoria/{id}` no mesmo commit. O teste documenta esse comportamento esperado atualmente e **não** comprova sua segurança. Não habilitar notificações push de `chamado_atualizado` enquanto a integridade bidirecional não for exigida e comprovada. Além disso, alguns testes negativos continuam exibindo `maximum of 1000 expressions`; aprovação isolada de `assertFails` não comprova a razão correta da rejeição.
 
 Validação pendente no Firebase Emulator: `npm run test:rules` (esperados 26 testes), `npm test`, `npm run build`. Sem deploy, sem publicação de regras e sem produção.
+
+
+## Etapa 6.10.2 — Vinculação bidirecional de auditoria (não validada)
+
+Commit de regras: `bfc3406`. A atualização do chamado Televendas com marcador agora requer que `auditoria/{ultima_auditoria_atualizacao_id}` não exista antes e exista após a mesma operação atômica, com ação, chamado, ator, escopo, status anterior/atual e horário compatíveis. O caminho legado de atualização verifica primeiro se o marcador não foi alterado, evitando avaliar o validador custoso para essas tentativas.
+
+Commit de testes: `13e46c2`. O antigo teste de caracterização `KNOWN GAP` passou a exigir `assertFails` e ausência de alteração no chamado; adicionado teste de auditoria com entidade divergente. Esperados **27 testes** de regras.
+
+**Ainda não testado no Emulator.** A nova verificação `existsAfter/getAfter` pode ultrapassar o orçamento de expressões em commits válidos. Não interpretar a aprovação de testes negativos com mensagens de `maximum of 1000 expressions` como validação de isolamento. Executar `npm run test:rules`, `npm test` e `npm run build` localmente. Não publicar regras, não habilitar push, não alterar produção.
