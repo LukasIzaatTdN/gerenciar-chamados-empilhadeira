@@ -630,6 +630,24 @@ service cloud.firestore {
         && isEmpilhadeiraCompativelComChamado(request.resource.data);
     }
 
+    // Bind the call-side marker to a newly created audit document in the
+    // SAME atomic commit. A marker alone must never authorize an update.
+    function hasNewMatchingTelevendasAudit() {
+      let auditId = request.resource.data.ultima_auditoria_atualizacao_id;
+      let auditPath = /databases/$(database)/documents/auditoria/$(auditId);
+      return !exists(auditPath)
+        && existsAfter(auditPath)
+        && getAfter(auditPath).data.action == "chamado_atualizado"
+        && getAfter(auditPath).data.entityType == "chamado"
+        && getAfter(auditPath).data.entityId == resource.data.id
+        && getAfter(auditPath).data.actorUid == request.auth.uid
+        && getAfter(auditPath).data.empresa_id == resource.data.empresa_id
+        && getAfter(auditPath).data.supermercado_id == resource.data.supermercado_id
+        && getAfter(auditPath).data.details.statusAnterior == resource.data.status
+        && getAfter(auditPath).data.details.statusAtual == request.resource.data.status
+        && getAfter(auditPath).data.details.atualizado_em == request.resource.data.atualizado_em;
+    }
+
     // Dedicated, bounded update path for Televendas audit batches. The
     // general call validator is expensive and cannot be combined with getAfter.
     function isScopedTelevendasAuditUpdate() {
@@ -658,7 +676,8 @@ service cloud.firestore {
         && isStatusChamadoValido(request.resource.data.status)
         && request.resource.data.atualizado_em is string
         && request.resource.data.operador_nome is string
-        && request.resource.data.atualizado_por == request.resource.data.operador_nome;
+        && request.resource.data.atualizado_por == request.resource.data.operador_nome
+        && hasNewMatchingTelevendasAudit();
     }
 
     match /chamados/{id} {
@@ -681,14 +700,15 @@ service cloud.firestore {
         && (
           isScopedTelevendasAuditUpdate()
           || (
-            canManageChamado()
+            // Reject marker changes before invoking the expensive legacy validator.
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(["ultima_auditoria_atualizacao_id"])
+            && canManageChamado()
             && isAtualizacaoChamadoValida()
             && (
               canAccessCurrentSupermercado(resource.data.supermercado_id)
               || canAccessEmpresa(resource.data.empresa_id)
             )
-            && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(["ultima_auditoria_atualizacao_id"])
           )
         );
 
