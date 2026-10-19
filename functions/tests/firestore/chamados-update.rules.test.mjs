@@ -316,3 +316,18 @@ test("audit with non-string entityId is rejected before any call lookup", async 
     ...audit("tv-gap"), entityId: 123,
   }));
 });
+
+test("missing audit details is rejected", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const payload = audit("tv-gap");
+  delete payload.details;
+  await assertFails(setDoc(doc(db, "auditoria/tv-missing-details"), payload));
+});
+
+test("incomplete audit details is rejected", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(setDoc(doc(db, "auditoria/tv-incomplete-details"), {
+    ...audit("tv-gap"),
+    details: { categoria: "televendas" },
+  }));
+});
