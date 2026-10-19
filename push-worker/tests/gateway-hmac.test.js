@@ -11,7 +11,7 @@ function independentVerify(e, seen, time = now) {
   if (e.version !== GATEWAY_VERSION || !Number.isSafeInteger(e.timestamp) || Math.abs(time - e.timestamp) > MAX_SKEW_MS) return false;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(e.nonce)) return false;
   if (typeof e.payload !== "string" || typeof e.signature !== "string" || !/^[0-9a-f]{64}$/.test(e.signature)) return false;
-  const expected = createHmac("sha256", secret).update(`${e.version}\\n${e.timestamp}\\n${e.nonce}\\n${e.payload}`, "utf8").digest();
+  const expected = createHmac("sha256", secret).update(`${e.version}\n${e.timestamp}\n${e.nonce}\n${e.payload}`, "utf8").digest();
   const received = Buffer.from(e.signature, "hex");
   if (!timingSafeEqual(expected, received)) return false;
   if (seen.has(e.nonce)) return false;
