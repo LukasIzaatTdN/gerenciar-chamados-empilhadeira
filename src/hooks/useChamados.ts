@@ -1082,7 +1082,10 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           await ensureFirebaseSessionForChamado();
           const batch = writeBatch(db);
           const auditRef = doc(collection(db, "auditoria"));
-          batch.update(doc(db, CHAMADOS_COLLECTION, id), payload);
+          batch.update(doc(db, CHAMADOS_COLLECTION, id), {
+            ...payload,
+            ultima_auditoria_atualizacao_id: auditRef.id,
+          });
           batch.set(auditRef, createAuditEntry({
             action: "chamado_atualizado",
             actorUid: auth?.currentUser?.uid,
