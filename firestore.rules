@@ -1109,8 +1109,7 @@ service cloud.firestore {
         || (
           canAdminEmpresaManageUser(resource.data, request.resource.data)
           && hasOnlyUserManagementChanges(resource.data, request.resource.data)
-        )
-;
+        );
 
       allow delete: if isAdminGeral()
         || (
