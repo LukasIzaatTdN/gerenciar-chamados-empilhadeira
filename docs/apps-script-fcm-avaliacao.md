@@ -89,3 +89,13 @@ Criado `functions/tests/firestore/chamados-update.rules.test.mjs` e incluído no
 **Lacuna de segurança conhecida e bloqueadora de produção:** as regras atuais permitem que um operador ativo da própria empresa crie uma auditoria `chamado_atualizado` isoladamente, sem alterar o chamado. O teste `KNOWN GAP` documenta que a operação **atualmente é aceita**; passar nesse teste NÃO demonstra segurança. Antes de ativar o push é obrigatório endurecer as regras e exigir vínculo atômico e verificável entre evento e alteração canônica, inclusive impedir falsificação de detalhes. O Worker também precisa conferir a auditoria e o estado persistido.
 
 Os sete testes são novos e **não foram executados pelo assistente**. Resultado esperado: 18 testes de regras (11 existentes + 7 novos), se todos passarem; além dos 19 testes Web e build já relatados na etapa anterior. Nenhum deploy ou publicação de regras.
+
+
+## Etapa 6.10 — Vinculação atômica de auditoria de atualização (em validação)
+
+Alterações exclusivamente na branch de desenvolvimento:
+- O cliente Web grava `ultima_auditoria_atualizacao_id` no chamado, no mesmo batch da atualização e do novo registro de `auditoria`.
+- Para `chamado_atualizado`, a regra de criação de auditoria consulta `get()` (estado anterior) e `getAfter()` (estado resultante do commit) do chamado. Confere escopo de empresa/unidade, tipo Televendas, ID novo, estado anterior e posterior, operador, horário de atualização e pelo menos uma mudança real nos dados de negócio.
+- O teste `KNOWN GAP` agora exige rejeição de auditoria isolada. Testes adicionais cobrem divergência de status, atualização apenas do marcador e reutilização do mesmo ID.
+
+**Limitação e condição para avançar:** esta alteração não foi executada pelo assistente no Emulator. Validar `npm run test:rules`, `npm test` e `npm run build` antes de considerar o resultado aprovado. O Firestore Emulator pode rejeitar expressões muito complexas; investigar se houver `maximum of 1000 expressions`. A regra atual impede a criação isolada de auditoria, mas ainda não obriga que *toda* atualização de chamado gere auditoria: esse contrato deve ser analisado separadamente. A conferência de autenticidade no Worker e as alterações Android ainda estão pendentes. **Nenhum deploy nem escrita em produção.**
