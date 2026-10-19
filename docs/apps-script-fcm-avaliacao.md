@@ -25,3 +25,14 @@
 **Somente leitura, sem envio FCM:** testar autorização Firestore REST em recurso deliberadamente inexistente usando o token do Apps Script, para distinguir `404` de `401/403`. Antes, verificar que o manifesto solicita `https://www.googleapis.com/auth/datastore` e `script.external_request`; essa mudança solicitará consentimento OAuth adicional. Nunca exibir token ou conteúdo de documentos. Não alterar IAM nem vincular projetos automaticamente.
 
 Se acesso ao Firestore não estiver disponível, interromper e revisar permissões mínimas antes de qualquer integração. A decisão de usar Apps Script em produção permanece **pendente**.
+
+
+## Etapa 6.5 — Contrato HMAC preparado (ainda sem implantação)
+
+- `push-worker/src/gateway-hmac.js`: assinatura HMAC-SHA256 com versão, timestamp em milissegundos, nonce UUID v4, payload JSON serializado e assinatura hexadecimal. Não está conectado à rota pública.
+- `apps-script-fcm/gateway-verifier.gs`: verificador Apps Script sem `doPost`, sem envio FCM e sem gravação Firestore. O segredo é lido de `PropertiesService` somente quando a função é chamada; não configurar nem executar até revisão.
+- `push-worker/tests/gateway-hmac.test.js`: quatro testes locais do contrato com verificador Node independente (alterações, repetição e janela de 5 minutos). **Não substituem testes reais no runtime Apps Script**.
+- A verificação do nonce exige `claimNonce` atômico e persistente; a função rejeita por padrão quando ele não existe. `LockService`/memória isoladamente não substituem claim durável entre serviços.
+- HMAC autentica o Worker para o Apps Script, **não** autentica o usuário final nem comprova que o evento/empresa/destinatário está autorizado. Antes de habilitar o transporte, preservar validação Firebase e verificações canônicas no Firestore.
+- O Worker atual ainda requer Google OAuth diretamente para consultas; portanto, a arquitetura de duas camadas **ainda não está funcional**. Precisamos mover cuidadosamente todas as operações privilegiadas ao backend Google ou validar uma outra fonte de identidade.
+- Não conectar `doPost`, não definir segredo, não adicionar IAM e não implantar até aprovação de threat model, teste de concorrência e verificação de quotas.
