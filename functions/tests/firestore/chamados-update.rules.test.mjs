@@ -19,6 +19,8 @@ const initial = {
   categoria: "televendas", tipo_servico: "Atendimento Televendas",
   status: "Em separação", operador_nome: "Operador A", atualizado_em: stamp,
   empilhadeira_id: null, empilhadeira_identificacao: null,
+  assumido_em: stamp, a_caminho_em: null, cheguei_em: null,
+  iniciado_em: null, finalizado_em: null, cancelado_em: null,
 };
 const update = {
   status: "Pronto", atualizado_em: "2026-10-19T10:01:00.000Z",
@@ -95,11 +97,12 @@ test("a foreign-company operator cannot disguise the event as its own company", 
 
 test("an invalid audit rejects the entire batch without updating the call", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
+  const beforeStatus = (await getDoc(doc(db, "chamados/tv-a"))).data().status;
   const batch = writeBatch(db);
   batch.update(doc(db, "chamados/tv-a"), { status: "Incompleto" });
   batch.set(doc(db, "auditoria/tv-invalid-actor"), audit("tv-a", { actorUid: "operator-b" }));
   await assertFails(batch.commit());
-  assert.equal((await getDoc(doc(db, "chamados/tv-a"))).data().status, "Pronto");
+  assert.equal((await getDoc(doc(db, "chamados/tv-a"))).data().status, beforeStatus);
 });
 
 test("inactive operators cannot update calls or create audit records", async () => {
