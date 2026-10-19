@@ -310,3 +310,24 @@ npm run build
 Enviar `/tmp/patio-rules-61013-chamados-summary.json`, `/tmp/patio-rules-61013-chamados.log` e `/tmp/patio-rules-61013-summary.json`. Critérios: manter 27/27 e 39/39; manter **0** estouros em chamados; verificar se desapareceu o `Null value error` do teste de auditoria órfã; não aumentar os estouros gerais. Os 46 erros de avaliação gerais não devem ser tratados como meta de zero nesta alteração isolada: muitos correspondem a outros fluxos negativos. Se houver regressão, reverter somente o guard `exists(callPath)`. O único estouro de `usuarios` ficará para investigação separada, com diagnóstico próprio.
 
 Sem deploy, publicação de regras, push real, escrita em produção, alteração de cobrança ou modificação da branch `main`.
+
+
+## Etapa 6.10.14 — Redução conservadora de avaliações em usuarios
+
+Baseline 6.10.13: `testExitCode=0`, 39/39 testes gerais e 27/27 chamados, 46 menções a erro de avaliação e 1 estouro de 1.000 expressões na regra `usuarios update` (linha 1130 no relatório daquela etapa). O log geral do teste específico que produz esse estouro ainda não foi disponibilizado.
+
+Alteração restrita a `match /usuarios/{id}`, `allow update`: (1) a verificação `isCurrentUserActive()` da autoatualização é feita **depois** das comparações imutáveis e do conjunto de campos alterados; (2) removidas verificações idênticas repetidas de `perfil`, `empresa_id` e `hasOnlyUserManagementChanges` no caminho de gestão do administrador geral. As mesmas condições continuam presentes uma vez. Não foram modificados os caminhos de chamados, auditoria, assinaturas, push tokens ou as funções de autenticação.
+
+### Validação no Emulator — obrigatória antes de aceitar a alteração
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61014 npm run test:rules:diagnose
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61014-chamados npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-61014-summary.json`, `/tmp/patio-rules-61014.log`, `/tmp/patio-rules-61014-chamados-summary.json` e, se possível, `/tmp/patio-rules-61014-chamados.log`. Comparar `evaluationErrorMentions`, `expressionBudgetMentions`, `budgetByRule` e resultados de testes. **Critérios:** manter todos os testes positivos e negativos, 39/39 gerais, 27/27 chamados, 0 estouros em chamados, e não aumentar o orçamento de expressões geral. Não afirmar eliminação do último estouro antes de analisar o log geral e o cenário correspondente. Em caso de regressão, reverter apenas a alteração desta etapa.
+
+Nenhum deploy, publicação de regras, escrita em produção, alteração de billing ou `main`.
