@@ -4,6 +4,6 @@ compatibility_date = "2026-10-18"
 
 [vars]
 FIREBASE_PROJECT_ID = "painel-772bf"
-ALLOWED_ORIGIN = ""
+ALLOWED_ORIGIN = "https://gerenciar-chamados-empilhadeira.vercel.app"
 
 # Configure FIREBASE_SERVICE_ACCOUNT_JSON with `wrangler secret put` only after review.
