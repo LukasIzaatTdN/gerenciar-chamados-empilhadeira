@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, recoveryPlan, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -189,4 +189,17 @@ test("per-recipient delivery tracking distinguishes accepted, rejected and uncer
   assert.equal(classifyFcmResult({ status: "rejected", reason: { httpStatus: 503 } }), "unknown");
   assert.equal(classifyFcmResult({ status: "rejected", reason: { httpStatus: 401 } }), "rejected");
   await assert.rejects(recipientDeliveryRecords(recipients, outcomes.slice(1)), /inconsistentes/);
+});
+
+
+test("recovery preview never authorizes uncertain or inconsistent deliveries", () => {
+  const base = { audit_id: "audit-1", state: "partial", recipient_count: 3, failure_count: 1, recipient_results: {
+    a: { status: "accepted" }, b: { status: "accepted" }, c: { status: "rejected" },
+  } };
+  assert.deepEqual(recoveryPlan(base, "audit-1"), { allowed: true, accepted: 2, rejected: 1, unknown: 0, requiresManualReview: false, automaticRetry: false });
+  assert.equal(recoveryPlan({ ...base, recipient_results: { ...base.recipient_results, c: { status: "unknown" } } }, "audit-1").allowed, false);
+  assert.equal(recoveryPlan({ ...base, failure_count: 2 }, "audit-1").allowed, false);
+  assert.equal(recoveryPlan({ ...base, recipient_results: { a: { status: "accepted" } } }, "audit-1").allowed, false);
+  assert.equal(recoveryPlan({ ...base, state: "claimed" }, "audit-1").allowed, false);
+  assert.equal(recoveryPlan(base, "audit-other").allowed, false);
 });
