@@ -99,3 +99,12 @@ Alterações exclusivamente na branch de desenvolvimento:
 - O teste `KNOWN GAP` agora exige rejeição de auditoria isolada. Testes adicionais cobrem divergência de status, atualização apenas do marcador e reutilização do mesmo ID.
 
 **Limitação e condição para avançar:** esta alteração não foi executada pelo assistente no Emulator. Validar `npm run test:rules`, `npm test` e `npm run build` antes de considerar o resultado aprovado. O Firestore Emulator pode rejeitar expressões muito complexas; investigar se houver `maximum of 1000 expressions`. A regra atual impede a criação isolada de auditoria, mas ainda não obriga que *toda* atualização de chamado gere auditoria: esse contrato deve ser analisado separadamente. A conferência de autenticidade no Worker e as alterações Android ainda estão pendentes. **Nenhum deploy nem escrita em produção.**
+
+
+## Etapa 6.10.1 — Testes de regressão e lacuna residual (aguardando execução)
+
+Acrescentados cinco testes ao arquivo `functions/tests/firestore/chamados-update.rules.test.mjs`: controle positivo de novo lote válido, tentativa de lote completo por empresa estrangeira, tentativa de alteração de identificadores/escopo, auditoria isolada com ID diferente do marcador e caracterização de atualização do marcador sem documento de auditoria.
+
+**KNOWN GAP:** a regra de atualização de `chamados` ainda aceita que um operador autorizado atualize `ultima_auditoria_atualizacao_id` sem criar `auditoria/{id}` no mesmo commit. O teste documenta esse comportamento esperado atualmente e **não** comprova sua segurança. Não habilitar notificações push de `chamado_atualizado` enquanto a integridade bidirecional não for exigida e comprovada. Além disso, alguns testes negativos continuam exibindo `maximum of 1000 expressions`; aprovação isolada de `assertFails` não comprova a razão correta da rejeição.
+
+Validação pendente no Firebase Emulator: `npm run test:rules` (esperados 26 testes), `npm test`, `npm run build`. Sem deploy, sem publicação de regras e sem produção.
