@@ -1,3 +1,4 @@
+import { getGoogleAccessToken } from "./google-auth.js";
 const FIREBASE_KEYS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const OAUTH_URL = "https://oauth2.googleapis.com/token";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore";
@@ -47,42 +48,6 @@ async function verifyFirebaseIdToken(token, projectId) {
   const signedData = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
   if (!(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, base64UrlToBytes(parts[2]), signedData))) throw new Error("Assinatura do token inválida.");
   return claims;
-}
-
-function pemToBytes(pem) {
-  const body = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
-  return base64UrlToBytes(body.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, ""));
-}
-
-async function signJwt(payload, privateKeyPem) {
-  const encoder = new TextEncoder();
-  const encode = (value) => btoa(String.fromCharCode(...encoder.encode(JSON.stringify(value))))
-    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const header = encode({ alg: "RS256", typ: "JWT" });
-  const body = encode(payload);
-  const content = `${header}.${body}`;
-  const key = await crypto.subtle.importKey("pkcs8", pemToBytes(privateKeyPem), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, encoder.encode(content)));
-  const encodedSignature = btoa(String.fromCharCode(...signature)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  return `${content}.${encodedSignature}`;
-}
-
-async function getGoogleAccessToken(env) {
-  if (oauthCache && oauthCache.expiresAt > Date.now() + 60_000) return oauthCache.token;
-  const serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
-  if (!serviceAccount.client_email || !serviceAccount.private_key) throw new Error("Credencial de serviço ausente no Worker.");
-  if (serviceAccount.project_id && serviceAccount.project_id !== env.FIREBASE_PROJECT_ID) throw new Error("A credencial configurada pertence a outro projeto Firebase.");
-  const now = Math.floor(Date.now() / 1000);
-  const assertion = await signJwt({ iss: serviceAccount.client_email, aud: OAUTH_URL, iat: now, exp: now + 3600, scope: FCM_SCOPE }, serviceAccount.private_key);
-  const response = await fetch(OAUTH_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
-  });
-  const result = await response.json();
-  if (!response.ok || !result.access_token) throw new Error(`Falha de autenticação Google: HTTP ${response.status}`);
-  oauthCache = { token: result.access_token, expiresAt: Date.now() + Number(result.expires_in || 3600) * 1000 };
-  return oauthCache.token;
 }
 
 async function firestoreRequest(env, path, init = {}) {
@@ -268,7 +233,7 @@ async function sendFcm(env, token, data) {
 }
 
 async function handleNotify(request, env) {
-  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_SERVICE_ACCOUNT_JSON) return json({ error: "Serviço push ainda não configurado." }, 503);
+  if (!env.FIREBASE_PROJECT_ID || (env.GOOGLE_AUTH_MODE === "wif" ? !env.WIF_AUDIENCE || !env.WIF_SERVICE_ACCOUNT_EMAIL || !env.WIF_IDENTITY_PROVIDER : !env.FIREBASE_SERVICE_ACCOUNT_JSON)) return json({ error: "Serviço push ainda não configurado." }, 503);
   const authorization = request.headers.get("authorization") || "";
   if (!authorization.startsWith("Bearer ")) return json({ error: "Autenticação necessária." }, 401);
   let claims;
