@@ -50,7 +50,7 @@ for (const match of errors) {
 // Categorize by source match blocks instead of hard-coded rule line numbers.
 const rulesLines = (await readFile("firestore.rules", "utf8")).split("\n");
 const matchBlocks = rulesLines.flatMap((line, index) => {
-  const match = line.match(/^\s*match\s+\/([^ {]+)(?:\/\{[^}]+\})?\s*\{/);
+  const match = line.match(/^\s*match\s+\/([^\s{]+)/);
   return match ? [{ line: index + 1, path: match[1] }] : [];
 });
 function categoryForLine(line) {
