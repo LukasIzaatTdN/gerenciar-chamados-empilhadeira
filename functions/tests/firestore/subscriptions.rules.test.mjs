@@ -273,3 +273,30 @@ test("inactive company administrators cannot read own subscription or history", 
   await assertFails(getDoc(doc(missingStatus, "empresas/empresa-a/assinaturas/atual")));
   await assertFails(getDoc(doc(missingStatus, "empresas/empresa-a/historico_assinatura/evento-1")));
 });
+
+test("malformed SaaS payloads without required fields are rejected", async () => {
+  const db = environment.authenticatedContext("platform-admin").firestore();
+  await assertFails(setDoc(doc(db, "planos/missing-plan-id"), {
+    nome: "Sem ID", descricao: "", valor_centavos: 100,
+    ciclo: "Mensal", status: "Ativo",
+    criado_em: serverTimestamp(), atualizado_em: serverTimestamp(),
+    ultima_operacao_id: "missing-plan-operation",
+  }));
+  await assertFails(setDoc(doc(db, "assinatura_operacoes/missing-operation-id"), {
+    actor_uid: "platform-admin", action: "assignPlan",
+    request_data: { action: "assignPlan", empresaId: "empresa-a", planId: "pro" },
+    target_id: "empresa-a", result: {}, processed_at: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(db, "assinatura_operacoes/missing-request-plan"), {
+    operation_id: "missing-request-plan", actor_uid: "platform-admin", action: "assignPlan",
+    request_data: { action: "assignPlan", empresaId: "empresa-a" },
+    target_id: "empresa-a", result: {}, processed_at: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(db, "empresas/empresa-a/assinaturas/atual"), {
+    empresa_id: "empresa-a", status: "Pendente", plano_id: "pro",
+  }));
+  await assertFails(setDoc(doc(db, "auditoria_assinaturas/missing-audit-operation"), {
+    acao: "plano_criado", plano_id: "pro", ator_uid: "platform-admin",
+    ator_nome: "Plataforma", ocorrido_em: serverTimestamp(), detalhes: {},
+  }));
+});
