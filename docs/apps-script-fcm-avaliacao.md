@@ -240,3 +240,31 @@ npm run build
 ```
 
 Arquivos para análise: `/tmp/patio-rules-61011-chamados-summary.json`, `/tmp/patio-rules-61011-chamados.log`, `/tmp/patio-rules-61011-summary.json` e `/tmp/patio-rules-61011-coverage.json`. Meta: 25/25 testes no foco chamados, 37/37 no total (antes 24 e 36); erros de avaliação e estouros idealmente menores que 24/11 no foco e 43/12 no total. Caso testes positivos falhem ou o limite aumente, reavaliar/reverter esta alteração antes de prosseguir. Não executar deploy, não publicar regras, não ativar push e não usar serviços pagos.
+
+
+## Etapa 6.10.11.1 — Reversão controlada e preparação da próxima otimização
+
+Os resultados locais da 6.10.11 foram: 37/37 testes gerais aprovados, 25/25 testes de chamados, **45** menções a erros de avaliação e **14** menções ao limite de 1.000 expressões. No foco chamados: **26** erros e **13** estouros. A linha de criação de auditoria continuou sendo o gargalo. Os dois testes adicionais (auditoria órfã e replay) passaram, mas geraram erros de avaliação; `assertFails` sozinho não prova rejeição limpa.
+
+A alteração experimental da função `isTelevendasUpdateAuditAgainstCall` introduzida no commit `55a2dc4` foi revertida **somente nessa função**. Foram removidas as chamadas adicionais `exists(callPath)` e `existsAfter(callPath)`, e restauradas a ordem e a comparação do marcador anteriores à 6.10.11. Os testes novos e os diagnósticos foram preservados. Não foi utilizado `git revert` do commit inteiro, para não desfazer trabalho não relacionado.
+
+### Plano para a otimização posterior
+
+1. Usar os testes negativos específicos que geram `maximum of 1000 expressions` para avaliar mudanças pequenas e isoladas.
+2. Investigar primeiro o custo duplicado entre a regra `allow update` de `chamados` e a regra `allow create` de `auditoria` no mesmo `writeBatch`, sem relaxar a validação de empresa, unidade, usuário, ID do chamado, marcador e dados anteriores/posteriores.
+3. Avaliar pré-filtros baratos e leituras de documentos apenas após validação de formato; medir o custo no Emulator a cada mudança.
+4. Manter testes positivos para operadores das duas empresas e negativos para alterações sem auditoria, replay, auditoria órfã, identidade adulterada, empresa diferente e usuário inativo.
+
+### Validação local necessária (sem deploy)
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610111-chamados npm run test:rules:diagnose
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610111 npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Arquivos para comparar: `/tmp/patio-rules-610111-chamados-summary.json`, `/tmp/patio-rules-610111-chamados.log`, `/tmp/patio-rules-610111-summary.json`. Esperado: 25/25 no foco, 37/37 geral, e retorno aproximado à linha de base 6.10.10 (24 erros/11 estouros no foco; 43/12 no geral). Como dois testes novos continuam na suíte, as contagens podem ficar maiores mesmo com a função restaurada. Registrar as diferenças por teste, não somente os totais.
+
+Nenhuma alteração de produção, deploy, publicação de regras, push real, serviço pago ou modificação na branch `main`.
