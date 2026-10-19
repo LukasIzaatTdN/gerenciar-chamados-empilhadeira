@@ -48,13 +48,15 @@ before(async () => {
 
 after(async () => environment.cleanup());
 
-test("a user cannot self-register or promote their profile to platform admin", async () => {
+test("user cannot self-register as platform admin", async () => {
   const db = environment.authenticatedContext("new-self-escalation").firestore();
   await assertFails(setDoc(doc(db, "usuarios/new-self-escalation"), {
     id: "new-self-escalation", perfil: "Administrador Geral", status: "Ativo", empresa_id: null,
     supermercado_id: null, nome: "Auto promovido", email: "attacker@example.test",
   }));
+});
 
+test("user cannot promote own profile to platform admin", async () => {
   const existingUser = environment.authenticatedContext("self-escalation").firestore();
   await assertFails(updateDoc(doc(existingUser, "usuarios/self-escalation"), {
     perfil: "Administrador Geral",
