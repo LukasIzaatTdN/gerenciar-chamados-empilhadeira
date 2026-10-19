@@ -163,3 +163,23 @@ Criado `scripts/firebase/diagnose-firestore-rules.mjs` e comando `npm run test:r
 Adicionados dois testes de auditoria malformada (detalhes ausentes/incompletos), total esperado de **35 testes de regras**. O diagnóstico **não afirma que rejeições com `assertFails` são rejeições seguras**; os erros continuam sendo contabilizados. Para exigir saída não zero diante de qualquer erro de avaliação: `PATIO_RULES_STRICT=1 npm run test:rules:diagnose` (espera-se que falhe no estado atual, útil como meta futura). O comando padrão só falha se os testes falharem.
 
 Executar `git pull --ff-only origin fix/push-worker-security-reliability`, `npm run test:rules:diagnose`, `npm test`, `npm run build`. Enviar o arquivo `/tmp/patio-rules-6107-summary.json` e, para diagnóstico detalhado, o HTML/JSON de cobertura e log. Sem publicação de regras, sem produção, sem push ativo, sem serviços pagos.
+
+
+## Etapa 6.10.8 — Diagnóstico de cobertura e isolamento de testes
+
+O diagnóstico 6.10.7 executado localmente passou 35/35 testes de regras e 19/19 testes JS, mas registrou 43 ocorrências de `evaluation error` e 12 ocorrências do limite de 1.000 expressões. O JSON de cobertura retornou HTTP 404 porque o script utilizava o sufixo `.json`, inexistente no endpoint do Emulator. O endereço foi corrigido para `/emulator/v1/projects/demo-patio-pro-log:ruleCoverage`, enquanto o HTML continua usando `:ruleCoverage.html`.
+
+O script agora aceita `PATIO_RULES_FOCUS=chamados` (somente Televendas) ou `PATIO_RULES_FOCUS=assinaturas` (somente SaaS), além do padrão `all`. O relatório inclui o foco e contagem resumida por categoria. Os arquivos gerados usam o prefixo `/tmp/patio-rules-6108` por padrão; para evitar sobrescrita, informe `PATIO_RULES_REPORT_PREFIX` diferente para cada execução.
+
+Comandos recomendados, **somente Emulator**:
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+npm run test:rules:diagnose
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-6108-chamados npm run test:rules:diagnose
+PATIO_RULES_FOCUS=assinaturas PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-6108-assinaturas npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Compartilhar os três arquivos `*-summary.json` e o `*-coverage.json` de cada execução. A correção do endpoint e a divisão de testes **não corrigem automaticamente** os erros de segurança: `assertFails` pode aprovar um erro interno. Sem deploy, publicação de regras, escrita em produção ou ativação de push.
