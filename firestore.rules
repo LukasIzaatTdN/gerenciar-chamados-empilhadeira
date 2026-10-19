@@ -696,6 +696,7 @@ service cloud.firestore {
         ])
         && request.resource.data.action in [
           "chamado_criado",
+          "chamado_atualizado",
           "chamado_assumido",
           "chamado_iniciado",
           "chamado_finalizado",
