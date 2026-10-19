@@ -157,6 +157,16 @@ async function claimDelivery(env, eventKey, auditId) {
   }
 }
 
+export function actorCanNotify(actor, companyId, supermarketId) {
+  if (actor.status !== "Ativo") return false;
+  if (actor.perfil === "Administrador Geral") return true;
+  if (actor.empresa_id !== companyId) return false;
+  if (actor.perfil === "Administrador da Empresa") {
+    return actor.supermercado_id === supermarketId || (actor.supermercado_id == null && (actor.supermercado_ids == null || (Array.isArray(actor.supermercado_ids) && actor.supermercado_ids.includes(supermarketId))));
+  }
+  return actor.supermercado_id === supermarketId;
+}
+
 export async function stableEventKey(action, call) {
   const timestamp = action === "chamado_criado" ? call.criado_em
     : action === "chamado_assumido" ? call.assumido_em
@@ -219,19 +229,26 @@ async function handleNotify(request, env) {
     const audit = fields(await firestoreRequest(env, `auditoria/${encodeURIComponent(auditId)}`));
     if (audit.actorUid !== claims.sub || audit.entityType !== "chamado" || !["chamado_criado", "chamado_assumido", "chamado_iniciado", "chamado_finalizado"].includes(audit.action)) return json({ error: "Evento não autorizado para envio." }, 403);
     const details = audit.details && typeof audit.details === "object" ? audit.details : {};
-    const companyId = details.empresa_id || audit.empresa_id;
-    const supermarketId = details.supermercado_id || audit.supermercado_id;
+    const companyId = audit.empresa_id;
+    const supermarketId = audit.supermercado_id;
+    if (details.empresa_id != null && details.empresa_id !== companyId) return json({ error: "Empresa da auditoria divergente." }, 403);
+    if (details.supermercado_id != null && details.supermercado_id !== supermarketId) return json({ error: "Unidade da auditoria divergente." }, 403);
     if (!companyId || !supermarketId) return json({ error: "Escopo do evento incompleto." }, 422);
     const call = fields(await firestoreRequest(env, `chamados/${encodeURIComponent(audit.entityId)}`));
     const actor = fields(await firestoreRequest(env, `usuarios/${encodeURIComponent(claims.sub)}`));
-    if (actor.status !== "Ativo" || (actor.perfil !== "Administrador Geral" && (actor.empresa_id !== companyId || actor.supermercado_id !== supermarketId))) return json({ error: "Usuário ativo e autorizado não confirmado." }, 403);
+    if (!actorCanNotify(actor, companyId, supermarketId)) return json({ error: "Usuário ativo e autorizado não confirmado." }, 403);
     if (call.empresa_id !== companyId || call.supermercado_id !== supermarketId) return json({ error: "Escopo do chamado não corresponde à auditoria." }, 403);
     if (audit.action === "chamado_criado" && call.solicitante_uid !== claims.sub) return json({ error: "O autor do evento não corresponde ao solicitante do chamado." }, 403);
     if (audit.action !== "chamado_criado" && actor.nome !== details.operador_nome) return json({ error: "O usuário autenticado não corresponde ao operador do evento." }, 403);
     if (["chamado_assumido", "chamado_iniciado", "chamado_finalizado"].includes(audit.action) && !["Operador", "Supervisor", "Separador de Televendas", "Administrador da Empresa", "Administrador Geral"].includes(actor.perfil)) return json({ error: "Perfil sem permissão para esta movimentação." }, 403);
     if (!eventMatchesCurrentCall(audit.action, details, call)) return json({ error: "O evento não corresponde ao estado atual do chamado." }, 409);
     const eventKey = await stableEventKey(audit.action, call);
-    if (!(await claimDelivery(env, eventKey, auditId))) return json({ ok: true, duplicate: true });
+    if (!(await claimDelivery(env, eventKey, auditId))) {
+      const prior = fields(await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`));
+      if (prior.audit_id !== auditId) return json({ error: "Evento já associado a outra auditoria." }, 409);
+      if (prior.state === "sent") return json({ ok: true, duplicate: true });
+      return json({ error: "Entrega anterior incompleta ou em processamento; requer reconciliação antes de reenviar." }, 409);
+    }
     const recipients = (await loadPushTokens(env, companyId, supermarketId)).filter((item) => item.uid !== claims.sub);
     const data = eventCopy(audit.action, call, auditId);
     const results = await Promise.allSettled(recipients.map(({ token }) => sendFcm(env, token, data)));
