@@ -349,3 +349,23 @@ PATIO_RULES_FOCUS=usuarios PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610142-usu
 Enviar quatro arquivos: `/tmp/patio-rules-610142-usuarios-summary.json`, `/tmp/patio-rules-610142-usuarios.log`, `/tmp/patio-rules-610142-usuarios-coverage.json` e `/tmp/patio-rules-610142-usuarios-coverage.html` (se disponíveis). O JSON de cobertura permite analisar os pontos da regra avaliados e identificar se a rejeição ocorre no ramo de autoatualização ou nos ramos de administração. Não atribuir a causa a um ramo específico sem ler a cobertura.
 
 A seguir, apenas depois da análise da cobertura, propor correção pontual e executar novamente o diagnóstico isolado e o completo. Sem deploy, publicação de regras, escrita em produção, serviços pagos ou alteração em `main`.
+
+
+## Etapa 6.10.14.3 — Guarda global de autopromoção e testes separados (experimental)
+
+Após a cobertura da 6.10.14.2, a regra `usuarios/{id}` foi ajustada para envolver os três ramos `OR` de `allow update` com uma guarda de rejeição de autopromoção (somente quando `request.auth.uid == id`, perfil anterior diferente de `Administrador Geral` e novo perfil igual a `Administrador Geral`). A guarda deve bloquear o caso antes de avaliar ramos administrativos, sem modificar suas condições internas. A alteração anterior da 6.10.14.1 não estava presente na branch remota; a implementação da 6.10.14.3 foi feita diretamente sobre a versão remota atual.
+
+O teste antigo que combinava autocadastro indevido e autopromoção foi dividido em dois testes, e `PATIO_RULES_FOCUS=usuarios` foi atualizado para ambos. Portanto, o total geral esperado passou de **39 para 40 testes** (chamados permanece em 27).
+
+### Validação local (somente Firebase Emulator)
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=usuarios PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610143-usuarios npm run test:rules:diagnose
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610143 npm run test:rules:diagnose
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610143-chamados npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar summaries e logs do diagnóstico isolado e geral, além do summary de chamados. Critérios: isolado 2/2, geral 40/40, chamados 27/27, zero estouros de expressões no isolado e nos chamados, idealmente zero no geral, sem regressões de autorização. Se o estouro persistir ou surgir qualquer regressão, não publicar regras e reavaliar/voltar atrás na guarda. Não houve deploy, publicação de regras, escrita em produção ou serviço pago.
