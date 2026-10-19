@@ -42,7 +42,11 @@ service cloud.firestore {
     }
 
     function isSaasPlanValid(planId, data) {
-      return data.keys().hasOnly([
+      return data.keys().hasAll([
+          "id", "nome", "descricao", "valor_centavos", "ciclo",
+          "status", "criado_em", "atualizado_em", "ultima_operacao_id"
+        ])
+        && data.keys().hasOnly([
           "id", "nome", "descricao", "valor_centavos", "ciclo", "limite_usuarios",
           "limite_filiais", "status", "criado_em", "atualizado_em", "ultima_operacao_id"
         ])
@@ -51,8 +55,8 @@ service cloud.firestore {
         && data.descricao is string && data.descricao.size() <= 500
         && data.valor_centavos is int && data.valor_centavos >= 0 && data.valor_centavos <= 100000000
         && data.ciclo in ["Mensal", "Trimestral", "Semestral", "Anual"]
-        && (data.limite_usuarios == null || (data.limite_usuarios is int && data.limite_usuarios >= 1 && data.limite_usuarios <= 100000))
-        && (data.limite_filiais == null || (data.limite_filiais is int && data.limite_filiais >= 1 && data.limite_filiais <= 100000))
+        && (data.get("limite_usuarios", null) == null || (data.limite_usuarios is int && data.limite_usuarios >= 1 && data.limite_usuarios <= 100000))
+        && (data.get("limite_filiais", null) == null || (data.limite_filiais is int && data.limite_filiais >= 1 && data.limite_filiais <= 100000))
         && data.status in ["Ativo", "Inativo"]
         && data.criado_em is timestamp && data.atualizado_em == request.time
         && data.ultima_operacao_id is string;
@@ -81,7 +85,14 @@ service cloud.firestore {
           : action == "activate"
             ? priorStatus == "Pendente" && data.status == "Ativa"
             : action == "renew" && priorStatus in ["Ativa", "Expirada"] && data.status == "Ativa";
-      return exists(companyPath) && exists(planPath)
+      return data.keys().hasAll([
+          "empresa_id", "plano_id", "plano_nome", "status", "ciclo", "valor_centavos",
+          "inicio_em", "vence_em", "renovacao_manual", "cobranca_automatica",
+          "provedor_pagamento", "criado_em", "atualizado_em", "atualizado_por",
+          "ultima_operacao_id"
+        ])
+        && exists(companyPath) && exists(planPath)
+        && existsAfter(saasHistoryPath(empresaId, operationId))
         && plan.status == "Ativo"
         && data.keys().hasOnly([
           "empresa_id", "plano_id", "plano_nome", "status", "ciclo", "valor_centavos",
@@ -134,12 +145,14 @@ service cloud.firestore {
 
     function isSaasHistoryValid(empresaId, operationId, data) {
       let op = getAfter(saasOperationPath(operationId)).data;
-      return data.keys().hasOnly(["acao", "empresa_id", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+      return data.keys().hasAll(["acao", "empresa_id", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+        && data.keys().hasOnly(["acao", "empresa_id", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
         && data.empresa_id == empresaId && data.plano_id is string
         && data.operation_id == operationId && data.ator_uid == request.auth.uid
         && data.ator_nome is string && data.ocorrido_em == request.time
         && data.acao in ["plano_vinculado", "assinatura_ativada", "assinatura_renovada"]
         && data.detalhes is map
+        && existsAfter(saasOperationPath(operationId))
         && op.target_id == empresaId && op.action in ["assignPlan", "activate", "renew"]
         && op.actor_uid == request.auth.uid
         && op.request_data.empresaId == empresaId
@@ -154,12 +167,17 @@ service cloud.firestore {
     }
 
     function isSaasOperationValid(operationId, data) {
-      return data.keys().hasOnly(["operation_id", "actor_uid", "action", "request_data", "target_id", "result", "processed_at"])
+      return data.keys().hasAll(["operation_id", "actor_uid", "action", "request_data", "target_id", "result", "processed_at"])
+        && data.keys().hasOnly(["operation_id", "actor_uid", "action", "request_data", "target_id", "result", "processed_at"])
         && data.operation_id == operationId && data.actor_uid == request.auth.uid
         && data.action in ["savePlan", "assignPlan", "activate", "renew"]
         && data.request_data is map && data.result is map && data.processed_at == request.time
         && data.target_id is string
-        && (data.action == "savePlan" ? data.request_data.plan is map : data.request_data.empresaId == data.target_id && data.request_data.planId is string);
+        && (data.action == "savePlan"
+          ? data.request_data.get("plan", null) is map
+          : data.request_data.keys().hasAll(["empresaId", "planId"])
+            && data.request_data.empresaId == data.target_id
+            && data.request_data.planId is string);
     }
 
     function isAdminEmpresa() {
@@ -890,7 +908,10 @@ service cloud.firestore {
         allow read: if isActiveSaasPlatformAdmin() || isActiveSaasCompanyAdmin(id);
         allow create, update: if assinaturaId == "atual"
           && isActiveSaasPlatformAdmin()
+          && request.resource.data.keys().hasAll(["ultima_operacao_id", "plano_id"])
           && request.resource.data.ultima_operacao_id is string
+          && request.resource.data.plano_id is string
+          && existsAfter(saasOperationPath(request.resource.data.ultima_operacao_id))
           && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == id
           && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action in ["assignPlan", "activate", "renew"]
           && isSaasSubscriptionValid(
@@ -915,6 +936,8 @@ service cloud.firestore {
       allow create, update: if isActiveSaasPlatformAdmin()
         && isSaasPlanValid(planoId, request.resource.data)
         && request.resource.data.ultima_operacao_id is string
+        && existsAfter(saasOperationPath(request.resource.data.ultima_operacao_id))
+        && existsAfter(saasAuditPath(request.resource.data.ultima_operacao_id))
         && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action == "savePlan"
         && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == planoId
         && getAfter(saasAuditPath(request.resource.data.ultima_operacao_id)).data.plano_id == planoId
@@ -925,6 +948,7 @@ service cloud.firestore {
     match /auditoria_assinaturas/{eventoId} {
       allow read: if isActiveSaasPlatformAdmin();
       allow create: if isActiveSaasPlatformAdmin()
+        && request.resource.data.keys().hasAll(["acao", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
         && request.resource.data.keys().hasOnly(["acao", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
         && request.resource.data.operation_id == eventoId
         && request.resource.data.ator_uid == request.auth.uid
@@ -932,6 +956,7 @@ service cloud.firestore {
         && request.resource.data.ocorrido_em == request.time
         && request.resource.data.acao in ["plano_criado", "plano_editado"]
         && request.resource.data.detalhes is map
+        && existsAfter(saasOperationPath(eventoId))
         && getAfter(saasOperationPath(eventoId)).data.action == "savePlan"
         && getAfter(saasOperationPath(eventoId)).data.target_id == request.resource.data.plano_id
         && getAfter(saasOperationPath(eventoId)).data.actor_uid == request.auth.uid;
