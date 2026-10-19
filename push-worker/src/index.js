@@ -165,14 +165,18 @@ export function classifyFcmResult(result) {
   return Number.isInteger(status) && status >= 400 && status < 500 && status !== 429 ? "rejected" : "unknown";
 }
 
+export async function recipientIdentityKey(recipient) {
+  const identity = new TextEncoder().encode(`${recipient.uid}:\0${recipient.token}`);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", identity));
+  return "r_" + [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function recipientDeliveryRecords(recipients, results) {
   if (recipients.length !== results.length) throw new Error("Resultados de destinatários inconsistentes.");
   const records = {};
   for (let i = 0; i < recipients.length; i++) {
     const recipient = recipients[i];
-    const identity = new TextEncoder().encode(`${recipient.uid}:\0${recipient.token}`);
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", identity));
-    const key = "r_" + [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const key = await recipientIdentityKey(recipient);
     records[key] = { uid: recipient.uid, status: classifyFcmResult(results[i]) };
   }
   return records;
@@ -296,6 +300,51 @@ async function handleNotify(request, env) {
     if (["chamado_assumido", "chamado_iniciado", "chamado_finalizado"].includes(audit.action) && !["Operador", "Supervisor", "Separador de Televendas", "Administrador da Empresa", "Administrador Geral"].includes(actor.perfil)) return json({ error: "Perfil sem permissão para esta movimentação." }, 403);
     if (!eventMatchesCurrentCall(audit.action, details, call)) return json({ error: "O evento não corresponde ao estado atual do chamado." }, 409);
     const eventKey = await stableEventKey(audit.action, call);
+    if (body.operation === "recover") {
+      // Only the original audited actor can recover; all scope and state checks above still apply.
+      const original = fields(await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`));
+      const plan = recoveryPlan(original, auditId);
+      if (!plan.allowed) return json({ error: plan.reason || "Recuperação não autorizada; revisão manual necessária." }, 409);
+      const active = (await loadPushTokens(env, companyId, supermarketId)).filter((item) => item.uid !== claims.sub);
+      const byKey = new Map();
+      for (const recipient of active) byKey.set(await recipientIdentityKey(recipient), recipient);
+      const rejectedKeys = Object.keys(original.recipient_results).filter((key) => original.recipient_results[key].status === "rejected");
+      if (rejectedKeys.some((key) => !byKey.has(key))) return json({ error: "Destinatário rejeitado não está mais ativo com o mesmo token; revisão necessária." }, 409);
+      // A create-only document is the durable concurrency lock. Never delete/reuse it,
+      // even if sending or persistence fails, because the FCM result may be uncertain.
+      const attemptId = eventKey + "_once";
+      try {
+        await firestoreRequest(env, "push_recovery_attempts?documentId=" + encodeURIComponent(attemptId), {
+          method: "POST",
+          body: JSON.stringify({ fields: {
+            audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey },
+            empresa_id: { stringValue: companyId }, supermercado_id: { stringValue: supermarketId },
+            state: { stringValue: "claimed" }, recipient_count: { integerValue: String(rejectedKeys.length) },
+            claimed_at: { timestampValue: new Date().toISOString() },
+          } }),
+        });
+      } catch (error) {
+        if (String(error).includes("HTTP 409")) return json({ error: "Recuperação já iniciada ou realizada; nenhuma notificação reenviada." }, 409);
+        throw error;
+      }
+      const retryRecipients = rejectedKeys.map((key) => byKey.get(key));
+      const results = await Promise.allSettled(retryRecipients.map(({ token }) => sendFcm(env, token, eventCopy(audit.action, call, auditId))));
+      const retryRecords = await recipientDeliveryRecords(retryRecipients, results);
+      const failed = Object.values(retryRecords).filter((entry) => entry.status !== "accepted").length;
+      await firestoreRequest(env, `push_recovery_attempts/${encodeURIComponent(attemptId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ fields: {
+          audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey },
+          empresa_id: { stringValue: companyId }, supermercado_id: { stringValue: supermarketId },
+          state: { stringValue: failed === 0 ? "sent" : "review_required" },
+          recipient_count: { integerValue: String(retryRecipients.length) },
+          failure_count: { integerValue: String(failed) },
+          recipient_results: { mapValue: { fields: Object.fromEntries(Object.entries(retryRecords).map(([key, entry]) => [key, { mapValue: { fields: { uid: { stringValue: entry.uid }, status: { stringValue: entry.status } } } }])) } },
+          completed_at: { timestampValue: new Date().toISOString() },
+        } }),
+      });
+      return json({ ok: failed === 0, recoveredCount: retryRecipients.length - failed, failureCount: failed, requiresReview: failed > 0 }, failed === 0 ? 200 : 503);
+    }
     if (body.operation === "status" || body.operation === "recovery_preview") {
       let record;
       try {
