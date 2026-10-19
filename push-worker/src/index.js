@@ -157,6 +157,27 @@ async function claimDelivery(env, eventKey, auditId) {
   }
 }
 
+export function classifyFcmResult(result) {
+  if (result.status === "fulfilled") return "accepted";
+  const status = result.reason?.httpStatus;
+  // An HTTP 4xx response (except throttling) is a confirmed rejection by FCM.
+  // Network errors, timeouts, 429 and 5xx cannot prove the message was not accepted.
+  return Number.isInteger(status) && status >= 400 && status < 500 && status !== 429 ? "rejected" : "unknown";
+}
+
+export async function recipientDeliveryRecords(recipients, results) {
+  if (recipients.length !== results.length) throw new Error("Resultados de destinatários inconsistentes.");
+  const records = {};
+  for (let i = 0; i < recipients.length; i++) {
+    const recipient = recipients[i];
+    const identity = new TextEncoder().encode(`${recipient.uid}:\0${recipient.token}`);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", identity));
+    const key = "r_" + [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    records[key] = { uid: recipient.uid, status: classifyFcmResult(results[i]) };
+  }
+  return records;
+}
+
 export function reconciliationStatus(record, auditId) {
   if (!record || record.audit_id !== auditId) return { httpStatus: 409, error: "Registro de entrega incompatível." };
   if (record.state === "sent") return { httpStatus: 200, state: "sent", requiresReview: false, recipientCount: record.recipient_count ?? null, failureCount: 0 };
@@ -221,7 +242,11 @@ async function sendFcm(env, token, data) {
     headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
     body: JSON.stringify({ message: { token, data } }),
   });
-  if (!response.ok) throw new Error(`FCM HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  if (!response.ok) {
+    const error = new Error(`FCM HTTP ${response.status}`);
+    error.httpStatus = response.status;
+    throw error;
+  }
 }
 
 async function handleNotify(request, env) {
@@ -276,13 +301,15 @@ async function handleNotify(request, env) {
       return json({ error: "Entrega anterior incompleta ou em processamento; requer reconciliação antes de reenviar." }, 409);
     }
     const recipients = (await loadPushTokens(env, companyId, supermarketId)).filter((item) => item.uid !== claims.sub);
+    if (recipients.length > 100) return json({ error: "Limite de destinatários por evento excedido; envio não iniciado." }, 422);
     const data = eventCopy(audit.action, call, auditId);
     const results = await Promise.allSettled(recipients.map(({ token }) => sendFcm(env, token, data)));
-    const failures = results.filter((result) => result.status === "rejected").length;
+    const recipientRecords = await recipientDeliveryRecords(recipients, results);
+    const failures = Object.values(recipientRecords).filter((record) => record.status !== "accepted").length;
     const outcome = deliveryOutcome(recipients.length, failures);
     await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`, {
       method: "PATCH",
-      body: JSON.stringify({ fields: { audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey }, state: { stringValue: outcome.state }, recipient_count: { integerValue: String(recipients.length) }, failure_count: { integerValue: String(failures) }, completed_at: { timestampValue: new Date().toISOString() } } }),
+      body: JSON.stringify({ fields: { audit_id: { stringValue: auditId }, event_key: { stringValue: eventKey }, state: { stringValue: outcome.state }, recipient_count: { integerValue: String(recipients.length) }, failure_count: { integerValue: String(failures) }, recipient_results: { mapValue: { fields: Object.fromEntries(Object.entries(recipientRecords).map(([key, record]) => [key, { mapValue: { fields: { uid: { stringValue: record.uid }, status: { stringValue: record.status } } } }])) } }, completed_at: { timestampValue: new Date().toISOString() } } }),
     });
     return json({ ok: !outcome.requiresReview, recipientCount: recipients.length, failureCount: failures, requiresReview: outcome.requiresReview }, outcome.httpStatus);
   } catch (error) {
