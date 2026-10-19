@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -143,4 +143,13 @@ test("tenant authorization distinguishes company admins and unit operators", () 
   assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null }, "b", "u1"), false);
   assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null, supermercado_ids: ["u2"] }, "a", "u1"), false);
   assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null, supermercado_ids: ["u2"] }, "a", "u2"), true);
+});
+
+
+test("partial FCM delivery is reported as incomplete and never marked sent", () => {
+  assert.deepEqual(deliveryOutcome(3, 0), { state: "sent", httpStatus: 200, requiresReview: false });
+  assert.deepEqual(deliveryOutcome(3, 1), { state: "partial", httpStatus: 503, requiresReview: true });
+  assert.deepEqual(deliveryOutcome(3, 3), { state: "partial", httpStatus: 503, requiresReview: true });
+  assert.throws(() => deliveryOutcome(1, 2), /Contagem de entrega inválida/);
+  assert.throws(() => deliveryOutcome(-1, 0), /Contagem de entrega inválida/);
 });
