@@ -146,3 +146,8 @@ A regra `usuarios/{id}` agora avalia primeiro a alternativa de atualização do 
 **Importante:** a mudança não garante por si só a eliminação de `evaluation error`, que pode continuar em casos de documento inexistente ou campos ausentes. O teste `assertFails` não distingue rejeição esperada de erro interno. Inspecionar as mensagens de `evaluation error` e de limite de 1.000 expressões nos logs; testar também os fluxos administrativos existentes. Não publicar regras até confirmação dos resultados.
 
 Comandos: `git pull --ff-only origin fix/push-worker-security-reliability`, `npm run test:rules 2>&1 | tee /tmp/patio-rules-6105.log`, `npm test`, `npm run build`. Sem deploy, push ativo, alterações em produção ou custos pagos.
+
+
+## Etapa 6.10.6 — Validação pendente
+
+Regras alteradas na branch de desenvolvimento: pré-validação de campos obrigatórios de auditoria de Televendas, isolamento da alternativa genérica para ações diferentes de `chamado_atualizado`, e filtros baratos antes dos caminhos administrativos de atualização de usuários. A implementação não foi validada no Emulator. Executar `npm run test:rules 2>&1 | tee /tmp/patio-rules-6106.log`, `npm test` e `npm run build`; inspecionar erros `evaluation error` e `maximum of 1000 expressions`, sobretudo em chamadas, auditoria e usuários. Não publicar regras ou habilitar push.
