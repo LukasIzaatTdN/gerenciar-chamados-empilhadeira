@@ -219,3 +219,24 @@ npm run build
 ```
 
 Compartilhar os arquivos `/tmp/patio-rules-61010-summary.json`, `/tmp/patio-rules-61010-chamados-summary.json`, `/tmp/patio-rules-61010-assinaturas-summary.json` e `/tmp/patio-rules-61010-coverage.json`. Testes `assertFails` aprovados não comprovam negação limpa; conferir `evaluationErrorMentions` e `expressionBudgetMentions`. Nenhum deploy, publicação de regras, alteração em produção, serviço pago ou push real.
+
+
+## Etapa 6.10.11 — Pré-filtros de auditoria Televendas (aguardando testes)
+
+Base 6.10.10 (Emulator): 43 menções a erros de avaliação e 12 ao limite de 1.000 expressões; foco chamados: 24 erros, 11 estouros, todos estes na criação de auditoria (linha 835); foco assinaturas: 19 erros, 1 estouro em atualização de usuários. Esses valores são **base anterior**, não resultados desta alteração.
+
+Em `firestore.rules`, `isTelevendasUpdateAuditAgainstCall` agora verifica a existência do chamado antes de ler seu estado, exige que o estado pós-commit contenha o marcador de auditoria exato e que o marcador anterior seja diferente, antes de executar as comparações de detalhes. O teste `chamados-update.rules.test.mjs` ganhou cenário para auditoria órfã e replay. O isolamento por empresa/unidade e a obrigatoriedade do commit atômico não foram removidos.
+
+Atenção: `assertFails` também pode aprovar negativas que geraram erros internos. Portanto, comparar **erros de avaliação e limites**, além da aprovação dos testes. `existsAfter` pode aumentar o custo das regras e precisa de validação real no Emulator antes de qualquer nova alteração.
+
+Comandos, sem deploy:
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61011-chamados npm run test:rules:diagnose
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61011 npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Arquivos para análise: `/tmp/patio-rules-61011-chamados-summary.json`, `/tmp/patio-rules-61011-chamados.log`, `/tmp/patio-rules-61011-summary.json` e `/tmp/patio-rules-61011-coverage.json`. Meta: 25/25 testes no foco chamados, 37/37 no total (antes 24 e 36); erros de avaliação e estouros idealmente menores que 24/11 no foco e 43/12 no total. Caso testes positivos falhem ou o limite aumente, reavaliar/reverter esta alteração antes de prosseguir. Não executar deploy, não publicar regras, não ativar push e não usar serviços pagos.
