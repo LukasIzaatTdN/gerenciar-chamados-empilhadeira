@@ -1,5 +1,6 @@
 export type NotificationType =
   | "chamado_criado"
+  | "chamado_atualizado"
   | "chamado_assumido"
   | "atendimento_iniciado"
   | "operador_proximo"
@@ -26,6 +27,11 @@ export const NOTIFICATION_CONFIG: Record<
 > = {
   chamado_criado: {
     icon: "📋",
+    color: "blue",
+    sound: "info",
+  },
+  chamado_atualizado: {
+    icon: "📝",
     color: "blue",
     sound: "info",
   },
