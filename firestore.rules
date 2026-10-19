@@ -1126,8 +1126,16 @@ service cloud.firestore {
           request.resource.data.supermercado_id
         );
 
-      // Fast self-update path first; admin management remains independent.
-      allow update: if (
+      // Reject self-promotion before any self-update or admin-management branch.
+      // The guard applies to the complete OR expression below.
+      allow update: if isSignedIn()
+        && !(
+          request.auth.uid == id
+          && resource.data.get("perfil", null) != "Administrador Geral"
+          && request.resource.data.get("perfil", null) == "Administrador Geral"
+        )
+        && (
+          (
           isSignedIn()
           && request.auth.uid == id
           && request.resource.data.id == resource.data.id
@@ -1166,6 +1174,7 @@ service cloud.firestore {
           && request.resource.data.perfil != "Administrador Geral"
           && hasOnlyUserManagementChanges(resource.data, request.resource.data)
           && canAdminEmpresaManageUser(resource.data, request.resource.data)
+        )
         );
 
       allow delete: if isAdminGeral()
