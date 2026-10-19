@@ -135,3 +135,14 @@ No Emulator da 6.10.3, 29/29 testes de regras, 19/19 JavaScript e build passaram
 **Critério de aceite:** os testes negativos do fluxo auditado devem rejeitar sem erro de orçamento na linha de `chamados` e os positivos devem continuar passando. Erros de avaliação em outras coleções (SaaS, usuários e auditoria) devem ser investigados separadamente, não escondidos. Testes `assertFails` não verificam motivo do erro; conferir log do Emulator e, se necessário, a cobertura de regras.
 
 Executar `npm run test:rules 2>&1 | tee /tmp/patio-rules-6104.log`, `npm test` e `npm run build`. Não publicar regras, não habilitar push, não modificar `main` ou produção.
+
+
+## Etapa 6.10.5 — Guarda de auditoria e prioridade da atualização própria (aguardando Emulator)
+
+Diagnóstico da 6.10.4: 31/31 testes de regras, 19/19 unitários e build aprovados; o erro de orçamento de 1.000 expressões deixou de aparecer em `chamados`, mas ainda ocorreu em `usuarios` e houve `evaluation error` em `chamados` e `auditoria`.
+
+A regra `usuarios/{id}` agora avalia primeiro a alternativa de atualização do próprio perfil, mantendo as duas alternativas administrativas. Isso visa evitar avaliação dispendiosa de privilégios administrativos para uma atualização própria legítima. Na auditoria de Televendas, o identificador do chamado é verificado como string não vazia e `details` como mapa antes da construção/leitura do caminho `chamados/{entityId}`. Dois testes negativos de identificador de entidade ausente/não textual foram adicionados (**33 testes de regras previstos**).
+
+**Importante:** a mudança não garante por si só a eliminação de `evaluation error`, que pode continuar em casos de documento inexistente ou campos ausentes. O teste `assertFails` não distingue rejeição esperada de erro interno. Inspecionar as mensagens de `evaluation error` e de limite de 1.000 expressões nos logs; testar também os fluxos administrativos existentes. Não publicar regras até confirmação dos resultados.
+
+Comandos: `git pull --ff-only origin fix/push-worker-security-reliability`, `npm run test:rules 2>&1 | tee /tmp/patio-rules-6105.log`, `npm test`, `npm run build`. Sem deploy, push ativo, alterações em produção ou custos pagos.
