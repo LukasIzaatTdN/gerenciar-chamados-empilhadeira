@@ -301,7 +301,6 @@ async function handleNotify(request, env) {
       return json({ error: "Entrega anterior incompleta ou em processamento; requer reconciliação antes de reenviar." }, 409);
     }
     const recipients = (await loadPushTokens(env, companyId, supermarketId)).filter((item) => item.uid !== claims.sub);
-    if (recipients.length > 100) return json({ error: "Limite de destinatários por evento excedido; envio não iniciado." }, 422);
     const data = eventCopy(audit.action, call, auditId);
     const results = await Promise.allSettled(recipients.map(({ token }) => sendFcm(env, token, data)));
     const recipientRecords = await recipientDeliveryRecords(recipients, results);
