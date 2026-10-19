@@ -733,6 +733,14 @@ service cloud.firestore {
     // Keep this path deliberately small: the general call update rule is already
     // expensive and Firestore enforces a 1,000-expression evaluation limit.
     function isTelevendasUpdateAuditAuthentic(auditId, data) {
+      return data.entityType == "chamado"
+        && data.entityId is string
+        && data.entityId.size() > 0
+        && data.details is map
+        && isTelevendasUpdateAuditAgainstCall(auditId, data);
+    }
+
+    function isTelevendasUpdateAuditAgainstCall(auditId, data) {
       let callPath = /databases/$(database)/documents/chamados/$(data.entityId);
       let previous = get(callPath).data;
       let current = getAfter(callPath).data;
@@ -1063,22 +1071,8 @@ service cloud.firestore {
           request.resource.data.supermercado_id
         );
 
+      // Fast self-update path first; admin management remains independent.
       allow update: if (
-          isAdminGeral()
-          && resource.data.perfil == "Administrador da Empresa"
-          && resource.data.convite_token is string
-          && resource.data.convite_token.size() > 0
-          && request.resource.data.perfil == resource.data.perfil
-          && request.resource.data.empresa_id == resource.data.empresa_id
-          && request.resource.data.convite_token == resource.data.convite_token
-          && isUsuarioVinculoValido(request.resource.data)
-          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
-        )
-        || (
-          canAdminEmpresaManageUser(resource.data, request.resource.data)
-          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
-        )
-        || (
           isSignedIn()
           && request.auth.uid == id
           && isCurrentUserActive()
@@ -1100,7 +1094,23 @@ service cloud.firestore {
             || (resource.data.perfil == "Administrador Geral" && request.resource.data.supermercado_id == null)
             || (resource.data.perfil == "Administrador da Empresa" && request.resource.data.supermercado_id == null)
           )
-        );
+        )
+        || (
+          isAdminGeral()
+          && resource.data.perfil == "Administrador da Empresa"
+          && resource.data.convite_token is string
+          && resource.data.convite_token.size() > 0
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.convite_token == resource.data.convite_token
+          && isUsuarioVinculoValido(request.resource.data)
+          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        )
+        || (
+          canAdminEmpresaManageUser(resource.data, request.resource.data)
+          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        )
+;
 
       allow delete: if isAdminGeral()
         || (
