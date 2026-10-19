@@ -343,3 +343,37 @@ test("6.10.11: orphaned and replayed Televendas audit records are rejected", asy
     details: { ...audit("tv-regression").details, statusAnterior: "Pronto" },
   })));
 });
+
+
+test("6.10.12: company admin can atomically audit its own Televendas call", async () => {
+  await environment.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, "usuarios/company-admin-61012"), {
+      perfil: "Administrador da Empresa", status: "Ativo",
+      empresa_id: "empresa-a", supermercado_id: null, nome: "Admin A",
+    });
+    await setDoc(doc(db, "chamados/tv-admin-61012"), { ...initial, id: "tv-admin-61012" });
+  });
+  const db = environment.authenticatedContext("company-admin-61012").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-admin-61012"), {
+    ...update, ultima_auditoria_atualizacao_id: "tv-admin-audit-61012",
+  });
+  batch.set(doc(db, "auditoria/tv-admin-audit-61012"), audit("tv-admin-61012", {
+    actorUid: "company-admin-61012", actorName: "Admin A",
+  }));
+  await assertSucceeds(batch.commit());
+  assert.equal((await getDoc(doc(db, "chamados/tv-admin-61012"))).data().status, "Pronto");
+});
+
+test("6.10.12: company admin cannot create a foreign company's Televendas audit", async () => {
+  const db = environment.authenticatedContext("company-admin-61012").firestore();
+  await assertFails(setDoc(doc(db, "auditoria/tv-admin-foreign-61012"), audit("tv-b", {
+    actorUid: "company-admin-61012", actorName: "Admin A",
+    empresa_id: "empresa-b", supermercado_id: "loja-b",
+    details: {
+      ...audit("tv-b").details,
+      empresa_id: "empresa-b", supermercado_id: "loja-b",
+    },
+  })));
+});
