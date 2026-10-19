@@ -355,7 +355,7 @@ export default function App() {
 
   useEffect(() => listenForForegroundPush((data) => {
     const type = data.type;
-    if (type === "chamado_criado" || type === "chamado_assumido" || type === "atendimento_iniciado" || type === "atendimento_finalizado") {
+    if (type === "chamado_criado" || type === "chamado_atualizado" || type === "chamado_assumido" || type === "atendimento_iniciado" || type === "atendimento_finalizado") {
       notify(type, data.title || "Atualização de chamado", data.body || "Um chamado foi atualizado.", data.chamadoId);
     }
   }), [notify]);
@@ -433,6 +433,16 @@ export default function App() {
           "atendimento_finalizado",
           "Atendimento Finalizado",
           `${chamado.tipo_servico} em ${chamado.setor} foi concluído por ${chamado.operador_nome || "operador"}`,
+          chamado.id
+        );
+      },
+      onAtualizado: (chamado: Chamado) => {
+        // Background push for this event remains disabled until the backend
+        // validates immutable audit data and supports this action.
+        notify(
+          "chamado_atualizado",
+          "Chamado Atualizado",
+          `${chamado.tipo_servico} em ${chamado.setor} foi atualizado.`,
           chamado.id
         );
       },
