@@ -213,20 +213,30 @@ test("a standalone audit cannot reuse the latest committed marker", async () => 
   })));
 });
 
-// Known gap: the scoped call-update rule does not require a matching audit
-// document. This characterization MUST NOT be mistaken for a security success.
-test("KNOWN GAP: same-tenant marker update without audit is currently allowed", async () => {
+// Regression: a matching audit MUST be created in the same atomic commit.
+test("same-tenant marker update without audit is denied and call stays unchanged", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
-  await assertSucceeds(updateDoc(doc(db, "chamados/tv-gap"), {
+  await assertFails(updateDoc(doc(db, "chamados/tv-gap"), {
     status: "Pronto", atualizado_em: "2026-10-19T10:07:00.000Z",
     atualizado_por: "Operador A", operador_nome: "Operador A",
     ultima_auditoria_atualizacao_id: "tv-no-audit",
   }));
-  assert.equal((await getDoc(doc(db, "chamados/tv-gap"))).data().ultima_auditoria_atualizacao_id, "tv-no-audit");
-  // Inspect absence with rules disabled; the application user is not allowed
-  // to read a missing audit document under the current read policy.
+  const call = await getDoc(doc(db, "chamados/tv-gap"));
+  assert.equal(call.data().status, "Em separação");
+  assert.equal(call.data().ultima_auditoria_atualizacao_id, undefined);
   await environment.withSecurityRulesDisabled(async context => {
     const auditSnapshot = await getDoc(doc(context.firestore(), "auditoria/tv-no-audit"));
     assert.equal(auditSnapshot.exists(), false);
   });
+});
+
+test("a scoped operator cannot attach a foreign call's audit to its marker", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-gap"), {
+    ...update, ultima_auditoria_atualizacao_id: "tv-wrong-entity",
+  });
+  batch.set(doc(db, "auditoria/tv-wrong-entity"), audit("tv-regression"));
+  await assertFails(batch.commit());
+  assert.equal((await getDoc(doc(db, "chamados/tv-gap"))).data().status, "Em separação");
 });
