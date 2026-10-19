@@ -1130,7 +1130,6 @@ service cloud.firestore {
       allow update: if (
           isSignedIn()
           && request.auth.uid == id
-          && isCurrentUserActive()
           && request.resource.data.id == resource.data.id
           && request.resource.data.nome == resource.data.nome
           && request.resource.data.email == resource.data.email
@@ -1143,6 +1142,7 @@ service cloud.firestore {
             "supermercado_ids",
             "atualizado_em"
           ])
+          && isCurrentUserActive()
           && (
             request.resource.data.supermercado_id == resource.data.supermercado_id
             || isSupermercadoDaEmpresaAtivo(resource.data.empresa_id, request.resource.data.supermercado_id)
@@ -1158,11 +1158,8 @@ service cloud.firestore {
           && isAdminGeral()
           && resource.data.convite_token is string
           && resource.data.convite_token.size() > 0
-          && request.resource.data.perfil == resource.data.perfil
-          && request.resource.data.empresa_id == resource.data.empresa_id
           && request.resource.data.convite_token == resource.data.convite_token
           && isUsuarioVinculoValido(request.resource.data)
-          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
         )
         || (
           resource.data.perfil != "Administrador Geral"
