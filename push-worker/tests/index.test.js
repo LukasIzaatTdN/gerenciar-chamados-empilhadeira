@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -115,4 +115,16 @@ test("authenticated lifecycle events are scoped and sent at most once without re
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test("tenant authorization distinguishes company admins and unit operators", () => {
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Operador", empresa_id: "a", supermercado_id: "u1" }, "a", "u1"), true);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Operador", empresa_id: "a", supermercado_id: "u1" }, "b", "u1"), false);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Operador", empresa_id: "a", supermercado_id: "u1" }, "a", "u2"), false);
+  assert.equal(actorCanNotify({ status: "Inativo", perfil: "Administrador Geral" }, "a", "u1"), false);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null }, "a", "u1"), true);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null }, "b", "u1"), false);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null, supermercado_ids: ["u2"] }, "a", "u1"), false);
+  assert.equal(actorCanNotify({ status: "Ativo", perfil: "Administrador da Empresa", empresa_id: "a", supermercado_id: null, supermercado_ids: ["u2"] }, "a", "u2"), true);
 });
