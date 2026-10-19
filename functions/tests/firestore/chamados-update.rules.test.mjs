@@ -21,6 +21,8 @@ const initial = {
   empilhadeira_id: null, empilhadeira_identificacao: null,
   assumido_em: stamp, a_caminho_em: null, cheguei_em: null,
   iniciado_em: null, finalizado_em: null, cancelado_em: null,
+  itens: [{ id: "item-1", nome: "Produto", quantidade: 1 }],
+  observacao_operador: null, motivo_incompleto: null,
 };
 const update = {
   status: "Pronto", atualizado_em: "2026-10-19T10:01:00.000Z",
@@ -70,7 +72,7 @@ after(async () => environment.cleanup());
 test("valid televendas update and scoped audit commit atomically", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
   const batch = writeBatch(db);
-  batch.update(doc(db, "chamados/tv-a"), update);
+  batch.update(doc(db, "chamados/tv-a"), { ...update, ultima_auditoria_atualizacao_id: "tv-update-1" });
   batch.set(doc(db, "auditoria/tv-update-1"), audit("tv-a"));
   await assertSucceeds(batch.commit());
   assert.equal((await getDoc(doc(db, "chamados/tv-a"))).data().status, "Pronto");
@@ -116,16 +118,46 @@ test("audit records are immutable after creation", async () => {
   await assertFails(updateDoc(doc(db, "auditoria/tv-update-1"), { action: "chamado_finalizado" }));
 });
 
-/**
- * SECURITY GAP CHARACTERIZATION, not a security success:
- * The current rules permit a same-tenant actor to create a standalone audit
- * without an accompanying call update. This test will PASS until the policy is
- * hardened, and MUST NOT be interpreted as proof of event authenticity.
- */
-test("KNOWN GAP: same-tenant standalone update audit is currently permitted", async () => {
+test("standalone forged update audit is denied", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
-  await assertSucceeds(setDoc(doc(db, "auditoria/tv-standalone-gap"), audit("tv-a", {
+  await assertFails(setDoc(doc(db, "auditoria/tv-standalone-gap"), audit("tv-a", {
     details: { ...audit("tv-a").details, statusAtual: "Cancelado" },
   })));
-  assert.ok((await getDoc(doc(db, "auditoria/tv-standalone-gap"))).exists());
+});
+
+test("audit with a mismatched post-commit status is denied", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-a"), {
+    ...update, status: "Incompleto", atualizado_em: "2026-10-19T10:02:00.000Z",
+    ultima_auditoria_atualizacao_id: "tv-wrong-status",
+  });
+  batch.set(doc(db, "auditoria/tv-wrong-status"), audit("tv-a", {
+    details: { ...audit("tv-a").details, statusAnterior: "Pronto", statusAtual: "Pronto", atualizado_em: "2026-10-19T10:02:00.000Z" },
+  }));
+  await assertFails(batch.commit());
+});
+
+test("marker-only changes cannot manufacture a new update event", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-a"), {
+    ultima_auditoria_atualizacao_id: "tv-marker-only",
+    atualizado_em: "2026-10-19T10:03:00.000Z",
+  });
+  batch.set(doc(db, "auditoria/tv-marker-only"), audit("tv-a", {
+    details: { ...audit("tv-a").details, statusAnterior: "Pronto", atualizado_em: "2026-10-19T10:03:00.000Z" },
+  }));
+  await assertFails(batch.commit());
+});
+
+test("an old audit ID cannot be reused for a later update", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-a"), {
+    status: "Incompleto", atualizado_em: "2026-10-19T10:04:00.000Z",
+    ultima_auditoria_atualizacao_id: "tv-update-1",
+  });
+  batch.set(doc(db, "auditoria/tv-update-1"), audit("tv-a"));
+  await assertFails(batch.commit());
 });
