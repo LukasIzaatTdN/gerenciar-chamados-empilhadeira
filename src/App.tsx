@@ -32,6 +32,7 @@ import { getOperatorStatusStorageKey, parseOperatorAvailability } from "./utils/
 import { useChamados } from "./hooks/useChamados";
 import { useTimeEstimates } from "./hooks/useTimeEstimates";
 import { useNotifications } from "./hooks/useNotifications";
+import { disablePushNotifications, enablePushNotifications, listenForForegroundPush, requestPushDelivery, type PushProfile } from "./services/pushNotifications";
 import { useUnidades } from "./hooks/useUnidades";
 import { useEmpresas } from "./hooks/useEmpresas";
 import { useUsuarios } from "./hooks/useUsuarios";
@@ -171,6 +172,10 @@ export default function App() {
     const saved = localStorage.getItem(SOM_KEY);
     return saved === null ? true : saved === "true";
   });
+  const [pushAtivo, setPushAtivo] = useState(() => usuarioAtual?.id
+    ? localStorage.getItem(`patio_push_enabled:${usuarioAtual.id}`) === "true"
+    : false);
+  const [pushMessage, setPushMessage] = useState("");
   const [tema, setTema] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(THEME_KEY);
     return saved === "dark" ? "dark" : "light";
@@ -312,6 +317,49 @@ export default function App() {
     soundEnabled: somAtivo,
   });
 
+  const pushProfile: PushProfile | null = usuarioAtual?.id && usuarioAtual.empresa_id
+    ? {
+        uid: usuarioAtual.id,
+        empresaId: usuarioAtual.empresa_id,
+        supermercadoId: usuarioAtual.supermercado_id,
+        perfil: usuarioAtual.perfil,
+        status: usuarioAtual.status ?? "Ativo",
+      }
+    : null;
+
+  const enableBrowserPush = useCallback(async () => {
+    if (!pushProfile) {
+      setPushMessage("É necessário estar conectado a uma conta de empresa ativa.");
+      return;
+    }
+    try {
+      await enablePushNotifications(pushProfile);
+      localStorage.setItem(`patio_push_enabled:${pushProfile.uid}`, "true");
+      setPushAtivo(true);
+      setPushMessage("Notificações em segundo plano ativadas neste navegador.");
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : "Não foi possível ativar o push.");
+    }
+  }, [pushProfile]);
+
+  const disableBrowserPush = useCallback(async () => {
+    try {
+      if (pushProfile) await disablePushNotifications(pushProfile.uid);
+      if (pushProfile) localStorage.removeItem(`patio_push_enabled:${pushProfile.uid}`);
+      setPushAtivo(false);
+      setPushMessage("Notificações em segundo plano desativadas neste navegador.");
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : "Não foi possível desativar o push.");
+    }
+  }, [pushProfile]);
+
+  useEffect(() => listenForForegroundPush((data) => {
+    const type = data.type;
+    if (type === "chamado_criado" || type === "chamado_assumido" || type === "atendimento_iniciado" || type === "atendimento_finalizado") {
+      notify(type, data.title || "Atualização de chamado", data.body || "Um chamado foi atualizado.", data.chamadoId);
+    }
+  }), [notify]);
+
   const showGovernanceError = useCallback(
     (title: string, error: unknown, fallbackMessage = "Não foi possível concluir esta operação.") => {
       const message = normalizeGovernanceMessage(error, fallbackMessage);
@@ -350,7 +398,8 @@ export default function App() {
   // Notification callbacks for chamado state changes
   const chamadoCallbacks = useMemo(
     () => ({
-      onCriado: (chamado: Chamado) => {
+      onCriado: (chamado: Chamado, auditId?: string) => {
+        void requestPushDelivery(auditId).catch((error) => console.warn("Push do chamado não enviado:", error));
         notify(
           "chamado_criado",
           "Novo Chamado Criado",
@@ -360,7 +409,8 @@ export default function App() {
           chamado.id
         );
       },
-      onAssumido: (chamado: Chamado, operador: string) => {
+      onAssumido: (chamado: Chamado, operador: string, auditId?: string) => {
+        void requestPushDelivery(auditId).catch((error) => console.warn("Push do chamado não enviado:", error));
         notify(
           "chamado_assumido",
           "Chamado Assumido",
@@ -368,7 +418,8 @@ export default function App() {
           chamado.id
         );
       },
-      onIniciado: (chamado: Chamado) => {
+      onIniciado: (chamado: Chamado, auditId?: string) => {
+        void requestPushDelivery(auditId).catch((error) => console.warn("Push do chamado não enviado:", error));
         notify(
           "atendimento_iniciado",
           "Atendimento Iniciado",
@@ -376,7 +427,8 @@ export default function App() {
           chamado.id
         );
       },
-      onFinalizado: (chamado: Chamado) => {
+      onFinalizado: (chamado: Chamado, auditId?: string) => {
+        void requestPushDelivery(auditId).catch((error) => console.warn("Push do chamado não enviado:", error));
         notify(
           "atendimento_finalizado",
           "Atendimento Finalizado",
@@ -589,6 +641,7 @@ export default function App() {
 
         if (!firebaseUser) {
           setUsuarioAtual(null);
+          setPushAtivo(false);
           setAuthHydrated(true);
           return;
         }
@@ -615,6 +668,7 @@ export default function App() {
           }
 
           setUsuarioAtual(nextUsuario);
+          setPushAtivo(localStorage.getItem(`patio_push_enabled:${nextUsuario.id}`) === "true");
           setView((prev) => {
             if (prev === "perfil") {
               return prev;
@@ -1191,9 +1245,18 @@ export default function App() {
     setShowLoginModal(false);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     if (hasFirebaseConfig && auth) {
-      void signOut(auth);
+      if (usuarioAtual?.id) {
+        try {
+          await disablePushNotifications(usuarioAtual.id);
+        } catch {
+          // Continue signing out; inactive users are excluded by the Worker.
+        }
+        localStorage.removeItem(`patio_push_enabled:${usuarioAtual.id}`);
+      }
+      setPushAtivo(false);
+      await signOut(auth);
     } else {
       setUsuarioAtual(null);
     }
@@ -1705,11 +1768,15 @@ export default function App() {
           setorPrincipal={setorPrincipal}
           notificacoesAtivas={notificacoesAtivas}
           somAtivo={somAtivo}
+          pushAtivo={pushAtivo}
+          pushMessage={pushMessage}
           tema={tema}
           onSupermercadoChange={handleOperadorSupermercadoChange}
           onSetorPrincipalChange={setSetorPrincipal}
           onNotificacoesChange={setNotificacoesAtivas}
           onSomChange={setSomAtivo}
+          onPushEnable={enableBrowserPush}
+          onPushDisable={disableBrowserPush}
           onTemaChange={setTema}
           onVoltar={goBackToPreviousView}
           backLabel="Voltar"

@@ -563,6 +563,8 @@ service cloud.firestore {
           request.resource.data.supermercado_id
         )
         && isTextoNaoVazio(request.resource.data.solicitante_nome)
+        && (!("solicitante_uid" in request.resource.data)
+          || request.resource.data.solicitante_uid == request.auth.uid)
         && isTextoNaoVazio(request.resource.data.setor)
         && isCategoriaValida(request.resource.data.categoria)
         && isTipoServicoValido(request.resource.data.tipo_servico)
@@ -607,6 +609,9 @@ service cloud.firestore {
         )
         && request.resource.data.empresa_id == resource.data.empresa_id
         && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && (("solicitante_uid" in resource.data)
+          ? request.resource.data.solicitante_uid == resource.data.solicitante_uid
+          : !("solicitante_uid" in request.resource.data))
         && isTextoNaoVazio(request.resource.data.id)
         && isTextoNaoVazio(request.resource.data.empresa_id)
         && isTextoNaoVazio(request.resource.data.supermercado_id)
@@ -974,6 +979,33 @@ service cloud.firestore {
           && resource.data.perfil != "Administrador Geral"
           && resource.data.empresa_id == currentUserEmpresaId()
         );
+
+      match /push_tokens/{deviceId} {
+        allow read: if false;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == id
+          && isCurrentUserActive()
+          && get(/databases/$(database)/documents/usuarios/$(id)).data.status == "Ativo"
+          && request.resource.data.keys().hasOnly([
+            "token", "uid", "empresa_id", "supermercado_id", "perfil", "status", "updated_at", "platform"
+          ])
+          && request.resource.data.keys().hasAll([
+            "token", "uid", "empresa_id", "supermercado_id", "perfil", "status", "updated_at", "platform"
+          ])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 20
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.uid == id
+          && request.resource.data.empresa_id == get(/databases/$(database)/documents/usuarios/$(id)).data.empresa_id
+          && request.resource.data.supermercado_id == get(/databases/$(database)/documents/usuarios/$(id)).data.supermercado_id
+          && request.resource.data.perfil == get(/databases/$(database)/documents/usuarios/$(id)).data.perfil
+          && request.resource.data.status == "Ativo"
+          && request.resource.data.updated_at is string
+          && request.resource.data.platform == "web";
+        allow delete: if isSignedIn()
+          && request.auth.uid == id
+          && isCurrentUserActive();
+      }
     }
 
     match /convites_admin_empresa/{id} {

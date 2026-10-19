@@ -13,11 +13,15 @@ interface ProfileSettingsProps {
   setorPrincipal: string;
   notificacoesAtivas: boolean;
   somAtivo: boolean;
+  pushAtivo: boolean;
+  pushMessage: string;
   tema: ThemeMode;
   onSupermercadoChange: (supermercadoId: string) => void | Promise<void>;
   onSetorPrincipalChange: (setor: string) => void;
   onNotificacoesChange: (enabled: boolean) => void;
   onSomChange: (enabled: boolean) => void;
+  onPushEnable: () => void | Promise<void>;
+  onPushDisable: () => void | Promise<void>;
   onTemaChange: (theme: ThemeMode) => void;
   onVoltar: () => void;
   backLabel?: string;
@@ -88,11 +92,15 @@ export default function ProfileSettings({
   setorPrincipal,
   notificacoesAtivas,
   somAtivo,
+  pushAtivo,
+  pushMessage,
   tema,
   onSupermercadoChange,
   onSetorPrincipalChange,
   onNotificacoesChange,
   onSomChange,
+  onPushEnable,
+  onPushDisable,
   onTemaChange,
   onVoltar,
   backLabel = "Voltar",
@@ -333,6 +341,29 @@ export default function ProfileSettings({
                   description="Ativar áudio para avisos importantes no app."
                   isDark={isDark}
                 />
+
+                <div className={cn(
+                  "rounded-[24px] border p-4",
+                  isDark ? "border-slate-700/80 bg-slate-900/70" : "border-slate-200/80 bg-white/80"
+                )}>
+                  <p className={cn("text-sm font-semibold", isDark ? "text-slate-50" : "text-slate-900")}>
+                    Push em segundo plano
+                  </p>
+                  <p className={cn("mt-1 text-sm", isDark ? "text-slate-400" : "text-slate-500")}>
+                    Receba atualizações de chamados mesmo com esta aba fechada. A permissão é solicitada pelo navegador.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void (pushAtivo ? onPushDisable() : onPushEnable())}
+                    className={cn(
+                      "mt-3 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors",
+                      pushAtivo ? "bg-slate-600 hover:bg-slate-700" : "bg-emerald-600 hover:bg-emerald-700"
+                    )}
+                  >
+                    {pushAtivo ? "Desativar push neste navegador" : "Ativar push neste navegador"}
+                  </button>
+                  {pushMessage && <p role="status" className={cn("mt-3 text-sm", isDark ? "text-amber-200" : "text-amber-800")}>{pushMessage}</p>}
+                </div>
               </div>
             </div>
 

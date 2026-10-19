@@ -36,6 +36,7 @@ export interface Chamado {
   empresa_id: string;
   supermercado_id: string;
   solicitante_nome: string;
+  solicitante_uid?: string | null;
   setor: Setor;
   local_exato: string | null;
   tipo_servico: TipoServico;

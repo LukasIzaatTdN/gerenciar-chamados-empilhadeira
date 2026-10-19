@@ -285,10 +285,10 @@ export type FilterStatus = "Todos" | Status;
 
 /** Callback signatures for notification integration */
 export interface ChamadoCallbacks {
-  onCriado?: (chamado: Chamado) => void;
-  onAssumido?: (chamado: Chamado, operadorNome: string) => void;
-  onIniciado?: (chamado: Chamado) => void;
-  onFinalizado?: (chamado: Chamado) => void;
+  onCriado?: (chamado: Chamado, auditId?: string) => void;
+  onAssumido?: (chamado: Chamado, operadorNome: string, auditId?: string) => void;
+  onIniciado?: (chamado: Chamado, auditId?: string) => void;
+  onFinalizado?: (chamado: Chamado, auditId?: string) => void;
 }
 
 interface AtualizacaoItensTelevendasInput {
@@ -489,6 +489,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         empresa_id: resolveEmpresaId(input.empresa_id, LEGACY_EMPRESA_ID),
         supermercado_id: input.supermercado_id,
         solicitante_nome: input.solicitante_nome,
+        solicitante_uid: auth?.currentUser?.uid ?? null,
         setor: input.setor,
         local_exato:
           typeof input.local_exato === "string" && input.local_exato.trim()
@@ -556,13 +557,16 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         cancelado_em: null,
       };
 
+      let auditId: string | undefined;
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
           const batch = writeBatch(db);
+          const auditRef = doc(collection(db, "auditoria"));
+          auditId = auditRef.id;
           batch.set(doc(collection(db, CHAMADOS_COLLECTION), novo.id), novo);
           batch.set(
-            doc(collection(db, "auditoria")),
+            auditRef,
             createAuditEntry({
               action: "chamado_criado",
               actorUid: auth?.currentUser?.uid,
@@ -590,7 +594,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         setChamados((prev) => [...prev, novo]);
       }
 
-      runCallbackSafely(() => callbacks?.onCriado?.(novo), "chamado creation");
+      runCallbackSafely(() => callbacks?.onCriado?.(novo, auditId), "chamado creation");
     },
     [callbacks, scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
   );
@@ -627,10 +631,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         entityName: "chamado",
       });
 
+      let auditId: string | undefined;
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
           const batch = writeBatch(db);
+          const auditRef = doc(collection(db, "auditoria"));
+          auditId = auditRef.id;
           batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: isTelevendasChamado(chamadoAtual) ? ("Em separação" as Status) : ("Aguardando" as Status),
             operador_nome: operadorNome,
@@ -639,7 +646,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             ...equipamentoPayload,
           });
           batch.set(
-            doc(collection(db, "auditoria")),
+            auditRef,
             createAuditEntry({
               action: "chamado_assumido",
               actorUid: auth?.currentUser?.uid,
@@ -665,7 +672,8 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         runCallbackSafely(
           () => callbacks?.onAssumido?.(
             { ...chamadoAtual, operador_nome: operadorNome },
-            operadorNome
+            operadorNome,
+            auditId
           ),
           "chamado assignment"
         );
@@ -732,10 +740,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         entityName: "chamado",
       });
 
+      let auditId: string | undefined;
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
           const batch = writeBatch(db);
+          const auditRef = doc(collection(db, "auditoria"));
+          auditId = auditRef.id;
           batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: isTelevendasChamado(chamadoAtual) ? ("Pronto" as Status) : ("Em atendimento" as Status),
             iniciado_em,
@@ -750,7 +761,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             ...equipamentoPayload,
           });
           batch.set(
-            doc(collection(db, "auditoria")),
+            auditRef,
             createAuditEntry({
               action: "chamado_iniciado",
               actorUid: auth?.currentUser?.uid,
@@ -779,7 +790,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: isTelevendasChamado(chamadoAtual) ? "Pronto" : "Em atendimento",
             iniciado_em,
             operador_nome,
-          }),
+          }, auditId),
           "chamado start"
         );
         return;
@@ -843,10 +854,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         entityName: "chamado",
       });
 
+      let auditId: string | undefined;
       if (db) {
         try {
           await ensureFirebaseSessionForChamado();
           const batch = writeBatch(db);
+          const auditRef = doc(collection(db, "auditoria"));
+          auditId = auditRef.id;
           batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: "Finalizado" as Status,
             finalizado_em,
@@ -856,7 +870,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             atualizado_por: operador_nome,
           });
           batch.set(
-            doc(collection(db, "auditoria")),
+            auditRef,
             createAuditEntry({
               action: "chamado_finalizado",
               actorUid: auth?.currentUser?.uid,
@@ -885,7 +899,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             status: "Finalizado",
             finalizado_em,
             operador_nome,
-          }),
+          }, auditId),
           "chamado completion"
         );
         return;

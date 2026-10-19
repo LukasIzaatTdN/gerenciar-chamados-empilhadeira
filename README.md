@@ -538,6 +538,22 @@ Base já funcional para:
 - histórico técnico por máquina
 - planos e assinaturas SaaS manuais com auditoria e idempotência
 
+## Notificações Push Web (preparação)
+
+O painel agora tem o fluxo de consentimento e registro do token FCM por usuário e navegador, além do service worker para exibir mensagens quando a aplicação estiver em segundo plano. O navegador nunca recebe a credencial do Firebase usada para enviar mensagens.
+
+O envio preparado usa `push-worker/`, um Cloudflare Worker gratuito chamado depois de uma operação Web de chamado. Ele valida o Firebase ID token, confere o evento de auditoria e o estado/escopo atual do chamado, limita os destinatários a usuários ativos da mesma empresa e unidade e usa uma chave de evento para evitar reenvio duplicado. O Worker precisa ser configurado e publicado separadamente; nada foi publicado nesta etapa. Como o Android não foi alterado, ações originadas nele ainda não chamam o Worker.
+
+Para habilitar após revisão e publicação autorizada:
+
+1. Ative Firebase Cloud Messaging para o app Web e gere uma chave Web Push (VAPID) no Console.
+2. Configure `VITE_FIREBASE_VAPID_KEY` e `VITE_PUSH_WORKER_URL` no ambiente de build do Web. A URL do Worker e a chave VAPID são públicas; a chave privada da conta de serviço não é.
+3. Configure no Cloudflare Worker `FIREBASE_PROJECT_ID`, `ALLOWED_ORIGIN` e o secret `FIREBASE_SERVICE_ACCOUNT_JSON`. Use uma conta de serviço dedicada e revise os papéis mínimos necessários para enviar FCM e ler os documentos de chamados, usuários e tokens, além de gravar marcadores de entrega.
+4. Publique também as regras e o índice de grupo de coleção `push_tokens` após revisão independente. As regras permitem que o usuário ativo grave/remova somente o token do próprio navegador; leitura por clientes fica negada.
+5. Teste em origem HTTPS real. O push é intencionalmente desativado no modo Firebase Emulator para impedir mistura de autenticação local com envio externo.
+
+O envio é best-effort: se a conexão do navegador que confirmou a mudança cair antes de chamar o Worker, essa mudança não gera push. FCM também não confirma que o dispositivo exibiu a notificação. O plano gratuito do Cloudflare tem limites de uso; monitore-os antes de adotar o fluxo em escala.
+
 ## Pendências Conhecidas
 
 - comparar e revisar as regras locais com a cópia atualmente publicada antes de qualquer publicação

@@ -24,6 +24,7 @@ before(async () => {
     await setDoc(doc(db, "usuarios/company-admin-b"), { perfil: "Administrador da Empresa", status: "Ativo", empresa_id: "empresa-b", nome: "Admin B" });
     await setDoc(doc(db, "usuarios/company-admin-inactive"), { perfil: "Administrador da Empresa", status: "Inativo", empresa_id: "empresa-a", nome: "Admin A Inativo" });
     await setDoc(doc(db, "usuarios/client-a"), { perfil: "Promotor", status: "Ativo", empresa_id: "empresa-a", nome: "Cliente A" });
+    await setDoc(doc(db, "usuarios/operator-push"), { perfil: "Operador", status: "Ativo", empresa_id: "empresa-a", supermercado_id: "loja-a", nome: "Operador Push" });
     await setDoc(doc(db, "usuarios/self-escalation"), {
       id: "self-escalation", perfil: "Promotor", status: "Ativo", empresa_id: "empresa-a",
       supermercado_id: null, nome: "Usuário comum", email: "user@example.test", criado_em: "2026-01-01T00:00:00.000Z",
@@ -58,6 +59,27 @@ test("a user cannot self-register or promote their profile to platform admin", a
   await assertFails(updateDoc(doc(existingUser, "usuarios/self-escalation"), {
     perfil: "Administrador Geral",
   }));
+});
+
+test("push tokens are private and can only be registered under the active owner's unchanged scope", async () => {
+  const ownerDb = environment.authenticatedContext("operator-push").firestore();
+  const tokenRef = doc(ownerDb, "usuarios/operator-push/push_tokens/browser-1");
+  const token = {
+    token: "fcm-token-value-long-enough-for-validation",
+    uid: "operator-push",
+    empresa_id: "empresa-a",
+    supermercado_id: "loja-a",
+    perfil: "Operador",
+    status: "Ativo",
+    updated_at: "2026-10-18T00:00:00.000Z",
+    platform: "web",
+  };
+  await assertSucceeds(setDoc(tokenRef, token));
+  await assertFails(getDoc(tokenRef));
+  await assertFails(setDoc(doc(ownerDb, "usuarios/operator-push/push_tokens/forged"), { ...token, empresa_id: "empresa-b" }));
+
+  const otherDb = environment.authenticatedContext("client-a").firestore();
+  await assertFails(setDoc(doc(otherDb, "usuarios/operator-push/push_tokens/stolen"), { ...token, uid: "operator-push" }));
 });
 
 test("platform admin reads SaaS data, but isolated direct document writes are denied", async () => {
