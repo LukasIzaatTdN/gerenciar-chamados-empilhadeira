@@ -279,3 +279,25 @@ test("inactive operator cannot bypass restrictions using a complete Televendas a
   await assertFails(batch.commit());
   assert.equal((await getDoc(doc(environment.authenticatedContext("operator-a").firestore(), "chamados/tv-gap"))).data().status, "Em separação");
 });
+
+
+test("invalid marker write is rejected without invoking the legacy update path", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(updateDoc(doc(db, "chamados/tv-gap"), {
+    ultima_auditoria_atualizacao_id: "tv-missing-audit",
+    atualizado_em: "2026-10-19T10:12:00.000Z",
+  }));
+  const snapshot = await getDoc(doc(db, "chamados/tv-gap"));
+  assert.equal(snapshot.data().ultima_auditoria_atualizacao_id, undefined);
+});
+
+test("legacy same-tenant update without changing audit marker remains available", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertSucceeds(updateDoc(doc(db, "chamados/tv-gap"), {
+    observacao_operador: "Revisão operacional sem novo marcador",
+  }));
+  assert.equal(
+    (await getDoc(doc(db, "chamados/tv-gap"))).data().observacao_operador,
+    "Revisão operacional sem novo marcador"
+  );
+});
