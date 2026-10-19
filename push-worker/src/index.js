@@ -178,6 +178,20 @@ export async function recipientDeliveryRecords(recipients, results) {
   return records;
 }
 
+export function recoveryPlan(record, auditId) {
+  if (!record || record.audit_id !== auditId || record.state !== "partial" || !record.recipient_results || typeof record.recipient_results !== "object") {
+    return { allowed: false, reason: "Registro incompleto ou incompatível; revisão manual necessária." };
+  }
+  const statuses = Object.values(record.recipient_results);
+  if (statuses.length !== record.recipient_count || statuses.some((entry) => !entry || !["accepted", "rejected", "unknown"].includes(entry.status))) {
+    return { allowed: false, reason: "Histórico de destinatários inconsistente." };
+  }
+  const counts = { accepted: 0, rejected: 0, unknown: 0 };
+  for (const entry of statuses) counts[entry.status]++;
+  if (counts.rejected + counts.unknown !== record.failure_count) return { allowed: false, reason: "Contagem de falhas inconsistente." };
+  return { allowed: counts.rejected > 0 && counts.unknown === 0, ...counts, requiresManualReview: counts.unknown > 0, automaticRetry: false };
+}
+
 export function reconciliationStatus(record, auditId) {
   if (!record || record.audit_id !== auditId) return { httpStatus: 409, error: "Registro de entrega incompatível." };
   if (record.state === "sent") return { httpStatus: 200, state: "sent", requiresReview: false, recipientCount: record.recipient_count ?? null, failureCount: 0 };
@@ -282,7 +296,7 @@ async function handleNotify(request, env) {
     if (["chamado_assumido", "chamado_iniciado", "chamado_finalizado"].includes(audit.action) && !["Operador", "Supervisor", "Separador de Televendas", "Administrador da Empresa", "Administrador Geral"].includes(actor.perfil)) return json({ error: "Perfil sem permissão para esta movimentação." }, 403);
     if (!eventMatchesCurrentCall(audit.action, details, call)) return json({ error: "O evento não corresponde ao estado atual do chamado." }, 409);
     const eventKey = await stableEventKey(audit.action, call);
-    if (body.operation === "status") {
+    if (body.operation === "status" || body.operation === "recovery_preview") {
       let record;
       try {
         record = fields(await firestoreRequest(env, `push_delivery_events/${encodeURIComponent(eventKey)}`));
@@ -290,6 +304,7 @@ async function handleNotify(request, env) {
         if (String(error).includes("HTTP 404")) return json({ state: "not_found", requiresReview: true }, 404);
         throw error;
       }
+      if (body.operation === "recovery_preview") return json(recoveryPlan(record, auditId));
       const result = reconciliationStatus(record, auditId);
       return json(result.error ? { error: result.error } : { state: result.state, requiresReview: result.requiresReview, recipientCount: result.recipientCount, failureCount: result.failureCount }, result.httpStatus);
     }
