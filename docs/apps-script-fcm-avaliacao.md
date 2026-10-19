@@ -331,3 +331,21 @@ npm run build
 Enviar `/tmp/patio-rules-61014-summary.json`, `/tmp/patio-rules-61014.log`, `/tmp/patio-rules-61014-chamados-summary.json` e, se possível, `/tmp/patio-rules-61014-chamados.log`. Comparar `evaluationErrorMentions`, `expressionBudgetMentions`, `budgetByRule` e resultados de testes. **Critérios:** manter todos os testes positivos e negativos, 39/39 gerais, 27/27 chamados, 0 estouros em chamados, e não aumentar o orçamento de expressões geral. Não afirmar eliminação do último estouro antes de analisar o log geral e o cenário correspondente. Em caso de regressão, reverter apenas a alteração desta etapa.
 
 Nenhum deploy, publicação de regras, escrita em produção, alteração de billing ou `main`.
+
+
+## Etapa 6.10.14.2 — Diagnóstico isolado de autopromoção (sem mudar regras)
+
+Baseline da 6.10.14.1: 39/39 testes gerais, 27/27 chamados, um estouro geral de expressões em `usuarios update`, zero estouros em chamados. O log geral aponta o cenário `a user cannot self-register or promote their profile to platform admin`; a operação é negada, mas o limite de 1.000 expressões ainda é atingido.
+
+Adicionado `PATIO_RULES_FOCUS=usuarios` ao diagnóstico: executa apenas o teste existente de autopromoção em `functions/tests/firestore/subscriptions.rules.test.mjs`, usando `--test-name-pattern`, e coleta os relatórios padrão de cobertura. Os demais testes da suíte são ignorados nesse modo, não removidos. **Não foi alterado `firestore.rules`**; não houve modificação de autenticação, escopos de empresa ou autorização de assinatura.
+
+### Executar no Firebase Emulator (somente testes)
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=usuarios PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610142-usuarios npm run test:rules:diagnose
+```
+
+Enviar quatro arquivos: `/tmp/patio-rules-610142-usuarios-summary.json`, `/tmp/patio-rules-610142-usuarios.log`, `/tmp/patio-rules-610142-usuarios-coverage.json` e `/tmp/patio-rules-610142-usuarios-coverage.html` (se disponíveis). O JSON de cobertura permite analisar os pontos da regra avaliados e identificar se a rejeição ocorre no ramo de autoatualização ou nos ramos de administração. Não atribuir a causa a um ramo específico sem ler a cobertura.
+
+A seguir, apenas depois da análise da cobertura, propor correção pontual e executar novamente o diagnóstico isolado e o completo. Sem deploy, publicação de regras, escrita em produção, serviços pagos ou alteração em `main`.
