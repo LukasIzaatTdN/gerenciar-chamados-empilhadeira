@@ -331,3 +331,15 @@ test("incomplete audit details is rejected", async () => {
     details: { categoria: "televendas" },
   }));
 });
+
+
+test("6.10.11: orphaned and replayed Televendas audit records are rejected", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  // A syntactically complete audit cannot refer to a nonexistent call.
+  await assertFails(setDoc(doc(db, "auditoria/tv-orphan-61011"), audit("tv-does-not-exist")));
+  // The current call already references its original audit marker; a new
+  // standalone audit must not be authorized by that prior successful update.
+  await assertFails(setDoc(doc(db, "auditoria/tv-replay-61011"), audit("tv-regression", {
+    details: { ...audit("tv-regression").details, statusAnterior: "Pronto" },
+  })));
+});
