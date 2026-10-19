@@ -26,7 +26,7 @@ const suites = suiteGroups[focus];
 
 const testArgs = ["--experimental-strip-types", "--test"];
 if (focus === "usuarios") {
-  testArgs.push("--test-name-pattern", "a user cannot self-register or promote their profile to platform admin");
+  testArgs.push("--test-name-pattern", "user cannot self-register as platform admin|user cannot promote own profile to platform admin");
 }
 const runner = spawn(process.execPath, [...testArgs, ...suites], {
   stdio: ["inherit", "pipe", "pipe"],
