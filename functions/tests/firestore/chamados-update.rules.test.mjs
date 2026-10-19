@@ -191,7 +191,7 @@ test("foreign-company operator cannot submit a complete valid-shaped update batc
     details: { ...audit("tv-regression").details, statusAnterior: "Pronto", statusAtual: "Incompleto", atualizado_em: "2026-10-19T10:05:00.000Z" },
   }));
   await assertFails(batch.commit());
-  assert.equal((await getDoc(environment.authenticatedContext("operator-a").firestore(), "chamados/tv-regression")).data().ultima_auditoria_atualizacao_id, "tv-regression-audit");
+  assert.equal((await getDoc(doc(environment.authenticatedContext("operator-a").firestore(), "chamados/tv-regression"))).data().ultima_auditoria_atualizacao_id, "tv-regression-audit");
 });
 
 test("Televendas scoped update rejects immutable identity and tenant changes", async () => {
@@ -222,7 +222,7 @@ test("KNOWN GAP: same-tenant marker update without audit is currently allowed", 
     atualizado_por: "Operador A", operador_nome: "Operador A",
     ultima_auditoria_atualizacao_id: "tv-no-audit",
   }));
-  assert.equal((await getDoc(db, "chamados/tv-gap")).data().ultima_auditoria_atualizacao_id, "tv-no-audit");
+  assert.equal((await getDoc(doc(db, "chamados/tv-gap"))).data().ultima_auditoria_atualizacao_id, "tv-no-audit");
   const auditSnapshot = await getDoc(doc(db, "auditoria/tv-no-audit"));
   assert.equal(auditSnapshot.exists(), false);
 });
