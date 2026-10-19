@@ -289,3 +289,24 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-61012-chamados-summary.json`, `/tmp/patio-rules-61012-chamados.log` e `/tmp/patio-rules-61012-summary.json`. Avaliar **testExitCode**, testes positivos, rejeições negativas, `evaluationErrorMentions` e `expressionBudgetMentions`. Não assumir melhora sem os relatórios. Se testes positivos falharem ou orçamento piorar, interromper e reverter apenas esta otimização. Nenhum deploy, publicação de regras, push real, cobrança ou mudança em produção.
+
+
+## Etapa 6.10.13 — Guarda mínima para auditoria órfã
+
+Baseline medido na 6.10.12: 39/39 testes gerais, 27/27 no foco chamados; **46** menções a erro de avaliação, **1** estouro geral de expressões (em `usuarios`), **0** estouros no foco chamados. O log da 6.10.12 ainda mostrou `Null value error` em auditoria órfã.
+
+Experimento controlado: acrescentado **somente** `exists(callPath)` antes da leitura dos campos de `get(callPath).data` / `getAfter(callPath).data` em `isTelevendasUpdateAuditAgainstCall`. Não foram alterados os caminhos de autorização de usuários, assinaturas, tokens ou chamados. Não se acrescentou `existsAfter(callPath)`, para evitar repetir a regressão de custo da 6.10.11. A presença do documento anterior não é garantia de que o documento posterior exista; verificar resultados e logs antes de qualquer mudança adicional.
+
+### Executar apenas no Emulator
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+PATIO_RULES_FOCUS=chamados PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61013-chamados npm run test:rules:diagnose
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-61013 npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-61013-chamados-summary.json`, `/tmp/patio-rules-61013-chamados.log` e `/tmp/patio-rules-61013-summary.json`. Critérios: manter 27/27 e 39/39; manter **0** estouros em chamados; verificar se desapareceu o `Null value error` do teste de auditoria órfã; não aumentar os estouros gerais. Os 46 erros de avaliação gerais não devem ser tratados como meta de zero nesta alteração isolada: muitos correspondem a outros fluxos negativos. Se houver regressão, reverter somente o guard `exists(callPath)`. O único estouro de `usuarios` ficará para investigação separada, com diagnóstico próprio.
+
+Sem deploy, publicação de regras, push real, escrita em produção, alteração de cobrança ou modificação da branch `main`.
