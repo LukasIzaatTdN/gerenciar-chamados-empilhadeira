@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -161,4 +161,19 @@ test("reconciliation reports pending, partial and sent states without retrying F
   assert.deepEqual(reconciliationStatus({ audit_id: "audit-1", state: "sent", recipient_count: 3 }, "audit-1"), { httpStatus: 200, state: "sent", requiresReview: false, recipientCount: 3, failureCount: 0 });
   assert.equal(reconciliationStatus({ audit_id: "other", state: "sent" }, "audit-1").httpStatus, 409);
   assert.equal(reconciliationStatus({ audit_id: "audit-1", state: "unknown" }, "audit-1").httpStatus, 409);
+});
+
+
+test("per-recipient delivery tracking distinguishes accepted, rejected and uncertain without storing tokens", async () => {
+  const recipients = [{ uid: "operator-1", token: "secret-device-token-1" }, { uid: "operator-2", token: "secret-device-token-2" }, { uid: "operator-3", token: "secret-device-token-3" }];
+  const outcomes = [{ status: "fulfilled", value: undefined }, { status: "rejected", reason: { httpStatus: 404 } }, { status: "rejected", reason: new Error("network timeout") }];
+  const records = await recipientDeliveryRecords(recipients, outcomes);
+  assert.equal(Object.keys(records).length, 3);
+  assert.deepEqual(Object.values(records).map(({ status }) => status), ["accepted", "rejected", "unknown"]);
+  assert.equal(JSON.stringify(records).includes("secret-device-token"), false);
+  assert.deepEqual(records, await recipientDeliveryRecords(recipients, outcomes));
+  assert.equal(classifyFcmResult({ status: "rejected", reason: { httpStatus: 429 } }), "unknown");
+  assert.equal(classifyFcmResult({ status: "rejected", reason: { httpStatus: 503 } }), "unknown");
+  assert.equal(classifyFcmResult({ status: "rejected", reason: { httpStatus: 401 } }), "rejected");
+  await assert.rejects(recipientDeliveryRecords(recipients, outcomes.slice(1)), /inconsistentes/);
 });
