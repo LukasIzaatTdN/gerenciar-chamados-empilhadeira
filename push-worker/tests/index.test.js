@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, deliveryOutcome, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
@@ -152,4 +152,13 @@ test("partial FCM delivery is reported as incomplete and never marked sent", () 
   assert.deepEqual(deliveryOutcome(3, 3), { state: "partial", httpStatus: 503, requiresReview: true });
   assert.throws(() => deliveryOutcome(1, 2), /Contagem de entrega inválida/);
   assert.throws(() => deliveryOutcome(-1, 0), /Contagem de entrega inválida/);
+});
+
+
+test("reconciliation reports pending, partial and sent states without retrying FCM", () => {
+  assert.deepEqual(reconciliationStatus({ audit_id: "audit-1", state: "claimed" }, "audit-1"), { httpStatus: 200, state: "claimed", requiresReview: true, recipientCount: null, failureCount: null });
+  assert.deepEqual(reconciliationStatus({ audit_id: "audit-1", state: "partial", recipient_count: 3, failure_count: 1 }, "audit-1"), { httpStatus: 200, state: "partial", requiresReview: true, recipientCount: 3, failureCount: 1 });
+  assert.deepEqual(reconciliationStatus({ audit_id: "audit-1", state: "sent", recipient_count: 3 }, "audit-1"), { httpStatus: 200, state: "sent", requiresReview: false, recipientCount: 3, failureCount: 0 });
+  assert.equal(reconciliationStatus({ audit_id: "other", state: "sent" }, "audit-1").httpStatus, 409);
+  assert.equal(reconciliationStatus({ audit_id: "audit-1", state: "unknown" }, "audit-1").httpStatus, 409);
 });
