@@ -61,7 +61,8 @@ const comparison = {
   stage: "6.10.14.7",
   emulatorOnly: true,
   officialRulesUnchanged: true,
-  isolatedNegativeTestsOnly: true,\n  pairs: pairs.map(pair => pair.join("+")),
+  isolatedNegativeTestsOnly: true,
+  pairs: pairs.map(pair => pair.join("+")),
   variants,
   results: Object.fromEntries(Object.entries(summaries).map(([name, s]) => [name, {
     testExitCode: s.testExitCode,
