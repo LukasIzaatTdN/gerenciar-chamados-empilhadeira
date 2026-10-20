@@ -454,3 +454,20 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-610149-comparison.json`, os quatro `/tmp/patio-rules-610149-*-summary.json` e, se houver falhas, os logs correspondentes. O experimento usa somente o Firebase Emulator e não altera regras oficiais, serviços pagos ou produção.
+
+
+## 6.10.14.10 — Ordem de verificações da ramificação empresarial
+
+Os logs da 6.10.14.9 confirmaram regressão da variante `request.auth.uid != id`: o teste de atualização do próprio status por administrador empresarial passou no baseline e falhou na candidata. A mesma candidata manteve dois estouros de 1.000 expressões em negativas de escopo/permissão.
+
+O script `scripts/firebase/experiment-user-guard-order-6101410.mjs` gera **apenas regras temporárias para o Emulator**, mantendo a ramificação original e acrescentando verificações já exigidas por `canAdminEmpresaManageUser` antes do `diff` e da validação de escopo. Variantes: `tenant-first`, `role-first`, `role-and-tenant-first`. Nenhuma adiciona `request.auth.uid != id`. O baseline e as três variantes executam os testes de segurança isolados (`usuarios`) e os sete testes legítimos (`usuarios-validacao`). O relatório contém contagens e associação aproximada dos diagnósticos aos testes TAP.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-guard-order-6101410.mjs
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-6101410-comparison.json` e os resumos `/tmp/patio-rules-6101410-*-summary.json`; em caso de falha, enviar os logs correspondentes. O script pode terminar com código 1 se nenhuma variante satisfizer os critérios; isso é resultado diagnóstico, não autorização para remover controles. Preservar alterações locais, especialmente `.env.example`. Não realizar deploy nem alterar regras oficiais, branch `main`, faturamento ou serviços pagos.
