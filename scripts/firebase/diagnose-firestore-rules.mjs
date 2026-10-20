@@ -54,7 +54,7 @@ for (const match of errors) {
   byRule[key] = (byRule[key] || 0) + 1;
 }
 // Categorize by source match blocks instead of hard-coded rule line numbers.
-const rulesLines = (await readFile("firestore.rules", "utf8")).split("\n");
+const rulesLines = (await readFile(process.env.PATIO_RULES_TEST_RULES_PATH || "firestore.rules", "utf8")).split("\n");
 const matchBlocks = rulesLines.flatMap((line, index) => {
   const match = line.match(/^\s*match\s+\/([^\s{]+)/);
   return match ? [{ line: index + 1, path: match[1] }] : [];
