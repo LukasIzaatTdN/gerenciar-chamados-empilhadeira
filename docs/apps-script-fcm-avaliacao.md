@@ -369,3 +369,17 @@ npm run build
 ```
 
 Enviar summaries e logs do diagnóstico isolado e geral, além do summary de chamados. Critérios: isolado 2/2, geral 40/40, chamados 27/27, zero estouros de expressões no isolado e nos chamados, idealmente zero no geral, sem regressões de autorização. Se o estouro persistir ou surgir qualquer regressão, não publicar regras e reavaliar/voltar atrás na guarda. Não houve deploy, publicação de regras, escrita em produção ou serviço pago.
+
+
+## Etapa 6.10.14.4 — Controle experimental de orçamento (somente Emulator)
+
+A cobertura da 6.10.14.3 registrou 2/2 testes isolados e 40/40 gerais aprovados, mas ainda 1 estouro do limite de 1.000 expressões na atualização de `usuarios/{id}`. O arquivo de teste prepara `usuarios/self-escalation`; não há prova de ausência do documento.
+
+O experimento compara a regra original com uma **cópia temporária que define apenas `usuarios/{id} allow update: if false`**. A segunda variante é um controle diagnóstico deliberadamente restritivo, **não deve ser publicada nem usada como regra final**. O script cria a cópia em `/tmp`, executa somente os dois testes negativos de privilégio no Firestore Emulator `demo-patio-pro-log` e produz relatórios separados. A suíte de teste aceita a variável opcional `PATIO_RULES_TEST_RULES_PATH`; sem ela, usa `firestore.rules` normalmente. O diagnóstico usa o mesmo arquivo para categorizar as linhas.
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-rule-budget.mjs
+```
+
+Enviar `/tmp/patio-rules-610144-comparison.json`, `/tmp/patio-rules-610144-baseline-summary.json` e `/tmp/patio-rules-610144-deny-update-control-summary.json`, além dos logs se houver erro. Esperado: ambos os conjuntos de 2 testes negativos passam; baseline reproduz o orçamento e controle o elimina. Se controle ainda tiver orçamento, investigar o comportamento de avaliação/relatórios do Emulator e regras sobrepostas. Se controle zerar, isolar os custos da expressão de `allow update` sem transformar a regra de bloqueio total em solução. Não fazer deploy nem alterar produção.
