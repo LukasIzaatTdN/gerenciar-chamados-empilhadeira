@@ -9,7 +9,7 @@ const environment = await initializeTestEnvironment({
   firestore: {
     host: "127.0.0.1",
     port: Number(process.env.PATIO_FIRESTORE_EMULATOR_PORT || "8080"),
-    rules: await readFile(new URL("../../../firestore.rules", import.meta.url), "utf8"),
+    rules: await readFile(process.env.PATIO_RULES_TEST_RULES_PATH || new URL("../../../firestore.rules", import.meta.url), "utf8"),
   },
 });
 
