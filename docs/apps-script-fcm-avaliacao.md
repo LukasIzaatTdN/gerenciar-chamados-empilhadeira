@@ -399,3 +399,21 @@ npm run build
 ```
 
 Arquivos solicitados: `/tmp/patio-rules-610145-comparison.json` e os quatro `/tmp/patio-rules-610145-*-summary.json`; se falhar, anexar também o log correspondente. Meta: 2/2 testes isolados, 40/40 gerais, 27/27 chamados e zero estouros na variante. Se a variante continuar com 1 estouro, investigar a avaliação do caminho de `usuarios/{id} allow update` em vez de aplicar a guarda sem evidência. Mesmo que zere, exigir testes positivos de atualização legítima de usuários e revisão da equivalência de permissões antes de propor alteração em `firestore.rules`. Não fazer deploy, não alterar `main`, não usar serviços pagos.
+
+
+## Etapa 6.10.14.6 — Diagnóstico por ramificações de usuarios/update
+
+A etapa 6.10.14.5 executou 2/2 testes negativos isolados, 40/40 gerais e 27/27 de chamados, mas o orçamento de 1.000 expressões permaneceu em `usuarios/{id} allow update`. A extração da guarda para função auxiliar não corrigiu o custo.
+
+O script `scripts/firebase/experiment-user-branches-610146.mjs` gera em `/tmp` três versões **exclusivamente diagnósticas** das regras. Cada versão mantém a guarda global de autopromoção e **uma** das três ramificações originais (autorrevisão, gerenciamento por Administrador Geral, gerenciamento por Administrador da Empresa); as outras são substituídas por condições `false && ...`, preservando o código para comparação. Uma baseline original é executada primeiro. São executados os dois testes negativos isolados em cada variante, nunca a suíte positiva sob regras intencionalmente restritivas. Nenhuma versão é publicável.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-branches-610146.mjs
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610146-original-all npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-610146-comparison.json` e os quatro `/tmp/patio-rules-610146-*-summary.json`, além dos logs se necessário. A suíte geral original serve de referência para não aceitar uma alteração que invalide permissões legítimas. Os testes negativos isolados são insuficientes para aprovar produção. Depois de identificar a ramificação onerosa, acrescentar testes positivos de autorrevisão e administração empresarial/plataforma e validar equivalência antes de qualquer proposta de mudança nas regras oficiais. Sem deploy, alterações de `main` ou serviços pagos.
