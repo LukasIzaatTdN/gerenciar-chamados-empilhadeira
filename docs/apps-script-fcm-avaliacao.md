@@ -435,3 +435,22 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-610147-comparison.json`, `/tmp/patio-rules-610147-baseline-summary.json`, `/tmp/patio-rules-610147-pair-self-platform-summary.json`, `/tmp/patio-rules-610147-pair-self-company-summary.json` e `/tmp/patio-rules-610147-pair-platform-company-summary.json`. Caso algum teste falhe, anexar o log da variante. O objetivo é identificar se alguma combinação de duas ramificações reproduz o estouro; resultado com 0 estouros não comprova equivalência de autorização. A correção final dependerá de testes positivos para operações legítimas e revisão das permissões multiempresa. Não fazer deploy, não alterar `main` nem usar serviços pagos.
+
+
+## 6.10.14.9 — Teste de equivalência de atualizações de usuários
+
+A etapa 6.10.14.8 identificou que a condição antecipada `request.auth.uid != id` na ramificação empresarial elimina o estouro no teste negativo isolado, mas pode retirar permissões legítimas de autoatualização administrativa.
+
+Arquivos: `functions/tests/firestore/user-update-610149.rules.test.mjs`, `scripts/firebase/experiment-user-equivalence-610149.mjs`. O diagnóstico admite o foco `PATIO_RULES_FOCUS=usuarios-validacao`.
+
+O experimento compara as regras originais e a candidata temporária em dois conjuntos: testes negativos existentes de autopromoção e sete casos de validação, incluindo autoatualização, administração da própria empresa, isolamento entre empresas, gerenciamento pela plataforma e regressão de autoatualização por administrador empresarial. Uma falha de teste não interrompe a comparação; o relatório final sinaliza reprovação. **Não publicar a candidata.**
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-equivalence-610149.mjs
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-610149-comparison.json`, os quatro `/tmp/patio-rules-610149-*-summary.json` e, se houver falhas, os logs correspondentes. O experimento usa somente o Firebase Emulator e não altera regras oficiais, serviços pagos ou produção.
