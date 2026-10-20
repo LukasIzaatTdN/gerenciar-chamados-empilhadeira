@@ -417,3 +417,21 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-610146-comparison.json` e os quatro `/tmp/patio-rules-610146-*-summary.json`, além dos logs se necessário. A suíte geral original serve de referência para não aceitar uma alteração que invalide permissões legítimas. Os testes negativos isolados são insuficientes para aprovar produção. Depois de identificar a ramificação onerosa, acrescentar testes positivos de autorrevisão e administração empresarial/plataforma e validar equivalência antes de qualquer proposta de mudança nas regras oficiais. Sem deploy, alterações de `main` ou serviços pagos.
+
+
+## Etapa 6.10.14.7 — Comparação par a par das ramificações de usuarios/update
+
+Na etapa 6.10.14.6, a baseline dos dois testes negativos isolados apresentou 1 estouro do limite de 1.000 expressões. Cada variante com apenas uma ramificação (`self`, `platform` ou `company`) teve 0 estouros, embora ainda houvesse erros genéricos de avaliação.
+
+O script `scripts/firebase/experiment-user-pairs-610147.mjs` cria cópias temporárias em `/tmp` e compara baseline com três pares de ramificações: `self+platform`, `self+company`, `platform+company`. Cada variante mantém a guarda global de autopromoção, desativa a terceira ramificação com `false &&` e executa somente os dois testes negativos isolados no Firebase Emulator. **As variantes não preservam todas as permissões legítimas e nunca devem ser publicadas.** `firestore.rules` permanece intacto.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-pairs-610147.mjs
+PATIO_RULES_REPORT_PREFIX=/tmp/patio-rules-610147-original-all npm run test:rules:diagnose
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-610147-comparison.json`, `/tmp/patio-rules-610147-baseline-summary.json`, `/tmp/patio-rules-610147-pair-self-platform-summary.json`, `/tmp/patio-rules-610147-pair-self-company-summary.json` e `/tmp/patio-rules-610147-pair-platform-company-summary.json`. Caso algum teste falhe, anexar o log da variante. O objetivo é identificar se alguma combinação de duas ramificações reproduz o estouro; resultado com 0 estouros não comprova equivalência de autorização. A correção final dependerá de testes positivos para operações legítimas e revisão das permissões multiempresa. Não fazer deploy, não alterar `main` nem usar serviços pagos.
