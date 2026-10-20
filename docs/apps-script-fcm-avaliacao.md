@@ -471,3 +471,20 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-6101410-comparison.json` e os resumos `/tmp/patio-rules-6101410-*-summary.json`; em caso de falha, enviar os logs correspondentes. O script pode terminar com código 1 se nenhuma variante satisfizer os critérios; isso é resultado diagnóstico, não autorização para remover controles. Preservar alterações locais, especialmente `.env.example`. Não realizar deploy nem alterar regras oficiais, branch `main`, faturamento ou serviços pagos.
+
+
+## 6.10.14.11 — Ordem das três ramificações de autorização (Emulator)
+
+Os resultados 6.10.14.10 indicaram que antecipar isoladamente o papel ou o vínculo empresarial não diminuiu os estouros e que repetir ambos aumentou as ocorrências e causou falhas. Nesta etapa, o script `scripts/firebase/experiment-user-or-order-6101411.mjs` mantém as mesmas condições e o mesmo bloqueio global de autopromoção, alterando somente a ordem das três ramificações OR de `usuarios.update`.
+
+Variantes: `baseline`, `company-self-platform`, `company-platform-self`, `platform-company-self` e `platform-self-company`. Cada variante executa os dois testes negativos isolados e os sete testes de atualizações legítimas/negações de escopo; agrega códigos de saída, budget, erros de avaliação e associação aproximada por teste. Esta associação é heurística, e `assertFails` não prova que a regra negou sem erro. Uma melhoria exige todos os testes aprovados, ausência de orçamento e nenhum aumento de erros de avaliação. O experimento não altera `firestore.rules` e **nenhuma variante temporária pode ser implantada**.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-or-order-6101411.mjs
+npm test
+npm run build
+```
+
+Enviar `/tmp/patio-rules-6101411-comparison.json` e os resumos `/tmp/patio-rules-6101411-*-summary.json`; logs de qualquer cenário anormal. O comando experimental pode retornar código 1 e ainda gerar relatórios completos. Sem deploy, sem mudança de branch main, faturamento, IAM ou serviços pagos. Preservar alterações locais, inclusive `.env.example`.
