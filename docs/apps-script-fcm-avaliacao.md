@@ -505,3 +505,21 @@ zip -j patio-rules-6101412-resultados.zip patio-rules-6101412-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101412-resultados.zip`. O experimento pode sair com código 1 devido às regressões esperadas em variantes inseguras. Sem mudanças em `firestore.rules`, deploy, produção, branch main, IAM, faturamento ou serviços pagos. Preservar alterações locais, incluindo `.env.example`.
+
+
+## 6.10.14.13 — Cache local do documento do administrador (Emulator)
+
+Script `scripts/firebase/experiment-user-actor-cache-6101413.mjs`: compara baseline com duas variantes temporárias da função empresarial de `usuarios.update`. A primeira lê uma vez o documento `usuarios/{request.auth.uid}` em uma variável local e reutiliza seus campos para status, perfil e empresa. A segunda faz o mesmo e avalia perfil antes de status. Em ambas são preservadas as verificações explícitas contra Administrador Geral, os dois vínculos de empresa e `isUsuarioVinculoValido`. A equivalência ainda precisa ser provada; **nenhuma variante está autorizada para deploy**.
+
+Executar somente no projeto de emulação `demo-patio-pro-log`:
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-actor-cache-6101413.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101413-resultados.zip patio-rules-6101413-*.json patio-rules-6101413-*.log
+```
+
+Enviar o ZIP para análise dos testes de segurança (`usuarios`) e permissões legítimas (`usuarios-validacao`). Mesmo que todos passem, ampliar a matriz com usuário ausente, inativo, status ausente, perfis inválidos, mudança de empresa e de supermercado antes de considerar uma otimização. `assertFails` aceita erros de avaliação como negativa; consultar logs/coverage. Preservar arquivos locais (especialmente `.env.example`). Nenhuma mudança em `firestore.rules`, produção, `main`, deploy ou serviços pagos.
