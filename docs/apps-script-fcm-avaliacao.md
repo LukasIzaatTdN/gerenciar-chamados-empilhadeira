@@ -383,3 +383,19 @@ node scripts/firebase/experiment-user-rule-budget.mjs
 ```
 
 Enviar `/tmp/patio-rules-610144-comparison.json`, `/tmp/patio-rules-610144-baseline-summary.json` e `/tmp/patio-rules-610144-deny-update-control-summary.json`, além dos logs se houver erro. Esperado: ambos os conjuntos de 2 testes negativos passam; baseline reproduz o orçamento e controle o elimina. Se controle ainda tiver orçamento, investigar o comportamento de avaliação/relatórios do Emulator e regras sobrepostas. Se controle zerar, isolar os custos da expressão de `allow update` sem transformar a regra de bloqueio total em solução. Não fazer deploy nem alterar produção.
+
+
+## Etapa 6.10.14.5 — Experimento isolado de guarda de autopromoção
+
+A etapa 6.10.14.4 confirmou no Emulator: baseline 1 estouro de 1.000 expressões; controle `usuarios allow update: if false` zero estouros; ambos os testes negativos passaram. O controle não é solução de produção.
+
+Este experimento mantém `firestore.rules` intacto e gera em `/tmp` uma cópia que substitui apenas a guarda inicial de `usuarios/{id} allow update` por `isNotSelfPromotion(id, resource.data, request.resource.data)`, com expressão booleana equivalente e checagem barata primeiro. As três ramificações de autorização continuam na mesma ordem. O script executa baseline isolada, variante isolada, variante geral e variante de chamados, todos no Emulator `demo-patio-pro-log` sem publicar regras.
+
+```bash
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-guard-610145.mjs
+npm test
+npm run build
+```
+
+Arquivos solicitados: `/tmp/patio-rules-610145-comparison.json` e os quatro `/tmp/patio-rules-610145-*-summary.json`; se falhar, anexar também o log correspondente. Meta: 2/2 testes isolados, 40/40 gerais, 27/27 chamados e zero estouros na variante. Se a variante continuar com 1 estouro, investigar a avaliação do caminho de `usuarios/{id} allow update` em vez de aplicar a guarda sem evidência. Mesmo que zere, exigir testes positivos de atualização legítima de usuários e revisão da equivalência de permissões antes de propor alteração em `firestore.rules`. Não fazer deploy, não alterar `main`, não usar serviços pagos.
