@@ -19,7 +19,12 @@ for (const [name, anchor] of Object.entries(branches)) {
 }
 const dir = await mkdtemp(join(tmpdir(), "patio-rules-610147-"));
 const variants = {};
-const pairs = [\n  ["self", "platform"],\n  ["self", "company"],\n  ["platform", "company"],\n];\nfor (const keep of pairs) {
+const pairs = [
+  ["self", "platform"],
+  ["self", "company"],
+  ["platform", "company"],
+];
+for (const keep of pairs) {
   let edited = block;
   for (const [name, anchor] of Object.entries(branches)) {
     if (!keep.includes(name)) edited = edited.replace(anchor, "          false\n          && " + anchor.trimStart());
