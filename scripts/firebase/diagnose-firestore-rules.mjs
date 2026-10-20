@@ -13,6 +13,7 @@ const suiteGroups = {
   chamados: ["functions/tests/firestore/chamados-update.rules.test.mjs"],
   // Isolate the existing security regression without modifying Firestore rules.
   usuarios: ["functions/tests/firestore/subscriptions.rules.test.mjs"],
+  "usuarios-validacao": ["functions/tests/firestore/user-update-610149.rules.test.mjs"],
   assinaturas: [
     "functions/tests/firestore/subscriptions.rules.test.mjs",
     "functions/tests/firestore/subscriptions.client.test.mjs",
@@ -20,7 +21,7 @@ const suiteGroups = {
 };
 const focus = process.env.PATIO_RULES_FOCUS || "all";
 if (!Object.hasOwn(suiteGroups, focus)) {
-  throw new Error("PATIO_RULES_FOCUS must be all, chamados, usuarios or assinaturas");
+  throw new Error("PATIO_RULES_FOCUS must be all, chamados, usuarios, usuarios-validacao or assinaturas");
 }
 const suites = suiteGroups[focus];
 
