@@ -488,3 +488,20 @@ npm run build
 ```
 
 Enviar `/tmp/patio-rules-6101411-comparison.json` e os resumos `/tmp/patio-rules-6101411-*-summary.json`; logs de qualquer cenário anormal. O comando experimental pode retornar código 1 e ainda gerar relatórios completos. Sem deploy, sem mudança de branch main, faturamento, IAM ou serviços pagos. Preservar alterações locais, inclusive `.env.example`.
+
+
+## 6.10.14.12 — Isolamento de custo da função empresarial
+
+Script de diagnóstico `scripts/firebase/experiment-user-helper-isolation-6101412.mjs`: executa baseline e cinco substituições temporárias **intencionalmente inseguras** da chamada `canAdminEmpresaManageUser(resource.data, request.resource.data)` somente no bloco `usuarios.update`. As substituições são `company-disabled`, `actor-only`, `actor-and-existing-tenant`, `actor-and-both-tenants`, `actor-and-vinculo`. Elas servem apenas para localizar a contribuição relativa de verificações da função; **nenhuma é candidata a publicação, independentemente de passar testes**. Comparar os dois conjuntos (`usuarios` e `usuarios-validacao`) e os diagnósticos associados a cada teste. Um `assertFails` aprovado pode representar erro de avaliação, não negação limpa.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-helper-isolation-6101412.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101412-resultados.zip patio-rules-6101412-*.json patio-rules-6101412-*.log
+```
+
+Enviar `/tmp/patio-rules-6101412-resultados.zip`. O experimento pode sair com código 1 devido às regressões esperadas em variantes inseguras. Sem mudanças em `firestore.rules`, deploy, produção, branch main, IAM, faturamento ou serviços pagos. Preservar alterações locais, incluindo `.env.example`.
