@@ -523,3 +523,20 @@ zip -j patio-rules-6101413-resultados.zip patio-rules-6101413-*.json patio-rules
 ```
 
 Enviar o ZIP para análise dos testes de segurança (`usuarios`) e permissões legítimas (`usuarios-validacao`). Mesmo que todos passem, ampliar a matriz com usuário ausente, inativo, status ausente, perfis inválidos, mudança de empresa e de supermercado antes de considerar uma otimização. `assertFails` aceita erros de avaliação como negativa; consultar logs/coverage. Preservar arquivos locais (especialmente `.env.example`). Nenhuma mudança em `firestore.rules`, produção, `main`, deploy ou serviços pagos.
+
+
+## 6.10.14.14 — Diagnóstico de negação antecipada de promoção (Emulator)
+
+O script `scripts/firebase/experiment-user-early-denial-6101414.mjs` gera três regras temporárias no diretório `/tmp`, preservando o baseline e sem modificar `firestore.rules`. Compara (1) forma De Morgan do bloqueio global de autopromoção, (2) verificação antecipada de tentativa de gravar perfil `Administrador Geral` para outro UID, e (3) combinação das duas. O segundo bloqueio é uma hipótese a validar, não equivalência comprovada. Os testes atuais incluem segurança, autoatualização do administrador empresarial e isolamento entre empresas; revisar logs de negativas pois `assertFails` também aceita erros de avaliação. Nenhuma variante temporária está aprovada para deploy.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-early-denial-6101414.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101414-resultados.zip patio-rules-6101414-*.json patio-rules-6101414-*.log
+```
+
+Enviar `/tmp/patio-rules-6101414-resultados.zip`. O experimento pode retornar código 1 mesmo após gerar relatórios completos. Não realizar deploy, operações em produção, mudanças em `main`, IAM, faturamento ou serviços pagos. Preservar alterações locais, especialmente `.env.example`.
