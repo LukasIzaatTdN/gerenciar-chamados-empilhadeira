@@ -29,6 +29,15 @@ const testArgs = ["--experimental-strip-types", "--test"];
 if (focus === "usuarios") {
   testArgs.push("--test-name-pattern", "user cannot self-register as platform admin|user cannot promote own profile to platform admin");
 }
+// An exact per-case pattern is opt-in and restricted to user rule suites.
+const individualPattern = process.env.PATIO_RULES_TEST_PATTERN;
+if (individualPattern) {
+  if (!["usuarios", "usuarios-validacao"].includes(focus)) {
+    throw new Error("PATIO_RULES_TEST_PATTERN is only supported for usuarios suites");
+  }
+  if (focus === "usuarios") testArgs.splice(testArgs.indexOf("--test-name-pattern"), 2);
+  testArgs.push("--test-name-pattern", individualPattern);
+}
 const runner = spawn(process.execPath, [...testArgs, ...suites], {
   stdio: ["inherit", "pipe", "pipe"],
   env: process.env,
