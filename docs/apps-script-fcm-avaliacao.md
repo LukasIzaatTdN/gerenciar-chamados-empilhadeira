@@ -540,3 +540,20 @@ zip -j patio-rules-6101414-resultados.zip patio-rules-6101414-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101414-resultados.zip`. O experimento pode retornar código 1 mesmo após gerar relatórios completos. Não realizar deploy, operações em produção, mudanças em `main`, IAM, faturamento ou serviços pagos. Preservar alterações locais, especialmente `.env.example`.
+
+
+## 6.10.14.15 — Cobertura individual por operação de usuários
+
+O runner `scripts/firebase/diagnose-firestore-rules.mjs` recebeu suporte opcional à variável `PATIO_RULES_TEST_PATTERN`, restrita aos focos `usuarios` e `usuarios-validacao`. O script `scripts/firebase/diagnose-user-coverage-6101415.mjs` executa **nove casos individualmente**, sempre usando as regras baseline em `firestore.rules` e o projeto fictício `demo-patio-pro-log`. Cada caso reinicia o Emulator, registra logs, resumo e `ruleCoverage` em JSON/HTML quando disponível. O `comparison.json` agrega resultado por teste, diagnóstico de budget/erro e pontos de cobertura com contagem, se presentes no formato devolvido pelo Emulator. A ausência de pontos legíveis não invalida os arquivos brutos de cobertura.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/diagnose-user-coverage-6101415.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101415-resultados.zip patio-rules-6101415-*.json patio-rules-6101415-*.log patio-rules-6101415-*.html
+```
+
+Enviar `/tmp/patio-rules-6101415-resultados.zip`. Nenhuma candidata de regra é gerada ou aprovada nesta etapa. `assertFails` pode passar quando a negação é consequência de orçamento ou erro. A cobertura ajuda a localizar expressões executadas, mas não prova causalidade; ler os logs e cobertura bruta antes de propor refatorações. Nenhum deploy, mudança em `firestore.rules`, `main`, faturamento, IAM ou serviços pagos. Preservar edições locais, inclusive `.env.example`.
