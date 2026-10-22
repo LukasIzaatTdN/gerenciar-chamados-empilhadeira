@@ -3,19 +3,7 @@ import type { Empresa, PlanoCiclo, PlanoStatus } from "../types/empresa";
 
 interface EmpresasAdminProps {
   empresas: Empresa[];
-  onCreate: (input: {
-    nome: string;
-    codigo: string;
-    cnpj?: string;
-    plano_codigo: string;
-    plano_nome: string;
-    plano_status: PlanoStatus;
-    plano_ciclo: PlanoCiclo;
-    max_usuarios?: number | null;
-    max_unidades?: number | null;
-    contrato_inicio?: string | null;
-    contrato_fim?: string | null;
-  }) => Promise<void>;
+  onCreate: (input: { nome: string; codigo: string; cnpj?: string }) => Promise<string | void>;
   onUpdate: (
     id: string,
     input: {
@@ -107,6 +95,7 @@ export default function EmpresasAdmin({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
+  const [createdCompany, setCreatedCompany] = useState<string | null>(null);
 
   const empresasOrdenadas = useMemo(
     () =>
@@ -120,13 +109,12 @@ export default function EmpresasAdmin({
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError(null);
+    setCreatedCompany(null);
   }
 
   function validateForm() {
     if (!form.nome.trim()) return "Informe o nome da empresa.";
     if (!form.codigo.trim()) return "Informe o código da empresa.";
-    if (!form.plano_codigo.trim()) return "Informe o código do plano comercial.";
-    if (!form.plano_nome.trim()) return "Informe o nome do plano comercial.";
     return null;
   }
 
@@ -138,28 +126,33 @@ export default function EmpresasAdmin({
       return;
     }
 
-    const payload = {
-      nome: form.nome.trim(),
-      codigo: form.codigo.trim().toUpperCase(),
-      cnpj: form.cnpj.trim() || undefined,
-      plano_codigo: form.plano_codigo.trim().toLowerCase(),
-      plano_nome: form.plano_nome.trim(),
-      plano_status: form.plano_status,
-      plano_ciclo: form.plano_ciclo,
-      max_usuarios: parseNullableNumber(form.max_usuarios),
-      max_unidades: parseNullableNumber(form.max_unidades),
-      contrato_inicio: form.contrato_inicio.trim() || null,
-      contrato_fim: form.contrato_fim.trim() || null,
-    };
-
     try {
       setIsSubmitting(true);
       if (editingId) {
-        await onUpdate(editingId, payload);
+        await onUpdate(editingId, {
+          nome: form.nome.trim(),
+          codigo: form.codigo.trim().toUpperCase(),
+          cnpj: form.cnpj.trim() || undefined,
+          plano_codigo: form.plano_codigo.trim().toLowerCase(),
+          plano_nome: form.plano_nome.trim(),
+          plano_status: form.plano_status,
+          plano_ciclo: form.plano_ciclo,
+          max_usuarios: parseNullableNumber(form.max_usuarios),
+          max_unidades: parseNullableNumber(form.max_unidades),
+          contrato_inicio: form.contrato_inicio.trim() || null,
+          contrato_fim: form.contrato_fim.trim() || null,
+        });
+        resetForm();
       } else {
-        await onCreate(payload);
+        const companyId = await onCreate({
+          nome: form.nome.trim(),
+          codigo: form.codigo.trim().toUpperCase(),
+          cnpj: form.cnpj.trim() || undefined,
+        });
+        setCreatedCompany(companyId ?? form.codigo.trim().toUpperCase());
+        setForm(EMPTY_FORM);
+        setError(null);
       }
-      resetForm();
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -217,7 +210,7 @@ export default function EmpresasAdmin({
               Empresas
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Cadastre clientes, contrato ativo e limites básicos do plano comercial.
+              Cadastre os dados da empresa. A assinatura é configurada separadamente.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -230,11 +223,12 @@ export default function EmpresasAdmin({
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
             {editingId ? "Editar empresa" : "Nova empresa"}
           </h2>
+          {createdCompany && !editingId && <div role="status" className="mb-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Empresa criada. A assinatura continua pendente até ser configurada.<button type="button" onClick={onOpenSubscriptions} disabled={!onOpenSubscriptions} className="ml-2 font-bold underline">Abrir Planos e assinaturas</button><button type="button" onClick={() => setCreatedCompany(null)} className="ml-3">Fechar</button></div>}
           <form onSubmit={handleSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
             <input type="text" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="text" value={form.codigo} onChange={(e) => setForm((prev) => ({ ...prev, codigo: e.target.value }))} placeholder="Código da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="text" value={form.cnpj} onChange={(e) => setForm((prev) => ({ ...prev, cnpj: e.target.value }))} placeholder="CNPJ" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <select value={form.plano_codigo} onChange={(e) => {
+            {editingId && <><select value={form.plano_codigo} onChange={(e) => {
               const selected = PLANO_OPTIONS.find((option) => option.codigo === e.target.value);
               setForm((prev) => ({
                 ...prev,
@@ -267,6 +261,7 @@ export default function EmpresasAdmin({
             <input type="number" min="1" value={form.max_unidades} onChange={(e) => setForm((prev) => ({ ...prev, max_unidades: e.target.value }))} placeholder="Limite de unidades" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="date" value={form.contrato_inicio} onChange={(e) => setForm((prev) => ({ ...prev, contrato_inicio: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="date" value={form.contrato_fim} onChange={(e) => setForm((prev) => ({ ...prev, contrato_fim: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
+            </>}
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white">
                 {isSubmitting ? "Salvando..." : editingId ? "Salvar empresa" : "Cadastrar empresa"}

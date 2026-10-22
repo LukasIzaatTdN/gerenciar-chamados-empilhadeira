@@ -1272,23 +1272,13 @@ export default function App() {
     nome: string;
     codigo: string;
     cnpj?: string;
-    plano_codigo: string;
-    plano_nome: string;
-    plano_status: "Ativo" | "Teste" | "Suspenso" | "Cancelado";
-    plano_ciclo: "Mensal" | "Trimestral" | "Semestral" | "Anual";
-    max_usuarios?: number | null;
-    max_unidades?: number | null;
-    contrato_inicio?: string | null;
-    contrato_fim?: string | null;
-  }) {
-    await runGovernanceAction(
+  }): Promise<string | undefined> {
+    return runGovernanceAction(
       "Não foi possível criar a empresa",
-      async () => {
-        await createEmpresa(input);
-      },
+      () => createEmpresa(input),
       {
         title: "Empresa criada",
-        message: "A empresa foi cadastrada com sucesso.",
+        message: "A empresa foi cadastrada. Configure a assinatura no painel SaaS quando desejar.",
       }
     );
   }
