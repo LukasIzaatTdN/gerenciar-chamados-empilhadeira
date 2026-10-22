@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../config/firebase";
+import type { AssinaturaEmpresa } from "../types/empresa";
 import type { Empresa, PlanoCiclo, PlanoStatus } from "../types/empresa";
 
 interface EmpresasAdminProps {
@@ -104,6 +107,32 @@ export default function EmpresasAdmin({
       ),
     [empresas]
   );
+
+  // Use canonical SaaS subscription documents, not legacy company plan defaults.
+  const [saas, setSaas] = useState<Record<string, { loading: boolean; value: AssinaturaEmpresa | null; error: boolean }>>({});
+  const idsKey = empresasOrdenadas.map((item) => item.id).join("|");
+  useEffect(() => {
+    let cancelled = false;
+    const ids = idsKey ? idsKey.split("|") : [];
+    setSaas(Object.fromEntries(ids.map((id) => [id, { loading: true, value: null, error: false }])));
+    if (!db) {
+      setSaas(Object.fromEntries(ids.map((id) => [id, { loading: false, value: null, error: true }])));
+      return;
+    }
+    const firestore = db;
+    for (const id of ids) {
+      void getDoc(doc(firestore, "empresas", id, "assinaturas", "atual"))
+        .then((snapshot) => {
+          if (!cancelled) setSaas((previous) => ({ ...previous, [id]: {
+            loading: false, value: snapshot.exists() ? snapshot.data() as AssinaturaEmpresa : null, error: false,
+          }}));
+        })
+        .catch(() => {
+          if (!cancelled) setSaas((previous) => ({ ...previous, [id]: { loading: false, value: null, error: true } }));
+        });
+    }
+    return () => { cancelled = true; };
+  }, [idsKey]);
 
   function resetForm() {
     setEditingId(null);
@@ -286,7 +315,10 @@ export default function EmpresasAdmin({
                 Nenhuma empresa cadastrada ou visível para este perfil.
               </p>
             ) : (
-              empresasOrdenadas.map((empresa) => (
+              empresasOrdenadas.map((empresa) => {
+                const info = saas[empresa.id];
+                const assinatura = info?.value;
+                return (
                 <div key={empresa.id} className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.55fr_0.95fr_0.9fr_0.9fr_auto]">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
@@ -298,26 +330,18 @@ export default function EmpresasAdmin({
                     <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.codigo}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.plano_nome}</p>
-                    <p className="mt-1 text-xs text-slate-500">{empresa.plano_codigo} · {empresa.plano_ciclo}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano SaaS</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{!info || info.loading ? "Consultando..." : info.error ? "Consulta indisponível" : assinatura ? assinatura.plano_nome : "Sem plano SaaS vinculado"}</p>
+                    {assinatura && <p className="mt-1 text-xs text-slate-500">{assinatura.ciclo} · {assinatura.status}</p>}
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites</p>
-                    <p className="mt-1 text-sm text-slate-700">{empresa.max_usuarios ?? "Livre"} usu.</p>
-                    <p className="text-xs text-slate-500">{empresa.max_unidades ?? "Livre"} unid.</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites SaaS</p>
+                    <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Indisponível" : assinatura ? "Ver limites no painel SaaS" : "Sem plano vinculado"}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Contrato</p>
-                    <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getPlanStatusClassName(empresa.plano_status)}`}>
-                      {empresa.plano_status}
-                    </span>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {formatDate(empresa.contrato_inicio)} ate {formatDate(empresa.contrato_fim)}
-                    </p>
-                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                      {empresa.status}
-                    </span>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Assinatura</p>
+                    {assinatura ? <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${assinatura.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assinatura.status}</span> : <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Não foi possível consultar" : "Não vinculada"}</p>}
+                    <p className="mt-2 text-xs text-slate-500">Empresa: {empresa.status}</p>
                   </div>
                   <div className="flex items-center gap-2 md:justify-end">
                     <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
@@ -328,7 +352,8 @@ export default function EmpresasAdmin({
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
