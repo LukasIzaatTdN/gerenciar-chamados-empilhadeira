@@ -5,6 +5,7 @@ import type { Empresa, EmpresaStatus, PlanoCiclo, PlanoStatus } from "../types/e
 import { resolveEmpresaId, sanitizeTenantId } from "../utils/tenant";
 import { EMPRESAS } from "../data/empresas";
 import { assertUserAccess } from "../utils/businessRules";
+import { buildCompanyRegistration } from "../utils/companyRegistration";
 
 const EMPRESAS_COLLECTION = "empresas";
 const EMPRESAS_CACHE_KEY = "empresas_cache_v1";
@@ -155,14 +156,6 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
       nome: string;
       codigo: string;
       cnpj?: string;
-      plano_codigo: string;
-      plano_nome: string;
-      plano_status: PlanoStatus;
-      plano_ciclo: PlanoCiclo;
-      max_usuarios?: number | null;
-      max_unidades?: number | null;
-      contrato_inicio?: string | null;
-      contrato_fim?: string | null;
     }) => {
       assertUserAccess({
         isAuthenticated: Boolean(auth?.currentUser),
@@ -172,29 +165,15 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
       });
 
       const codigo = input.codigo.trim().toUpperCase();
-      const empresa: Empresa = {
-        id: buildEmpresaId(codigo),
-        nome: input.nome.trim(),
-        codigo,
-        cnpj: input.cnpj?.trim() ? input.cnpj.trim() : null,
-        status: "Ativa",
-        plano_codigo: input.plano_codigo.trim().toLowerCase(),
-        plano_nome: input.plano_nome.trim() || `Plano ${input.plano_codigo.trim().toLowerCase()}`,
-        plano_status: input.plano_status,
-        plano_ciclo: input.plano_ciclo,
-        max_usuarios: input.max_usuarios ?? null,
-        max_unidades: input.max_unidades ?? null,
-        contrato_inicio: input.contrato_inicio?.trim() ? input.contrato_inicio : null,
-        contrato_fim: input.contrato_fim?.trim() ? input.contrato_fim : null,
-        criado_em: new Date().toISOString(),
-      };
+      const empresa = buildCompanyRegistration(input, buildEmpresaId(codigo), new Date().toISOString());
 
       if (db) {
         await setDoc(doc(db, EMPRESAS_COLLECTION, empresa.id), empresa);
-        return;
+        return empresa.id;
       }
 
-      setEmpresas((prev) => [empresa, ...prev]);
+      setEmpresas((prev) => [normalizeEmpresa(empresa, empresa.id), ...prev]);
+      return empresa.id;
     },
     []
   );

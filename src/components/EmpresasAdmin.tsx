@@ -1,21 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../config/firebase";
+import type { AssinaturaEmpresa } from "../types/empresa";
 import type { Empresa, PlanoCiclo, PlanoStatus } from "../types/empresa";
 
 interface EmpresasAdminProps {
   empresas: Empresa[];
-  onCreate: (input: {
-    nome: string;
-    codigo: string;
-    cnpj?: string;
-    plano_codigo: string;
-    plano_nome: string;
-    plano_status: PlanoStatus;
-    plano_ciclo: PlanoCiclo;
-    max_usuarios?: number | null;
-    max_unidades?: number | null;
-    contrato_inicio?: string | null;
-    contrato_fim?: string | null;
-  }) => Promise<void>;
+  onCreate: (input: { nome: string; codigo: string; cnpj?: string }) => Promise<string | void>;
   onUpdate: (
     id: string,
     input: {
@@ -107,6 +98,7 @@ export default function EmpresasAdmin({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
+  const [createdCompany, setCreatedCompany] = useState<string | null>(null);
 
   const empresasOrdenadas = useMemo(
     () =>
@@ -116,17 +108,42 @@ export default function EmpresasAdmin({
     [empresas]
   );
 
+  // Use canonical SaaS subscription documents, not legacy company plan defaults.
+  const [saas, setSaas] = useState<Record<string, { loading: boolean; value: AssinaturaEmpresa | null; error: boolean }>>({});
+  const idsKey = empresasOrdenadas.map((item) => item.id).join("|");
+  useEffect(() => {
+    let cancelled = false;
+    const ids = idsKey ? idsKey.split("|") : [];
+    setSaas(Object.fromEntries(ids.map((id) => [id, { loading: true, value: null, error: false }])));
+    if (!db) {
+      setSaas(Object.fromEntries(ids.map((id) => [id, { loading: false, value: null, error: true }])));
+      return;
+    }
+    const firestore = db;
+    for (const id of ids) {
+      void getDoc(doc(firestore, "empresas", id, "assinaturas", "atual"))
+        .then((snapshot) => {
+          if (!cancelled) setSaas((previous) => ({ ...previous, [id]: {
+            loading: false, value: snapshot.exists() ? snapshot.data() as AssinaturaEmpresa : null, error: false,
+          }}));
+        })
+        .catch(() => {
+          if (!cancelled) setSaas((previous) => ({ ...previous, [id]: { loading: false, value: null, error: true } }));
+        });
+    }
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
   function resetForm() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError(null);
+    setCreatedCompany(null);
   }
 
   function validateForm() {
     if (!form.nome.trim()) return "Informe o nome da empresa.";
     if (!form.codigo.trim()) return "Informe o código da empresa.";
-    if (!form.plano_codigo.trim()) return "Informe o código do plano comercial.";
-    if (!form.plano_nome.trim()) return "Informe o nome do plano comercial.";
     return null;
   }
 
@@ -138,28 +155,33 @@ export default function EmpresasAdmin({
       return;
     }
 
-    const payload = {
-      nome: form.nome.trim(),
-      codigo: form.codigo.trim().toUpperCase(),
-      cnpj: form.cnpj.trim() || undefined,
-      plano_codigo: form.plano_codigo.trim().toLowerCase(),
-      plano_nome: form.plano_nome.trim(),
-      plano_status: form.plano_status,
-      plano_ciclo: form.plano_ciclo,
-      max_usuarios: parseNullableNumber(form.max_usuarios),
-      max_unidades: parseNullableNumber(form.max_unidades),
-      contrato_inicio: form.contrato_inicio.trim() || null,
-      contrato_fim: form.contrato_fim.trim() || null,
-    };
-
     try {
       setIsSubmitting(true);
       if (editingId) {
-        await onUpdate(editingId, payload);
+        await onUpdate(editingId, {
+          nome: form.nome.trim(),
+          codigo: form.codigo.trim().toUpperCase(),
+          cnpj: form.cnpj.trim() || undefined,
+          plano_codigo: form.plano_codigo.trim().toLowerCase(),
+          plano_nome: form.plano_nome.trim(),
+          plano_status: form.plano_status,
+          plano_ciclo: form.plano_ciclo,
+          max_usuarios: parseNullableNumber(form.max_usuarios),
+          max_unidades: parseNullableNumber(form.max_unidades),
+          contrato_inicio: form.contrato_inicio.trim() || null,
+          contrato_fim: form.contrato_fim.trim() || null,
+        });
+        resetForm();
       } else {
-        await onCreate(payload);
+        const companyId = await onCreate({
+          nome: form.nome.trim(),
+          codigo: form.codigo.trim().toUpperCase(),
+          cnpj: form.cnpj.trim() || undefined,
+        });
+        setCreatedCompany(companyId ?? form.codigo.trim().toUpperCase());
+        setForm(EMPTY_FORM);
+        setError(null);
       }
-      resetForm();
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -217,7 +239,7 @@ export default function EmpresasAdmin({
               Empresas
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Cadastre clientes, contrato ativo e limites básicos do plano comercial.
+              Cadastre os dados da empresa. A assinatura é configurada separadamente.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -230,11 +252,12 @@ export default function EmpresasAdmin({
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
             {editingId ? "Editar empresa" : "Nova empresa"}
           </h2>
+          {createdCompany && !editingId && <div role="status" className="mb-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Empresa criada. A assinatura continua pendente até ser configurada.<button type="button" onClick={onOpenSubscriptions} disabled={!onOpenSubscriptions} className="ml-2 font-bold underline">Abrir Planos e assinaturas</button><button type="button" onClick={() => setCreatedCompany(null)} className="ml-3">Fechar</button></div>}
           <form onSubmit={handleSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
             <input type="text" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="text" value={form.codigo} onChange={(e) => setForm((prev) => ({ ...prev, codigo: e.target.value }))} placeholder="Código da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="text" value={form.cnpj} onChange={(e) => setForm((prev) => ({ ...prev, cnpj: e.target.value }))} placeholder="CNPJ" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <select value={form.plano_codigo} onChange={(e) => {
+            {editingId && <><select value={form.plano_codigo} onChange={(e) => {
               const selected = PLANO_OPTIONS.find((option) => option.codigo === e.target.value);
               setForm((prev) => ({
                 ...prev,
@@ -267,6 +290,7 @@ export default function EmpresasAdmin({
             <input type="number" min="1" value={form.max_unidades} onChange={(e) => setForm((prev) => ({ ...prev, max_unidades: e.target.value }))} placeholder="Limite de unidades" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="date" value={form.contrato_inicio} onChange={(e) => setForm((prev) => ({ ...prev, contrato_inicio: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
             <input type="date" value={form.contrato_fim} onChange={(e) => setForm((prev) => ({ ...prev, contrato_fim: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
+            </>}
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white">
                 {isSubmitting ? "Salvando..." : editingId ? "Salvar empresa" : "Cadastrar empresa"}
@@ -291,7 +315,10 @@ export default function EmpresasAdmin({
                 Nenhuma empresa cadastrada ou visível para este perfil.
               </p>
             ) : (
-              empresasOrdenadas.map((empresa) => (
+              empresasOrdenadas.map((empresa) => {
+                const info = saas[empresa.id];
+                const assinatura = info?.value;
+                return (
                 <div key={empresa.id} className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.55fr_0.95fr_0.9fr_0.9fr_auto]">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
@@ -303,26 +330,18 @@ export default function EmpresasAdmin({
                     <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.codigo}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.plano_nome}</p>
-                    <p className="mt-1 text-xs text-slate-500">{empresa.plano_codigo} · {empresa.plano_ciclo}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano SaaS</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{!info || info.loading ? "Consultando..." : info.error ? "Consulta indisponível" : assinatura ? assinatura.plano_nome : "Sem plano SaaS vinculado"}</p>
+                    {assinatura && <p className="mt-1 text-xs text-slate-500">{assinatura.ciclo} · {assinatura.status}</p>}
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites</p>
-                    <p className="mt-1 text-sm text-slate-700">{empresa.max_usuarios ?? "Livre"} usu.</p>
-                    <p className="text-xs text-slate-500">{empresa.max_unidades ?? "Livre"} unid.</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites SaaS</p>
+                    <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Indisponível" : assinatura ? "Ver limites no painel SaaS" : "Sem plano vinculado"}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Contrato</p>
-                    <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getPlanStatusClassName(empresa.plano_status)}`}>
-                      {empresa.plano_status}
-                    </span>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {formatDate(empresa.contrato_inicio)} ate {formatDate(empresa.contrato_fim)}
-                    </p>
-                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                      {empresa.status}
-                    </span>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Assinatura</p>
+                    {assinatura ? <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${assinatura.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assinatura.status}</span> : <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Não foi possível consultar" : "Não vinculada"}</p>}
+                    <p className="mt-2 text-xs text-slate-500">Empresa: {empresa.status}</p>
                   </div>
                   <div className="flex items-center gap-2 md:justify-end">
                     <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
@@ -333,7 +352,8 @@ export default function EmpresasAdmin({
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
