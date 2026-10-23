@@ -557,3 +557,22 @@ zip -j patio-rules-6101415-resultados.zip patio-rules-6101415-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101415-resultados.zip`. Nenhuma candidata de regra é gerada ou aprovada nesta etapa. `assertFails` pode passar quando a negação é consequência de orçamento ou erro. A cobertura ajuda a localizar expressões executadas, mas não prova causalidade; ler os logs e cobertura bruta antes de propor refatorações. Nenhum deploy, mudança em `firestore.rules`, `main`, faturamento, IAM ou serviços pagos. Preservar edições locais, inclusive `.env.example`.
+
+
+## 6.10.14.16 — Contexto de autenticação compartilhado nas três ramificações
+
+Criado o experimento `scripts/firebase/experiment-user-shared-actor-6101416.mjs`, **exclusivo do Emulator**. Ele compara `firestore.rules` oficial (sem modificá-lo) com uma regra temporária cuja função `stage161UpdateUser` centraliza a leitura do documento autenticado e reaproveita status, perfil e empresa nos caminhos de autoatualização, administrador da plataforma e administrador da empresa. Conserva o bloqueio global de autopromoção, os vínculos de origem e destino, a validação de vínculo e os campos modificáveis. Essa versão é somente uma hipótese: diferenças sutis entre regras originais e refatoradas precisam ser detectadas por testes; **não usar em produção**.
+
+O runner executa nove operações separadamente para baseline e variante, com logs, contagem de orçamentos/erros e cobertura. As negativas `assertFails` podem passar mesmo com erros; exigir inspeção dos logs brutos. Sem equivalência formal nem ampliação da matriz negativa (usuários inativos/ausentes, status inválidos, empresas diferentes, elevação de privilégios), nenhuma candidata será aprovada para publicação.
+
+```bash
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-shared-actor-6101416.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101416-resultados.zip patio-rules-6101416-*.json patio-rules-6101416-*.log
+```
+
+Enviar `/tmp/patio-rules-6101416-resultados.zip`; caso o runner encerre com código 1, preservar os relatórios. Não alterar `firestore.rules`, a branch `main`, configurações de faturamento/IAM, Firebase ou Vercel em produção. Preservar alterações locais, especialmente `.env.example`.
