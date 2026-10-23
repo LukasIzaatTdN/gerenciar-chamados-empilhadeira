@@ -660,3 +660,23 @@ zip -j patio-rules-6101420-resultados.zip patio-rules-6101420-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101420-resultados.zip` mesmo com resultados inesperados. Não alterar regras oficiais, `main`, produção Firebase/Vercel, permissões IAM ou cobrança. Preservar mudanças locais.
+
+
+## 6.10.14.21 — Campos opcionais em usuarios.update (Emulator)
+
+Adicionados os testes `functions/tests/firestore/user-optional-fields-6101421.rules.test.mjs`, o foco `usuarios-campos-6101421` no diagnóstico e o script `scripts/firebase/experiment-user-optional-fields-6101421.mjs`. As **três alternativas originais** de `usuarios.update` permanecem presentes. O experimento compara as regras oficiais (baseline, sem alteração) com três versões temporárias: `safe-store` (somente leituras de `supermercado_id`), `safe-invite` (somente leituras de `convite_token`) e `safe-both` (ambas). As variantes substituem leituras diretas por `.get("campo", null)` somente dentro de `usuarios.update`; o parser interrompe se as âncoras de substituição não existirem. Isso pode alterar comportamento e NÃO constitui correção validada.
+
+Quatro novos cenários verificam campos omitidos e complementam nove regressões já existentes, totalizando **52 execuções isoladas** no projeto fictício. Incluem atualização própria com `supermercado_id` ausente e tentativas proibidas com `convite_token` ou `supermercado_id` ausentes. Os testes podem mostrar diferenças entre baseline e variante. `assertFails` passando não prova negativa limpa; conferir `evaluationErrorMentions`, `expressionBudgetMentions`, relatórios e logs. Caso baseline falhe com novo cenário, preservar evidência, não esconder/alterar expectativa.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-optional-fields-6101421.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101421-resultados.zip patio-rules-6101421-*.json patio-rules-6101421-*.log
+```
+
+Enviar `/tmp/patio-rules-6101421-resultados.zip` ainda que existam testes reprovados. **Nada disso deve ser implantado**. Não modificar regras oficiais, `main`, IAM, cobrança, Firebase/Vercel produção ou alterações locais.
