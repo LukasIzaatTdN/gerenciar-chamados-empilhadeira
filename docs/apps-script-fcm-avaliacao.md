@@ -596,3 +596,25 @@ zip -j patio-rules-6101417-resultados.zip patio-rules-6101417-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101417-resultados.zip`. Não realizar deploy, alteração de regras oficiais, produção, `main`, IAM, cobrança ou serviços pagos. Preservar `.env.example` e demais modificações locais.
+
+
+## 6.10.14.18 — setDoc/updateDoc e documento ausente
+
+Experimento exclusivo do Firestore Emulator. Foram acrescentados os testes isolados `functions/tests/firestore/user-operations-6101418.rules.test.mjs` e o orquestrador `scripts/firebase/experiment-user-operations-6101418.mjs`. O diagnóstico `scripts/firebase/diagnose-firestore-rules.mjs` aceita o novo foco `usuarios-operacoes-6101418`.
+
+O orquestrador compara **baseline** com controle temporário **update-exists-guard** (adição de `exists(/databases/$(database)/documents/usuarios/$(id))` antes de `allow update`), para seis operações: `setDoc` com usuário comum ausente permitido, `setDoc` com Administrador Geral ausente negado, `setDoc` com usuário existente tentando elevar privilégio, `updateDoc` existente tentando elevar privilégio, `updateDoc` ausente negado e `updateDoc` existente alterando somente timestamp permitido.
+
+O controle é somente para atribuir mudanças nos erros de avaliação e no orçamento, **não é uma correção validada**. `setDoc` sobre documento ausente é criação; sobre documento existente é atualização. A avaliação de múltiplas regras pode aparecer nos logs sem implicar que o acesso foi permitido. Não interpretar `assertFails` aprovado como negativa limpa: verificar erros, orçamento e cobertura.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-operations-6101418.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101418-resultados.zip patio-rules-6101418-*.json patio-rules-6101418-*.log
+```
+
+Enviar `/tmp/patio-rules-6101418-resultados.zip`, inclusive quando algum teste falhar. Nenhuma regra oficial, Firebase de produção, Vercel ou `main` foi alterada. Não usar a regra temporária em produção; preservar modificações locais (incluindo `.env.example`).
