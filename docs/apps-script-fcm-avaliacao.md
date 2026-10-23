@@ -680,3 +680,23 @@ zip -j patio-rules-6101421-resultados.zip patio-rules-6101421-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101421-resultados.zip` ainda que existam testes reprovados. **Nada disso deve ser implantado**. Não modificar regras oficiais, `main`, IAM, cobrança, Firebase/Vercel produção ou alterações locais.
+
+
+## 6.10.14.22 — Matriz de regressão da leitura segura supermercado_id
+
+Adicionados `functions/tests/firestore/user-store-matrix-6101422.rules.test.mjs` (14 novos cenários), foco `usuarios-matriz-6101422` no diagnóstíco e `scripts/firebase/experiment-user-store-matrix-6101422.mjs`. O script compara **baseline** com a variante **safe-store**, preservando todas as três alternativas originais de `usuarios.update` e substituindo, somente em regra temporária, leituras de `supermercado_id` por `data.get("supermercado_id", null)`.
+
+São 27 cenários por variante (13 regressões herdadas da etapa 6.10.14.21 + 14 adicionais), totalizando **54 execuções isoladas**. Cobertura: usuários com unidade presente, ausente ou nula; usuário inativo; administradores ativos e inativos; atualização legítima entre usuários da mesma empresa; movimentação proibida entre empresas/unidades; elevação indevida de privilégio; Administrador Geral sem convite. Casos positivos com campos incompletos podem reprovar no baseline; manter essas reprovações como evidência, sem relaxar a asserção para `assertFails`.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-store-matrix-6101422.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101422-resultados.zip patio-rules-6101422-*.json patio-rules-6101422-*.log
+```
+
+Enviar `/tmp/patio-rules-6101422-resultados.zip` mesmo em caso de erros. O relatório `-comparison.json` mostra as duas versões e inclui referências aos logs. `assertFails` passando pode ocultar estouro/erro de avaliação; inspecionar `evaluationErrorMentions` e `expressionBudgetMentions`. Uma melhoria pontual não garante equivalência de autorização nem autoriza deploy. Sem mudança nas regras oficiais, `main`, produção, IAM, billing ou arquivos locais fora da branch experimental.
