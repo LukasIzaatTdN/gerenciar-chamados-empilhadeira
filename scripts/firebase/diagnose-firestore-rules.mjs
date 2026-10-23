@@ -14,6 +14,7 @@ const suiteGroups = {
   // Isolate the existing security regression without modifying Firestore rules.
   usuarios: ["functions/tests/firestore/subscriptions.rules.test.mjs"],
   "usuarios-validacao": ["functions/tests/firestore/user-update-610149.rules.test.mjs"],
+  "usuarios-operacoes-6101418": ["functions/tests/firestore/user-operations-6101418.rules.test.mjs"],
   assinaturas: [
     "functions/tests/firestore/subscriptions.rules.test.mjs",
     "functions/tests/firestore/subscriptions.client.test.mjs",
@@ -21,7 +22,7 @@ const suiteGroups = {
 };
 const focus = process.env.PATIO_RULES_FOCUS || "all";
 if (!Object.hasOwn(suiteGroups, focus)) {
-  throw new Error("PATIO_RULES_FOCUS must be all, chamados, usuarios, usuarios-validacao or assinaturas");
+  throw new Error("PATIO_RULES_FOCUS must be all, chamados, usuarios, usuarios-validacao, usuarios-operacoes-6101418 or assinaturas");
 }
 const suites = suiteGroups[focus];
 
@@ -32,7 +33,7 @@ if (focus === "usuarios") {
 // An exact per-case pattern is opt-in and restricted to user rule suites.
 const individualPattern = process.env.PATIO_RULES_TEST_PATTERN;
 if (individualPattern) {
-  if (!["usuarios", "usuarios-validacao"].includes(focus)) {
+  if (!["usuarios", "usuarios-validacao", "usuarios-operacoes-6101418"].includes(focus)) {
     throw new Error("PATIO_RULES_TEST_PATTERN is only supported for usuarios suites");
   }
   if (focus === "usuarios") testArgs.splice(testArgs.indexOf("--test-name-pattern"), 2);
