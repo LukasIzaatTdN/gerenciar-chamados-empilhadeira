@@ -34,7 +34,7 @@ if (branches.some(b => !b.startsWith("(") || !b.endsWith(")")))
 const dir = await mkdtemp(join(tmpdir(), "patio-rules-6101420-"));
 const variants = [["baseline", null]];
 for (const [name, indices] of [["self-platform", [0, 1]], ["self-company", [0, 2]], ["platform-company", [1, 2]]]) {
-  const changed = head + "          " + indices.map(index => branches[index]).join("\\n        || ") + updateBlock.slice(tail);
+  const changed = head + "          " + indices.map(index => branches[index]).join("\n        || ") + updateBlock.slice(tail);
   const file = join(dir, name + ".rules");
   await writeFile(file, rules.slice(0, updateStart) + changed + rules.slice(updateEnd));
   variants.push([name, file]);
