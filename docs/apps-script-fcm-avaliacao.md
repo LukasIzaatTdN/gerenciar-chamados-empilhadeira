@@ -640,3 +640,23 @@ zip -j patio-rules-6101419-resultados.zip patio-rules-6101419-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101419-resultados.zip`, mesmo que alguma variante retorne código não zero. Não fazer deploy, merge na `main`, atualização de `firestore.rules` oficiais, IAM ou cobrança. Preservar modificações locais existentes.
+
+
+## 6.10.14.20 — Isolamento das ramificações em pares (Emulator)
+
+Criado `scripts/firebase/experiment-user-pairs-6101420.mjs`, baseado nos controles da etapa 6.10.14.19. São geradas três regras temporárias com as combinações das alternativas OR originais de `usuarios.update`: `self-platform`, `self-company` e `platform-company`, mantendo as verificações globais de autenticação e autopromoção. O baseline é a regra original completa, não modificada.
+
+O diagnóstico executa 9 operações de segurança para cada uma das quatro versões (**36 execuções isoladas**), com logs, resumos JSON, cobertura do Firebase Emulator e comparativo `/tmp/patio-rules-6101420-comparison.json`. Inclui negativas e atualizações administrativas legítimas. Controles em pares negam algumas permissões de forma proposital; nunca são candidatos a deploy. Não presumir que zero estouro de expressão significa autorização correta: `assertFails` também passa em caso de erros de avaliação, portanto comparar as duas classes de erro e conferir os logs.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-pairs-6101420.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101420-resultados.zip patio-rules-6101420-*.json patio-rules-6101420-*.log
+```
+
+Enviar `/tmp/patio-rules-6101420-resultados.zip` mesmo com resultados inesperados. Não alterar regras oficiais, `main`, produção Firebase/Vercel, permissões IAM ou cobrança. Preservar mudanças locais.
