@@ -618,3 +618,25 @@ zip -j patio-rules-6101418-resultados.zip patio-rules-6101418-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101418-resultados.zip`, inclusive quando algum teste falhar. Nenhuma regra oficial, Firebase de produção, Vercel ou `main` foi alterada. Não usar a regra temporária em produção; preservar modificações locais (incluindo `.env.example`).
+
+
+## 6.10.14.19 — Isolamento das três alternativas de usuarios.update (Emulator)
+
+Criado `scripts/firebase/experiment-user-branches-6101419.mjs`. As três ramificações OR originais de `allow update` são extraídas mecanicamente do `firestore.rules` e avaliadas **separadamente** em regras temporárias: `self-only`, `platform-only` e `company-only`. Todas conservam o guard global de autenticação e bloqueio de autopromoção. Uma validação de âncoras interrompe a geração caso a estrutura não corresponda exatamente ao esperado.
+
+A comparação executa nove cenários de segurança de usuários para quatro variantes (`baseline` e três controles), ou seja, **36 execuções isoladas**. Além dos negativos (autocadastro de Administrador Geral, autopromoção, alteração entre empresas, usuário comum tentando elevar privilégio), inclui os positivos (atualização do próprio timestamp, gestão da mesma empresa, convite por Administrador Geral e gestão do próprio status) para mostrar explicitamente quais permissões legítimas são negadas pelas variantes parciais.
+
+Controles `*-only` **não são correções nem candidatas a deploy**: removem ramificações de autorização e, portanto, devem negar operações legítimas em alguns casos. A aprovação de `assertFails` não constitui negativa limpa quando logs apresentam erros de avaliação/estouro. Comparar `*-comparison.json` com os logs individuais e cobertura. Não concluir causalidade unicamente pela contagem das mensagens.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-branches-6101419.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101419-resultados.zip patio-rules-6101419-*.json patio-rules-6101419-*.log
+```
+
+Enviar `/tmp/patio-rules-6101419-resultados.zip`, mesmo que alguma variante retorne código não zero. Não fazer deploy, merge na `main`, atualização de `firestore.rules` oficiais, IAM ou cobrança. Preservar modificações locais existentes.
