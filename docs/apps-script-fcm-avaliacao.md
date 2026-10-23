@@ -576,3 +576,23 @@ zip -j patio-rules-6101416-resultados.zip patio-rules-6101416-*.json patio-rules
 ```
 
 Enviar `/tmp/patio-rules-6101416-resultados.zip`; caso o runner encerre com código 1, preservar os relatórios. Não alterar `firestore.rules`, a branch `main`, configurações de faturamento/IAM, Firebase ou Vercel em produção. Preservar alterações locais, especialmente `.env.example`.
+
+
+## 6.10.14.17 — Isolamento create versus update de usuarios
+
+Criado `scripts/firebase/experiment-user-create-update-6101417.mjs`. O script gera duas regras temporárias em `/tmp`: `create-denied` substitui somente `allow create` por `false`, e `update-denied` substitui somente `allow update` por `false`. Compara ambas com o baseline para **seis operações isoladas** (autocadastro de privilégio, autopromoção, bloqueio entre empresas, alteração de privilégios por usuário comum e duas operações administrativas permitidas). Executa 18 vezes o Firebase Emulator no projeto fictício `demo-patio-pro-log`; mantém `firestore.rules` intocado.
+
+As variantes que negam criação/atualização são **controles diagnósticos intencionalmente incompletos e NÃO PODEM SER PUBLICADOS**. Uma negativa aprovada via `assertFails` pode decorrer de orçamento esgotado ou erro de avaliação; conferir logs e cobertura. Os resultados ajudam a identificar participação de cada operação, mas não estabelecem causa raiz nem equivalência. Comparar também operações legítimas para comprovar que as variantes negadoras quebram permissões por desenho.
+
+```bash
+git branch --show-current
+git status --short
+git pull --ff-only origin fix/push-worker-security-reliability
+node scripts/firebase/experiment-user-create-update-6101417.mjs
+npm test
+npm run build
+cd /tmp
+zip -j patio-rules-6101417-resultados.zip patio-rules-6101417-*.json patio-rules-6101417-*.log
+```
+
+Enviar `/tmp/patio-rules-6101417-resultados.zip`. Não realizar deploy, alteração de regras oficiais, produção, `main`, IAM, cobrança ou serviços pagos. Preservar `.env.example` e demais modificações locais.
