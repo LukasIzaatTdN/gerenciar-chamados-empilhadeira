@@ -15,7 +15,11 @@ import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
 import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
 import { getEmpilhadeiraStatusEfetivo } from "../utils/empilhadeiraStatus";
+import { getLinkedCallProgress, getLinkedCallsForItem } from "../utils/televendasLinkedCalls.ts";
 import { isChecklistEmpilhadeiraAprovado } from "../utils/checklistEmpilhadeira";
+import SolicitarEmpilhadeiraPedidoModal from "./SolicitarEmpilhadeiraPedidoModal";
+import type { NovoChamadoInput } from "../hooks/useChamados";
+import { getConfirmedQuantityForItem, getSeparationConfirmationSummary, hasForkliftReceiptForItem } from "../utils/separationConfirmation";
 import {
   formatQuantidadeComUnidade,
   getTotaisItensTelevendas,
@@ -50,6 +54,7 @@ interface OperadorPanelProps {
   ) => void | Promise<void>;
   onMarcarACaminho: (id: string, operadorNome: string) => void | Promise<void>;
   onMarcarChegada: (id: string, operadorNome: string) => void | Promise<void>;
+  onConfirmarSeparacaoEmpilhadeira: (pedidoId: string, chamadoId: string, itemIndex: number, quantidade: number, justificativa: string) => Promise<void>;
   onAtualizarItensTelevendas: (inputId: string, input: {
     itens: ItemTelevendas[];
     operadorNome: string;
@@ -57,6 +62,7 @@ interface OperadorPanelProps {
     motivoIncompleto?: string | null;
     observacaoOperador?: string | null;
   }) => void | Promise<void>;
+  onCreateLinkedCall: (input: NovoChamadoInput) => Promise<unknown>;
   onIniciar: (
     id: string,
     operadorNome: string,
@@ -137,6 +143,12 @@ function parseListaProdutos(produto: string | null | undefined): string[] {
 }
 
 type FilterTab = "pendentes" | "meus" | "finalizados";
+
+function linkedCallProgressClass(progress: ReturnType<typeof getLinkedCallProgress>) {
+  if (progress === "Finalizado") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (progress === "Cancelado") return "border-slate-200 bg-slate-100 text-slate-600";
+  return "border-amber-200 bg-amber-50 text-amber-800";
+}
 type TechnicalTab = "checklist" | "problema";
 
 function normalizeOperatorName(value: string | null | undefined) {
@@ -172,6 +184,8 @@ export default function OperadorPanel({
   onMarcarACaminho,
   onMarcarChegada,
   onAtualizarItensTelevendas,
+  onConfirmarSeparacaoEmpilhadeira,
+  onCreateLinkedCall,
   onIniciar,
   onFinalizar,
   onCreateChecklist,
@@ -189,6 +203,7 @@ export default function OperadorPanel({
 }: OperadorPanelProps) {
   const [filterSetor, setFilterSetor] = useState<"Todos" | Setor>("Todos");
   const isSeparadorTelevendas = perfilAcesso === "Separador de Televendas";
+  const isOperadorEmpilhadeira = perfilAcesso === "Operador";
   const [filterCategoria, setFilterCategoria] = useState<"Todos" | "operacional" | "televendas">(
     isSeparadorTelevendas ? "televendas" : "Todos"
   );
@@ -222,6 +237,19 @@ export default function OperadorPanel({
       }
     >
   >({});
+  const [separationConfirmationSelection, setSeparationConfirmationSelection] = useState<{
+    pedido: Chamado;
+    call: Chamado;
+    item: ItemTelevendas;
+    itemIndex: number;
+  } | null>(null);
+  const [separationConfirmationQuantity, setSeparationConfirmationQuantity] = useState("0");
+  const [separationConfirmationReason, setSeparationConfirmationReason] = useState("");
+  const [linkedCallSelection, setLinkedCallSelection] = useState<{
+    pedido: Chamado;
+    item: ItemTelevendas;
+    itemIndex: number;
+  } | null>(null);
   const isMountedRef = useRef(true);
   const runningActionRef = useRef<string | null>(null);
   const isDisponivel = operadorStatus === "Disponível";
@@ -268,13 +296,16 @@ export default function OperadorPanel({
       Array.from(
         new Set(
           chamados
-            .filter((chamado) => !isSeparadorTelevendas || isTelevendasChamado(chamado))
+            .filter((chamado) =>
+              (!isSeparadorTelevendas || isTelevendasChamado(chamado)) &&
+              (!isOperadorEmpilhadeira || !isTelevendasChamado(chamado))
+            )
             .map((c) => (typeof c.setor === "string" ? c.setor.trim() : ""))
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b, "pt-BR"))
         )
       ),
-    [chamados, isSeparadorTelevendas]
+    [chamados, isSeparadorTelevendas, isOperadorEmpilhadeira]
   );
 
   const pendentes = useMemo(
@@ -283,6 +314,7 @@ export default function OperadorPanel({
         .filter(
           (c) =>
             (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (!isOperadorEmpilhadeira || !isTelevendasChamado(c)) &&
             (c.status === "Aguardando" ||
               c.status === "Aberto" ||
               c.status === "Em separação" ||
@@ -293,7 +325,7 @@ export default function OperadorPanel({
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados, isSeparadorTelevendas]
+    [chamados, isSeparadorTelevendas, isOperadorEmpilhadeira]
   );
 
   const pendentesNaoAssumidos = useMemo(
@@ -302,6 +334,7 @@ export default function OperadorPanel({
         .filter(
           (c) =>
             (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (!isOperadorEmpilhadeira || !isTelevendasChamado(c)) &&
             (c.status === "Aguardando" || c.status === "Aberto") &&
             !c.operador_nome
         )
@@ -310,7 +343,7 @@ export default function OperadorPanel({
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados, isSeparadorTelevendas]
+    [chamados, isSeparadorTelevendas, isOperadorEmpilhadeira]
   );
 
   const meusChamados = useMemo(
@@ -319,6 +352,7 @@ export default function OperadorPanel({
         .filter(
           (c) =>
             (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (!isOperadorEmpilhadeira || !isTelevendasChamado(c)) &&
             isSameOperatorName(c.operador_nome, operadorNome) &&
             c.status !== "Finalizado"
         )
@@ -329,7 +363,7 @@ export default function OperadorPanel({
           if (a.prioridade !== "Urgente" && b.prioridade === "Urgente") return 1;
           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
         }),
-    [chamados, operadorNome, isSeparadorTelevendas]
+    [chamados, operadorNome, isSeparadorTelevendas, isOperadorEmpilhadeira]
   );
 
   const finalizados = useMemo(
@@ -338,11 +372,12 @@ export default function OperadorPanel({
         .filter(
           (c) =>
             (!isSeparadorTelevendas || isTelevendasChamado(c)) &&
+            (!isOperadorEmpilhadeira || !isTelevendasChamado(c)) &&
             isSameOperatorName(c.operador_nome, operadorNome) &&
             c.status === "Finalizado"
         )
         .sort((a, b) => new Date(b.finalizado_em!).getTime() - new Date(a.finalizado_em!).getTime()),
-    [chamados, operadorNome, isSeparadorTelevendas]
+    [chamados, operadorNome, isSeparadorTelevendas, isOperadorEmpilhadeira]
   );
 
   const applySetorFilter = (list: Chamado[]) =>
@@ -479,9 +514,10 @@ export default function OperadorPanel({
     const current = getTelevendasDraft(chamado);
     const nextItens = current.itens.map((item, index) => {
       if (index !== itemIndex) return item;
+      const minConfirmed = getConfirmedQuantityForItem(chamado, index);
       const qtdEncontrada = Math.max(
-        0,
-        Math.min(Number.isFinite(quantidadeEncontrada) ? Math.floor(quantidadeEncontrada) : 0, item.quantidadeSolicitada)
+        minConfirmed,
+        Math.min(Number.isFinite(quantidadeEncontrada) ? Math.floor(quantidadeEncontrada) : minConfirmed, item.quantidadeSolicitada)
       );
       return {
         ...item,
@@ -1398,59 +1434,105 @@ export default function OperadorPanel({
                               Conferência de itens
                             </p>
                             <div className="mt-2 space-y-2">
-                              {televendasDraft.itens.map((item, index) => (
-                                <div
-                                  key={`${chamado.id}-item-${index}`}
-                                  className={cn(
-                                    "grid grid-cols-1 gap-2 rounded-lg border px-3 py-2 sm:grid-cols-[1fr_130px_130px]",
-                                    item.quantidadeFaltante > 0
-                                      ? "border-rose-200 bg-rose-50/70"
-                                      : "border-slate-200 bg-slate-50/80"
-                                  )}
-                                >
-                                  <div className="text-xs font-semibold text-slate-800">{item.produto}</div>
-                                  <div className="text-xs text-slate-600">
-                                    Solicitado:{" "}
-                                    <span className="font-semibold text-slate-900">
-                                      {formatQuantidadeComUnidade(
-                                        item.quantidadeSolicitada,
-                                        item.unidadeMedida
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <label className="text-slate-600">Encontrado:</label>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={item.quantidadeSolicitada}
-                                      value={item.quantidadeEncontrada}
-                                      onChange={(event) =>
-                                        updateTelevendasItemQuantidade(
-                                          chamado,
-                                          index,
-                                          Number(event.target.value)
-                                        )
-                                      }
-                                      className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                    />
-                                    <span
+                              {televendasDraft.itens.map((item, index) => {
+                                const linkedCalls = isSeparadorTelevendas
+                                  ? getLinkedCallsForItem(chamados, chamado, index)
+                                  : [];
+                                return (
+                                  <div key={`${chamado.id}-item-${index}`} className="space-y-2">
+                                    <div
                                       className={cn(
-                                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                        "grid grid-cols-1 gap-2 rounded-lg border px-3 py-2 sm:grid-cols-[1fr_130px_130px_auto]",
                                         item.quantidadeFaltante > 0
-                                          ? "bg-rose-100 text-rose-700"
-                                          : "bg-emerald-100 text-emerald-700"
+                                          ? "border-rose-200 bg-rose-50/70"
+                                          : "border-slate-200 bg-slate-50/80"
                                       )}
                                     >
-                                      Falta:{" "}
-                                      {formatQuantidadeComUnidade(
-                                        item.quantidadeFaltante,
-                                        item.unidadeMedida
+                                      <div className="text-xs font-semibold text-slate-800">{item.produto}</div>
+                                      <div className="text-xs text-slate-600">
+                                        Solicitado:{" "}
+                                        <span className="font-semibold text-slate-900">
+                                          {formatQuantidadeComUnidade(item.quantidadeSolicitada, item.unidadeMedida)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs">
+                                        <label className="text-slate-600">Encontrado:</label>
+                                        <input
+                                          type="number"
+                                          min={getConfirmedQuantityForItem(chamado, index)}
+                                          max={item.quantidadeSolicitada}
+                                          value={item.quantidadeEncontrada}
+                                          onChange={(event) => updateTelevendasItemQuantidade(chamado, index, Number(event.target.value))}
+                                          disabled={hasForkliftReceiptForItem(chamado, index)}
+                                          className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                        <span className={cn(
+                                          "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                          item.quantidadeFaltante > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                                        )}>
+                                          Falta: {formatQuantidadeComUnidade(item.quantidadeFaltante, item.unidadeMedida)}
+                                        </span>
+                                        {getConfirmedQuantityForItem(chamado, index) > 0 && (
+                                          <span className="text-[11px] font-medium text-indigo-700">
+                                            Confirmado por empilhadeira: {formatQuantidadeComUnidade(getConfirmedQuantityForItem(chamado, index), item.unidadeMedida)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isSeparadorTelevendas && isEmSeparacaoTelevendas && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setLinkedCallSelection({ pedido: chamado, item, itemIndex: index })}
+                                          className="min-h-10 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-600 active:scale-[0.98]"
+                                        >
+                                          Solicitar Empilhadeira
+                                        </button>
                                       )}
-                                    </span>
+                                    </div>
+                                    {hasForkliftReceiptForItem(chamado, index) && (
+                                      <p className="text-[11px] text-amber-800">Este item já foi confirmado no recebimento da empilhadeira e está bloqueado para edição manual. Os demais itens continuam disponíveis.</p>
+                                    )}
+                                    {linkedCalls.length > 0 && (
+                                      <div className="space-y-1.5 pl-2" aria-label={`Solicitações de empilhadeira para ${item.produto}`}>
+                                        {linkedCalls.map((linkedCall) => {
+                                          const progress = getLinkedCallProgress(linkedCall);
+                                          const confirmationMarker = chamado.confirmacoes_empilhadeira?.[linkedCall.id];
+                                          const alreadyConfirmed = Boolean(confirmationMarker);
+                                          const confirmedQuantity = typeof confirmationMarker === "object" && confirmationMarker !== null ? confirmationMarker.quantidade : 0;
+                                          return (
+                                            <div key={linkedCall.id} className="space-y-1">
+                                              <div className={cn("flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between", linkedCallProgressClass(progress))}>
+                                                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                                  <span className="font-bold">Empilhadeira · {progress}</span>
+                                                  <span>{linkedCall.tipo_servico}</span>
+                                                  {linkedCall.operador_nome && <span>Operador: {linkedCall.operador_nome}</span>}
+                                                </div>
+                                                <span className="text-[11px] sm:text-right">📍 {linkedCall.localizacao_pallet || linkedCall.local_exato || "Local não informado"}</span>
+                                              </div>
+                                              {alreadyConfirmed ? (
+                                                <p className="px-3 text-[11px] font-semibold text-emerald-700">Recebimento confirmado: {formatQuantidadeComUnidade(
+                                                  confirmedQuantity,
+                                                  item.unidadeMedida
+                                                )}</p>
+                                              ) : isSeparadorTelevendas && linkedCall.status === "Finalizado" ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const summary = getSeparationConfirmationSummary(chamado, index);
+                                                    setSeparationConfirmationSelection({ pedido: chamado, call: linkedCall, item, itemIndex: index });
+                                                    setSeparationConfirmationQuantity(String(summary.restante));
+                                                    setSeparationConfirmationReason("");
+                                                  }}
+                                                  className="min-h-9 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600"
+                                                >Confirmar recebimento e separação</button>
+                                              ) : null}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
 
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -1764,6 +1846,62 @@ export default function OperadorPanel({
       <footer className="mt-8 border-t border-slate-200 py-4 text-center text-xs text-slate-400">
         Painel do Operador · Sistema de Gerenciamento de Chamados
       </footer>
+      {linkedCallSelection && (
+        <SolicitarEmpilhadeiraPedidoModal
+          key={`${linkedCallSelection.pedido.id}:${linkedCallSelection.itemIndex}`}
+          pedido={linkedCallSelection.pedido}
+          item={linkedCallSelection.item}
+          itemIndex={linkedCallSelection.itemIndex}
+          solicitanteNome={operadorNome}
+          onCreate={onCreateLinkedCall}
+          onClose={() => setLinkedCallSelection(null)}
+        />
+      )}
+      {separationConfirmationSelection && (() => {
+        const selection = separationConfirmationSelection;
+        const summary = getSeparationConfirmationSummary(selection.pedido, selection.itemIndex);
+        const submit = () => {
+          const quantity = Number(separationConfirmationQuantity);
+          if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > summary.restante) {
+            setActionError(`Informe uma quantidade inteira entre 0 e ${summary.restante}.`);
+            return;
+          }
+          if (quantity === 0 && !separationConfirmationReason.trim()) {
+            setActionError("Informe uma justificativa para confirmar quantidade zero.");
+            return;
+          }
+          void runAction(`confirmar-separacao-${selection.call.id}`, async () => {
+            await onConfirmarSeparacaoEmpilhadeira(
+              selection.pedido.id, selection.call.id, selection.itemIndex,
+              quantity, separationConfirmationReason.trim()
+            );
+            setSeparationConfirmationSelection(null);
+          });
+        };
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4" role="presentation">
+            <section role="dialog" aria-modal="true" aria-labelledby="confirm-separation-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+              <h2 id="confirm-separation-title" className="text-lg font-bold text-slate-900">Confirmar recebimento e separação</h2>
+              <p className="mt-1 text-sm text-slate-600">{selection.item.produto} · Pedido {selection.pedido.numero_pedido || selection.pedido.id.slice(0, 8)}</p>
+              <dl className="mt-4 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
+                <div><dt className="text-slate-500">Solicitado</dt><dd className="font-semibold">{formatQuantidadeComUnidade(summary.solicitada, summary.unidade)}</dd></div>
+                <div><dt className="text-slate-500">Já separado</dt><dd className="font-semibold">{formatQuantidadeComUnidade(summary.separada, summary.unidade)}</dd></div>
+                <div><dt className="text-slate-500">Restante</dt><dd className="font-semibold">{formatQuantidadeComUnidade(summary.restante, summary.unidade)}</dd></div>
+              </dl>
+              <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="separation-quantity">Quantidade recebida</label>
+              <input id="separation-quantity" type="number" min={0} max={summary.restante} step={1} value={separationConfirmationQuantity} onChange={(event) => setSeparationConfirmationQuantity(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              <label className="mt-3 block text-sm font-semibold text-slate-700" htmlFor="separation-reason">Justificativa (obrigatória se informar zero)</label>
+              <textarea id="separation-reason" value={separationConfirmationReason} onChange={(event) => setSeparationConfirmationReason(event.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              <p className="mt-2 text-xs text-slate-500">A confirmação não altera o status do pedido. Informe somente a quantidade que ainda não foi contabilizada manualmente.</p>
+              {actionError && <p role="alert" className="mt-2 text-sm text-rose-700">{actionError}</p>}
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" disabled={Boolean(loadingActionId)} onClick={() => setSeparationConfirmationSelection(null)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancelar</button>
+                <button type="button" disabled={Boolean(loadingActionId)} onClick={submit} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{loadingActionId === `confirmar-separacao-${selection.call.id}` ? "Salvando..." : "Confirmar"}</button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
     </div>
   );
 }

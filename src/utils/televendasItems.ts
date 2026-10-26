@@ -38,6 +38,7 @@ export function normalizeItemTelevendas(item: Partial<ItemTelevendas>): ItemTele
     quantidadeSolicitada,
     quantidadeEncontrada,
     quantidadeFaltante,
+    ...(item.recebimentoEmpilhadeiraConfirmado === true ? { recebimentoEmpilhadeiraConfirmado: true } : {}),
   };
 }
 

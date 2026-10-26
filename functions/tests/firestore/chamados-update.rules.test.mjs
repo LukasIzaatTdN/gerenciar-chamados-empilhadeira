@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 
 const environment = await initializeTestEnvironment({
   projectId: "demo-patio-pro-log",
@@ -21,7 +21,7 @@ const initial = {
   empilhadeira_id: null, empilhadeira_identificacao: null,
   assumido_em: stamp, a_caminho_em: null, cheguei_em: null,
   iniciado_em: null, finalizado_em: null, cancelado_em: null,
-  itens: [{ id: "item-1", nome: "Produto", quantidade: 1 }],
+  itens: [{ id: "item-1", produto: "Produto", nome: "Produto", quantidade: 1 }],
   observacao_operador: null, motivo_incompleto: null,
 };
 const update = {
@@ -46,12 +46,28 @@ before(async () => {
   await environment.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await setDoc(doc(db, "usuarios/operator-a"), {
-      perfil: "Operador", status: "Ativo", nome: "Operador A",
+      perfil: "Separador de Televendas", status: "Ativo", nome: "Separador A",
       empresa_id: "empresa-a", supermercado_id: "loja-a",
     });
     await setDoc(doc(db, "usuarios/operator-b"), {
-      perfil: "Operador", status: "Ativo", nome: "Operador B",
+      perfil: "Separador de Televendas", status: "Ativo", nome: "Separador B",
       empresa_id: "empresa-b", supermercado_id: "loja-b",
+    });
+    await setDoc(doc(db, "usuarios/real-operator"), {
+      perfil: "Operador", status: "Ativo", nome: "Operador Real",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
+    });
+    await setDoc(doc(db, "usuarios/supervisor-a"), {
+      perfil: "Supervisor", status: "Ativo", nome: "Supervisor A",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
+    });
+    await setDoc(doc(db, "usuarios/company-admin-a"), {
+      perfil: "Administrador da Empresa", status: "Ativo", nome: "Admin A",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
+    });
+    await setDoc(doc(db, "usuarios/televendas-a"), {
+      perfil: "Televendas", status: "Ativo", nome: "Televendas A",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
     });
     await setDoc(doc(db, "usuarios/inactive-a"), {
       perfil: "Operador", status: "Inativo", nome: "Inativo A",
@@ -62,16 +78,28 @@ before(async () => {
       await setDoc(doc(db, "supermercados", store), { empresa_id: company, status: "Ativo", nome: store });
     }
     await setDoc(doc(db, "chamados/tv-a"), initial);
+    // Keep linked-call creation independent from tests that advance tv-a's status.
+    await setDoc(doc(db, "chamados/tv-linked"), { ...initial, id: "tv-linked" });
     await setDoc(doc(db, "chamados/tv-regression"), { ...initial, id: "tv-regression" });
     await setDoc(doc(db, "chamados/tv-gap"), { ...initial, id: "tv-gap" });
     await setDoc(doc(db, "chamados/tv-b"), {
       ...initial, id: "tv-b", empresa_id: "empresa-b", supermercado_id: "loja-b",
     });
+    await setDoc(doc(db, "chamados/tv-other-unit"), {
+      ...initial, id: "tv-other-unit", supermercado_id: "loja-other",
+    });
+    await setDoc(doc(db, "supermercados/loja-other"), { empresa_id: "empresa-a", status: "Ativo", nome: "Outra" });
+    await setDoc(doc(db, "chamados/op-source"), {
+      ...initial, id: "op-source", categoria: "operacional", tipo_servico: "Reposição", status: "Aguardando",
+    });
+    await setDoc(doc(db, "chamados/op-operator-transition"), linkedOperationalCall("op-operator-transition", {
+      operador_nome: null,
+    }));
   });
 });
 after(async () => environment.cleanup());
 
-test("valid televendas update and scoped audit commit atomically", async () => {
+test("a scoped Televendas separator can update a pedido and its audit atomically", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
   const batch = writeBatch(db);
   batch.update(doc(db, "chamados/tv-a"), { ...update, ultima_auditoria_atualizacao_id: "tv-update-1" });
@@ -84,14 +112,257 @@ test("valid televendas update and scoped audit commit atomically", async () => {
   assert.equal(recorded.details.statusAtual, "Pronto");
 });
 
-test("a foreign-company operator cannot update or audit another company's call", async () => {
+test("an operator cannot modify a Televendas pedido", async () => {
+  const db = environment.authenticatedContext("real-operator").firestore();
+  await assertFails(updateDoc(doc(db, "chamados/tv-a"), { status: "Pronto" }));
+  const batch = writeBatch(db);
+  batch.update(doc(db, "chamados/tv-a"), { ...update, ultima_auditoria_atualizacao_id: "operator-tv-audit" });
+  batch.set(doc(db, "auditoria/operator-tv-audit"), audit("tv-a", {
+    actorUid: "real-operator", actorName: "Operador Real",
+  }));
+  await assertFails(batch.commit());
+});
+
+test("Televendas can create a pedido with its authenticated creator identity", async () => {
+  const db = environment.authenticatedContext("televendas-a").firestore();
+  const pedido = {
+    id: "tv-created-by-televendas", empresa_id: "empresa-a", supermercado_id: "loja-a",
+    categoria: "televendas", solicitante_nome: "Televendas A", solicitante_uid: "televendas-a",
+    setor: "Televendas", tipo_servico: "Atendimento Televendas", numero_pedido: "PED-100",
+    cliente: "Cliente A", produto: "Produto A", quantidade: "2 Unidade",
+    itens: [{ produto: "Produto A", unidadeMedida: "Unidade", quantidadeSolicitada: 2, quantidadeEncontrada: 0, quantidadeFaltante: 2 }],
+    total_solicitado: 2, total_encontrado: 0, percentual_atendido: 0,
+    motivo_incompleto: null, observacao_operador: null, atualizado_em: null, atualizado_por: null,
+    local_exato: "Separação A", local_separacao: "Separação A", prazo_limite: "18:00",
+    prioridade: "Normal", observacoes: null, foto_nome: null, foto_data_url: null,
+    empilhadeira_id: null, empilhadeira_identificacao: null, status: "Aberto",
+    operador_nome: null, criado_em: stamp, assumido_em: null, a_caminho_em: null,
+    cheguei_em: null, iniciado_em: null, finalizado_em: null, cancelado_em: null,
+  };
+  await assertSucceeds(setDoc(doc(db, "chamados/tv-created-by-televendas"), pedido));
+  await assertFails(setDoc(doc(db, "chamados/tv-forged-creator"), {
+    ...pedido, id: "tv-forged-creator", solicitante_uid: "another-user",
+  }));
+});
+
+test("a Televendas separator cannot create an unlinked operational call, regardless of empty or forged link fields", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  const unlinked = linkedOperationalCall("op-separator-unlinked", {
+    pedido_origem_id: null,
+    pedido_origem_item_index: null,
+    pedido_origem_produto: null,
+    localizacao_pallet: null,
+  });
+  await assertFails(setDoc(doc(db, "chamados/op-separator-unlinked"), unlinked));
+  await assertFails(setDoc(doc(db, "chamados/op-separator-empty"), {
+    ...unlinked, id: "op-separator-empty", pedido_origem_id: "",
+  }));
+  await assertFails(setDoc(doc(db, "chamados/op-separator-forged"), {
+    ...unlinked, id: "op-separator-forged", pedido_origem_id: "tv-does-not-exist",
+    pedido_origem_item_index: 0, pedido_origem_produto: "Produto",
+    localizacao_pallet: "Rua 4, módulo 2, nível 1",
+  }));
+});
+
+test("blocking unlinked operational calls for separators preserves other profiles and Televendas pedidos", async () => {
+  const unlinked = linkedOperationalCall("op-unlinked-profile", {
+    pedido_origem_id: null,
+    pedido_origem_item_index: null,
+    pedido_origem_produto: null,
+    localizacao_pallet: null,
+  });
+  for (const [uid, id] of [
+    ["real-operator", "op-unlinked-operator"],
+    ["supervisor-a", "op-unlinked-supervisor"],
+    ["company-admin-a", "op-unlinked-company-admin"],
+  ]) {
+    const db = environment.authenticatedContext(uid).firestore();
+    await assertSucceeds(setDoc(doc(db, `chamados/${id}`), { ...unlinked, id, solicitante_uid: uid }));
+  }
+  const televendasDb = environment.authenticatedContext("televendas-a").firestore();
+  await assertSucceeds(setDoc(doc(televendasDb, "chamados/op-unlinked-televendas"), {
+    ...unlinked, id: "op-unlinked-televendas", solicitante_uid: "televendas-a",
+  }));
+  // The Televendas user's authorized order creation is covered above; the
+  // separator remains allowed to create such orders by the unlinked branch.
+  const separatorDb = environment.authenticatedContext("operator-a").firestore();
+  const pedido = {
+    id: "tv-created-by-separator", empresa_id: "empresa-a", supermercado_id: "loja-a",
+    categoria: "televendas", solicitante_nome: "Separador A", solicitante_uid: "operator-a",
+    setor: "Televendas", tipo_servico: "Atendimento Televendas", numero_pedido: "PED-SEP-1",
+    cliente: "Cliente", produto: "Produto", quantidade: "1 Unidade",
+    itens: [{ produto: "Produto", unidadeMedida: "Unidade", quantidadeSolicitada: 1, quantidadeEncontrada: 0, quantidadeFaltante: 1 }],
+    total_solicitado: 1, total_encontrado: 0, percentual_atendido: 0,
+    motivo_incompleto: null, observacao_operador: null, atualizado_em: null, atualizado_por: null,
+    local_exato: "Separação A", local_separacao: "Separação A", prazo_limite: "18:00",
+    prioridade: "Normal", observacoes: null, foto_nome: null, foto_data_url: null,
+    empilhadeira_id: null, empilhadeira_identificacao: null, status: "Aberto",
+    operador_nome: null, criado_em: stamp, assumido_em: null, a_caminho_em: null,
+    cheguei_em: null, iniciado_em: null, finalizado_em: null, cancelado_em: null,
+  };
+  await assertSucceeds(setDoc(doc(separatorDb, "chamados/tv-created-by-separator"), pedido));
+});
+
+const linkedOperationalCall = (id, overrides = {}) => ({
+  id, empresa_id: "empresa-a", supermercado_id: "loja-a", categoria: "operacional",
+  solicitante_nome: "Separador A", solicitante_uid: "operator-a", setor: "Televendas",
+  local_exato: "Corredor 3", tipo_servico: "Movimentação", numero_pedido: null,
+  cliente: null, produto: "Produto", quantidade: null, itens: [], total_solicitado: null,
+  total_encontrado: null, percentual_atendido: null, motivo_incompleto: null,
+  observacao_operador: null, atualizado_em: null, atualizado_por: null, local_separacao: null,
+  prazo_limite: null, prioridade: "Normal", observacoes: null, foto_nome: null,
+  foto_data_url: null, empilhadeira_id: null, empilhadeira_identificacao: null,
+  pedido_origem_id: "tv-linked", pedido_origem_item_index: 0, pedido_origem_produto: "Produto",
+  localizacao_pallet: "Rua 4, módulo 2, nível 1", status: "Aguardando", operador_nome: null,
+  criado_em: stamp, assumido_em: null, a_caminho_em: null, cheguei_em: null,
+  iniciado_em: null, finalizado_em: null, cancelado_em: null, ...overrides,
+});
+
+test("an Operator can assume and advance a linked operational call without changing its Televendas pedido", async () => {
+  const db = environment.authenticatedContext("real-operator").firestore();
+  const callRef = doc(db, "chamados/op-operator-transition");
+  const pedidoRef = doc(db, "chamados/tv-linked");
+  await assertSucceeds(updateDoc(callRef, {
+    operador_nome: "Operador Real", assumido_em: stamp, atualizado_em: stamp,
+  }));
+  await assertSucceeds(updateDoc(callRef, {
+    a_caminho_em: "2026-10-19T10:01:00.000Z",
+    atualizado_em: "2026-10-19T10:01:00.000Z", atualizado_por: "Operador Real",
+  }));
+  await assertSucceeds(runTransaction(db, async (transaction) => {
+    const current = await transaction.get(callRef);
+    const time = "2026-10-19T10:02:00.000Z";
+    transaction.update(callRef, {
+      status: "Em atendimento", iniciado_em: time, atualizado_em: time, atualizado_por: "Operador Real",
+    });
+    transaction.set(doc(db, "auditoria/operator-transition-start"), {
+      action: "chamado_iniciado", actorUid: "real-operator", actorName: "Operador Real",
+      entityType: "chamado", entityId: current.id, occurredAt: time,
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
+      details: {
+        statusAnterior: current.data().status, statusAtual: "Em atendimento",
+        operador_nome: "Operador Real", empresa_id: "empresa-a", supermercado_id: "loja-a",
+      },
+    });
+  }));
+  assert.equal((await getDoc(callRef)).data().status, "Em atendimento");
+  assert.equal((await getDoc(callRef)).data().a_caminho_em, "2026-10-19T10:01:00.000Z");
+  assert.equal((await getDoc(pedidoRef)).data().status, "Em separação");
+});
+
+test("multiple operational calls can link to the same Televendas pedido without changing it", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertSucceeds(setDoc(doc(db, "chamados/op-linked-1"), linkedOperationalCall("op-linked-1")));
+  await assertSucceeds(setDoc(doc(db, "chamados/op-linked-2"), linkedOperationalCall("op-linked-2", {
+    tipo_servico: "Retirada", localizacao_pallet: "Rua 5, módulo 1, nível 2",
+  })));
+  const created = (await getDoc(doc(db, "chamados/op-linked-1"))).data();
+  assert.equal(created.categoria, "operacional");
+  assert.equal(created.status, "Aguardando");
+  assert.equal(created.pedido_origem_id, "tv-linked");
+  assert.equal(created.pedido_origem_item_index, 0);
+  assert.equal(created.pedido_origem_produto, "Produto");
+  assert.equal((await getDoc(doc(db, "chamados/tv-linked"))).data().status, "Em separação");
+});
+
+test("linked calls reject missing, non-Televendas, and incomplete item references", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(setDoc(doc(db, "chamados/op-no-origin"), linkedOperationalCall("op-no-origin", { pedido_origem_id: "missing" })));
+  await assertFails(setDoc(doc(db, "chamados/op-not-tv"), linkedOperationalCall("op-not-tv", { pedido_origem_id: "op-source" })));
+  await assertFails(setDoc(doc(db, "chamados/op-missing-item"), linkedOperationalCall("op-missing-item", { pedido_origem_produto: "" })));
+  await assertFails(setDoc(doc(db, "chamados/op-item-index"), linkedOperationalCall("op-item-index", { pedido_origem_item_index: -1 })));
+});
+
+test("linked calls cannot cross company or unit boundaries", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(setDoc(doc(db, "chamados/op-cross-unit"), linkedOperationalCall("op-cross-unit", { pedido_origem_id: "tv-other-unit" })));
+  await assertFails(setDoc(doc(db, "chamados/op-cross-company"), linkedOperationalCall("op-cross-company", { pedido_origem_id: "tv-b" })));
+});
+
+test("only Televendas separators and scoped administrators can create linked calls", async () => {
+  const operatorDb = environment.authenticatedContext("real-operator").firestore();
+  await assertFails(setDoc(doc(operatorDb, "chamados/op-linked-operator"), linkedOperationalCall("op-linked-operator", { solicitante_uid: "real-operator" })));
+  const tvDb = environment.authenticatedContext("televendas-a").firestore();
+  await assertFails(setDoc(doc(tvDb, "chamados/op-linked-tv"), linkedOperationalCall("op-linked-tv", { solicitante_uid: "televendas-a" })));
+});
+
+test("a Televendas separator cannot update an operational call", async () => {
+  const db = environment.authenticatedContext("operator-a").firestore();
+  await assertFails(updateDoc(doc(db, "chamados/op-source"), { status: "Em atendimento" }));
+});
+
+test("a separator reads only linked calls in the authorized unit and receives live status changes", async () => {
+  const separatorDb = environment.authenticatedContext("operator-a").firestore();
+  const linkedRef = doc(separatorDb, "chamados/op-read-live");
+  await assertSucceeds(setDoc(linkedRef, linkedOperationalCall("op-read-live")));
+  await assertFails(getDoc(doc(separatorDb, "chamados/op-source")));
+  await assertSucceeds(getDoc(doc(separatorDb, "chamados/tv-linked")));
+
+  const linkedQuery = query(
+    collection(separatorDb, "chamados"),
+    where("empresa_id", "==", "empresa-a"),
+    where("supermercado_id", "==", "loja-a"),
+    where("categoria", "==", "operacional"),
+    where("pedido_origem_id", "in", ["tv-linked"])
+  );
+  const linkedSnapshot = await getDocs(linkedQuery);
+  assert(linkedSnapshot.docs.some((snapshot) => snapshot.id === "op-read-live"));
+
+  const foreignDb = environment.authenticatedContext("operator-b").firestore();
+  await assertFails(getDoc(doc(foreignDb, "chamados/op-read-live")));
+
+  const operatorDb = environment.authenticatedContext("real-operator").firestore();
+  await assertSucceeds(getDoc(doc(operatorDb, "chamados/op-source")));
+
+  let unsubscribe = () => {};
+  const initialSnapshot = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out waiting for linked-call snapshot")), 5000);
+    unsubscribe = onSnapshot(linkedQuery, (snapshot) => {
+      if (snapshot.docs.some((entry) => entry.id === "op-read-live")) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    }, (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+  try {
+    await initialSnapshot;
+    unsubscribe();
+    const statusUpdate = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Timed out waiting for linked-call status update")), 5000);
+      unsubscribe = onSnapshot(linkedQuery, (snapshot) => {
+        const linkedCall = snapshot.docs.find((entry) => entry.id === "op-read-live")?.data();
+        if (linkedCall?.status === "Em atendimento") {
+          clearTimeout(timeout);
+          resolve();
+        }
+      }, (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "chamados/op-read-live"), {
+        status: "Em atendimento", operador_nome: "Operador A", iniciado_em: stamp,
+      });
+    });
+    await statusUpdate;
+    assert.equal((await getDoc(doc(separatorDb, "chamados/tv-linked"))).data().status, "Em separação");
+  } finally {
+    unsubscribe();
+  }
+});
+
+test("a foreign-company separator cannot update or audit another company's call", async () => {
   const db = environment.authenticatedContext("operator-b").firestore();
   await assertFails(updateDoc(doc(db, "chamados/tv-a"), { status: "Incompleto" }));
   await assertFails(setDoc(doc(db, "auditoria/tv-foreign-1"), audit("tv-a", { actorUid: "operator-b" })));
   await assertFails(getDoc(doc(db, "chamados/tv-a")));
 });
 
-test("a foreign-company operator cannot disguise the event as its own company", async () => {
+test("a foreign-company separator cannot disguise the event as its own company", async () => {
   const db = environment.authenticatedContext("operator-b").firestore();
   await assertFails(setDoc(doc(db, "auditoria/tv-foreign-2"), audit("tv-a", {
     actorUid: "operator-b",
@@ -178,7 +449,7 @@ test("a valid second same-company update and matching audit succeed", async () =
   assert.equal((await getDoc(doc(db, "chamados/tv-regression"))).data().ultima_auditoria_atualizacao_id, "tv-regression-audit");
 });
 
-test("foreign-company operator cannot submit a complete valid-shaped update batch", async () => {
+test("foreign-company separator cannot submit a complete valid-shaped update batch", async () => {
   const db = environment.authenticatedContext("operator-b").firestore();
   const batch = writeBatch(db);
   batch.update(doc(db, "chamados/tv-regression"), {
@@ -230,7 +501,7 @@ test("same-tenant marker update without audit is denied and call stays unchanged
   });
 });
 
-test("a scoped operator cannot attach a foreign call's audit to its marker", async () => {
+test("a scoped separator cannot attach a foreign call's audit to its marker", async () => {
   const db = environment.authenticatedContext("operator-a").firestore();
   const batch = writeBatch(db);
   batch.update(doc(db, "chamados/tv-gap"), {
@@ -242,7 +513,7 @@ test("a scoped operator cannot attach a foreign call's audit to its marker", asy
 });
 
 
-test("active operator from company B can update its own Televendas call with an atomic audit", async () => {
+test("active separator from company B can update its own Televendas call with an atomic audit", async () => {
   const db = environment.authenticatedContext("operator-b").firestore();
   const batch = writeBatch(db);
   batch.update(doc(db, "chamados/tv-b"), {

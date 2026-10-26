@@ -377,17 +377,31 @@ service cloud.firestore {
         && currentUserSupermercadoId() == supermercadoId;
     }
 
-    function canCreateChamado() {
-      return isCurrentUserActive()
-        && isPerfilValido(currentUserPerfil());
+    function canCreateChamado(data) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      return exists(userPath)
+        && canCreateChamadoForUser(data, get(userPath).data);
     }
 
-    function canManageChamado() {
-      return currentUserPerfil() == "Operador"
-        || currentUserPerfil() == "Supervisor"
-        || currentUserPerfil() == "Separador de Televendas"
-        || isAdminEmpresa()
-        || isAdminGeral();
+    function canCreateChamadoForUser(data, user) {
+      let perfil = user.get("perfil", null);
+      return (!("status" in user) || user.status == "Ativo")
+        && isPerfilValido(perfil)
+        && (data.categoria == "televendas" || perfil != "Separador de Televendas");
+    }
+
+    function isTelevendasChamado(data) {
+      return data.get("categoria", null) == "televendas"
+        || data.get("tipo_servico", null) == "Atendimento Televendas";
+    }
+
+    function canManageChamado(data) {
+      let perfil = currentUserPerfil();
+      return perfil == "Supervisor"
+        || perfil == "Administrador da Empresa"
+        || perfil == "Administrador Geral"
+        || (perfil == "Operador" && !isTelevendasChamado(data))
+        || (perfil == "Separador de Televendas" && isTelevendasChamado(data));
     }
 
     function isStatusUsuarioValido(status) {
@@ -572,6 +586,65 @@ service cloud.firestore {
       );
     }
 
+    // Operational calls may reference an in-separation Televendas pedido.
+    // The link is a snapshot pointer only: it never writes to the parent.
+    function isVinculoPedidoTelevendasValido(data) {
+      let pedidoPath = /databases/$(database)/documents/chamados/$(data.pedido_origem_id);
+      return data.categoria == "operacional"
+        && data.tipo_servico in ["Descarga", "Reposição", "Retirada", "Movimentação", "Apoio interno"]
+        && data.pedido_origem_id is string && data.pedido_origem_id.size() > 0
+        && data.pedido_origem_item_index >= 0
+        && data.pedido_origem_produto is string && data.pedido_origem_produto.size() > 0
+        && data.localizacao_pallet is string && data.localizacao_pallet.size() > 0
+        && exists(pedidoPath)
+        && get(pedidoPath).data.categoria == "televendas"
+        && get(pedidoPath).data.status == "Em separação"
+        && get(pedidoPath).data.empresa_id == data.empresa_id
+        && get(pedidoPath).data.supermercado_id == data.supermercado_id;
+    }
+
+    function isLinkedCallCreatorInScope(data) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let user = get(userPath).data;
+      return exists(userPath)
+        && user.status == "Ativo"
+        && user.perfil == "Separador de Televendas"
+        && user.empresa_id == data.empresa_id
+        && user.supermercado_id == data.supermercado_id;
+    }
+
+    function isLinkedOperationalCallReadableForSeparator(data) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      return data.get("pedido_origem_id", null) is string
+        && data.pedido_origem_id > ""
+        && data.categoria == "operacional"
+        && exists(userPath)
+        && get(userPath).data.get("status", null) == "Ativo"
+        && get(userPath).data.get("perfil", null) == "Separador de Televendas"
+        && get(userPath).data.empresa_id == data.empresa_id
+        && get(userPath).data.supermercado_id == data.supermercado_id
+        && isTelevendasPedidoVinculadoLegivel(data);
+    }
+
+    function isTelevendasPedidoVinculadoLegivel(data) {
+      let pedidoPath = /databases/$(database)/documents/chamados/$(data.pedido_origem_id);
+      return exists(pedidoPath)
+        && get(pedidoPath).data.get("categoria", null) == "televendas"
+        && get(pedidoPath).data.empresa_id == data.empresa_id
+        && get(pedidoPath).data.supermercado_id == data.supermercado_id;
+    }
+
+    function canSeparatorReadChamado(data) {
+      return currentUserPerfil() == "Separador de Televendas"
+        && isCurrentUserActive()
+        && data.empresa_id == currentUserEmpresaId()
+        && data.supermercado_id == currentUserSupermercadoId()
+        && (
+          isTelevendasChamado(data)
+          || isLinkedOperationalCallReadableForSeparator(data)
+        );
+    }
+
     function isCriacaoChamadoValida() {
       return isTextoNaoVazio(request.resource.data.id)
         && isTextoNaoVazio(request.resource.data.empresa_id)
@@ -581,8 +654,7 @@ service cloud.firestore {
           request.resource.data.supermercado_id
         )
         && isTextoNaoVazio(request.resource.data.solicitante_nome)
-        && (!("solicitante_uid" in request.resource.data)
-          || request.resource.data.solicitante_uid == request.auth.uid)
+        && request.resource.data.solicitante_uid == request.auth.uid
         && isTextoNaoVazio(request.resource.data.setor)
         && isCategoriaValida(request.resource.data.categoria)
         && isTipoServicoValido(request.resource.data.tipo_servico)
@@ -619,6 +691,15 @@ service cloud.firestore {
         && request.resource.data.observacao_operador == null;
     }
 
+    // Separate bounded validator so legacy creation paths keep their existing
+    // expression budget while linked operational calls receive strict checks.
+    function isCriacaoChamadoVinculadoValida(data) {
+      return data.solicitante_uid == request.auth.uid
+        && data.status == "Aguardando"
+        && isLinkedCallCreatorInScope(data)
+        && isVinculoPedidoTelevendasValido(data);
+    }
+
     function isAtualizacaoChamadoValida() {
       return request.resource.data.id == resource.data.id
         && (
@@ -627,6 +708,10 @@ service cloud.firestore {
         )
         && request.resource.data.empresa_id == resource.data.empresa_id
         && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.get("pedido_origem_id", null) == resource.data.get("pedido_origem_id", null)
+        && request.resource.data.get("pedido_origem_item_index", null) == resource.data.get("pedido_origem_item_index", null)
+        && request.resource.data.get("pedido_origem_produto", null) == resource.data.get("pedido_origem_produto", null)
+        && request.resource.data.get("localizacao_pallet", null) == resource.data.get("localizacao_pallet", null)
         && (("solicitante_uid" in resource.data)
           ? request.resource.data.solicitante_uid == resource.data.solicitante_uid
           : !("solicitante_uid" in request.resource.data))
@@ -682,13 +767,27 @@ service cloud.firestore {
           "total_encontrado", "percentual_atendido", "status",
           "motivo_incompleto", "observacao_operador", "atualizado_em",
           "atualizado_por", "operador_nome", "cancelado_em",
-          "ultima_auditoria_atualizacao_id"
+          "ultima_auditoria_atualizacao_id", "confirmacoes_empilhadeira",
+          "ultima_separacao_confirmacao_id"
         ])
         && changed.hasAll(["ultima_auditoria_atualizacao_id", "atualizado_em"])
+        && request.resource.data.get("confirmacoes_empilhadeira", {}).keys()
+          .hasAll(resource.data.get("confirmacoes_empilhadeira", {}).keys())
+        && (!changed.hasAny(["confirmacoes_empilhadeira"])
+          || request.resource.data.confirmacoes_empilhadeira.diff(
+            resource.data.get("confirmacoes_empilhadeira", {})
+          ).affectedKeys().hasOnly([request.resource.data.get("ultima_separacao_confirmacao_id", "")]))
+        // Once a forklift receipt exists, item totals are frozen against old
+        // absolute edits. Manual receipts are recorded by the trusted callable;
+        // client writes remain limited to linked-call receipts.
+        && (!changed.hasAny(["itens"])
+          || (resource.data.get("confirmacoes_empilhadeira", {}).size() == 0
+            && resource.data.get("confirmacoes_manuais", {}).size() == 0)
+          || hasNewMatchingSeparationConfirmation())
         && exists(userPath)
         && get(userPath).data.get("status", null) == "Ativo"
         && get(userPath).data.perfil in [
-          "Operador", "Supervisor", "Separador de Televendas",
+          "Supervisor", "Separador de Televendas",
           "Administrador da Empresa", "Administrador Geral"
         ]
         && (
@@ -708,24 +807,97 @@ service cloud.firestore {
         && request.resource.data.atualizado_em is string
         && request.resource.data.operador_nome is string
         && request.resource.data.atualizado_por == request.resource.data.operador_nome
-        && hasNewMatchingTelevendasAudit();
+        && hasNewMatchingTelevendasAudit()
+        && (
+          request.resource.data.get("ultima_separacao_confirmacao_id", null)
+            == resource.data.get("ultima_separacao_confirmacao_id", null)
+          || hasNewMatchingSeparationConfirmation()
+        );
+    }
+
+    function hasNewMatchingSeparationConfirmation() {
+      let confirmationId = request.resource.data.ultima_separacao_confirmacao_id;
+      let receiptPath = /databases/$(database)/documents/chamados/$(resource.data.id)/separacao_confirmacoes/$(confirmationId);
+      let marker = request.resource.data.confirmacoes_empilhadeira.get(confirmationId, null);
+      return confirmationId is string
+        && confirmationId.size() > 0
+        && !exists(receiptPath)
+        && existsAfter(receiptPath)
+        && getAfter(receiptPath).data.chamado_id == confirmationId
+        && getAfter(receiptPath).data.pedido_id == resource.data.id
+        && getAfter(receiptPath).data.actor_uid == request.auth.uid
+        && marker is map
+        && marker.item_index == getAfter(receiptPath).data.item_index
+        && marker.quantidade == getAfter(receiptPath).data.quantidade;
+    }
+
+    function isValidSeparationConfirmation(orderId, callId, data) {
+      let orderPath = /databases/$(database)/documents/chamados/$(orderId);
+      let callPath = /databases/$(database)/documents/chamados/$(callId);
+      let orderBefore = get(orderPath).data;
+      let orderAfter = getAfter(orderPath).data;
+      let call = get(callPath).data;
+      let index = data.item_index;
+      let beforeItem = orderBefore.itens[index];
+      let afterItem = orderAfter.itens[index];
+      let marker = orderAfter.confirmacoes_empilhadeira.get(callId, null);
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Separador de Televendas"
+        && currentUserEmpresaId() == data.empresa_id
+        && currentUserSupermercadoId() == data.supermercado_id
+        && exists(orderPath)
+        && exists(callPath)
+        && isTelevendasChamado(orderBefore)
+        && orderBefore.status == "Em separação"
+        && orderBefore.empresa_id == data.empresa_id
+        && orderBefore.supermercado_id == data.supermercado_id
+        && call.categoria == "operacional"
+        && call.status == "Finalizado"
+        && call.empresa_id == data.empresa_id
+        && call.supermercado_id == data.supermercado_id
+        && call.pedido_origem_id == orderId
+        && call.pedido_origem_item_index == index
+        && call.pedido_origem_produto == beforeItem.produto
+        && data.produto == beforeItem.produto
+        && index is int && index >= 0 && index < orderBefore.itens.size()
+        && data.quantidade is int && data.quantidade >= 0
+        && data.unidade_medida == beforeItem.unidadeMedida
+        && data.actor_uid == request.auth.uid
+        && data.actor_nome is string && data.actor_nome.size() > 0
+        && (data.quantidade > 0 || data.justificativa is string && data.justificativa.size() > 0)
+        && data.confirmado_em == request.time
+        && orderAfter.status == orderBefore.status
+        && afterItem.produto == beforeItem.produto
+        && afterItem.unidadeMedida == beforeItem.unidadeMedida
+        && afterItem.quantidadeSolicitada == beforeItem.quantidadeSolicitada
+        && beforeItem.quantidadeEncontrada + data.quantidade <= beforeItem.quantidadeSolicitada
+        && afterItem.quantidadeEncontrada == beforeItem.quantidadeEncontrada + data.quantidade
+        && afterItem.quantidadeFaltante == beforeItem.quantidadeSolicitada - afterItem.quantidadeEncontrada
+        && marker.item_index == index
+        && marker.quantidade == data.quantidade
+        && marker.unidade_medida == data.unidade_medida
+        && orderAfter.ultima_separacao_confirmacao_id == callId;
     }
 
     match /chamados/{id} {
       allow read: if isSignedIn()
-        && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
-        );
+        && (currentUserPerfil() == "Separador de Televendas"
+          ? canSeparatorReadChamado(resource.data)
+          : (
+            canAccessCurrentSupermercado(resource.data.supermercado_id)
+            || canAccessEmpresa(resource.data.empresa_id)
+          ));
 
       allow create: if isSignedIn()
-        && canCreateChamado()
         && request.resource.data.id == id
-        && isCriacaoChamadoValida()
-        && (
-          canAccessCurrentSupermercado(request.resource.data.supermercado_id)
-          || canAccessEmpresa(request.resource.data.empresa_id)
-        );
+        && (request.resource.data.get("pedido_origem_id", null) == null
+          ? canCreateChamado(request.resource.data)
+            && isCriacaoChamadoValida()
+            && (
+              canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+              || canAccessEmpresa(request.resource.data.empresa_id)
+            )
+          : isCriacaoChamadoVinculadoValida(request.resource.data));
 
       // Partition marker writes from legacy writes BEFORE evaluating either
       // branch. An invalid marker must not trigger the expensive legacy rule.
@@ -739,12 +911,40 @@ service cloud.firestore {
               canAccessCurrentSupermercado(resource.data.supermercado_id)
               || canAccessEmpresa(resource.data.empresa_id)
             )
-            && canManageChamado()
+            && canManageChamado(resource.data)
+            && !(resource.data.categoria == "televendas"
+              && request.resource.data.diff(resource.data).affectedKeys().hasAny(["itens"])
+              && (resource.data.get("confirmacoes_empilhadeira", {}).size() > 0
+                || resource.data.get("confirmacoes_manuais", {}).size() > 0))
             && isAtualizacaoChamadoValida()
           )
         );
 
       allow delete: if isAdminGeral();
+
+      match /separacao_confirmacoes/{confirmationId} {
+        allow read: if isSignedIn() && exists(/databases/$(database)/documents/chamados/$(id))
+          && (
+            canAccessEmpresa(get(/databases/$(database)/documents/chamados/$(id)).data.empresa_id)
+            || canAccessCurrentSupermercado(get(/databases/$(database)/documents/chamados/$(id)).data.supermercado_id)
+          );
+        allow create: if isSignedIn()
+          && request.resource.data.keys().hasAll([
+            "id", "pedido_id", "chamado_id", "item_index", "produto", "empresa_id",
+            "supermercado_id", "actor_uid", "actor_nome", "quantidade", "unidade_medida",
+            "justificativa", "confirmado_em"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id", "pedido_id", "chamado_id", "item_index", "produto", "empresa_id",
+            "supermercado_id", "actor_uid", "actor_nome", "quantidade", "unidade_medida",
+            "justificativa", "confirmado_em"
+          ])
+          && confirmationId == request.resource.data.chamado_id
+          && request.resource.data.id == confirmationId
+          && request.resource.data.pedido_id == id
+          && isValidSeparationConfirmation(id, confirmationId, request.resource.data);
+        allow update, delete: if false;
+      }
     }
 
     // Use a single user-document lookup for Televendas audit actor scope.
@@ -815,8 +1015,9 @@ service cloud.firestore {
         && (
           current.status != previous.status
           || current.itens != previous.get("itens", [])
-          || current.observacao_operador != previous.get("observacao_operador", null)
-          || current.motivo_incompleto != previous.get("motivo_incompleto", null)
+          || current.get("confirmacoes_empilhadeira", {}) != previous.get("confirmacoes_empilhadeira", {})
+          || current.get("observacao_operador", null) != previous.get("observacao_operador", null)
+          || current.get("motivo_incompleto", null) != previous.get("motivo_incompleto", null)
         );
     }
 
@@ -1206,7 +1407,7 @@ service cloud.firestore {
           && request.resource.data.perfil == get(/databases/$(database)/documents/usuarios/$(id)).data.perfil
           && request.resource.data.status == "Ativo"
           && request.resource.data.updated_at is string
-          && request.resource.data.platform == "web";
+          && request.resource.data.platform in ["web", "android"];
         allow delete: if isSignedIn()
           && request.auth.uid == id
           && isCurrentUserActive();

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test src/**/*.test.ts",
     "test:rules:diagnose": "PATIO_FIRESTORE_EMULATOR_PORT=28080 firebase emulators:exec --config firebase.emulator.test.json --only firestore --project demo-patio-pro-log \"node scripts/firebase/diagnose-firestore-rules.mjs\"",
-    "test:rules": "PATIO_FIRESTORE_EMULATOR_PORT=28080 firebase emulators:exec --config firebase.emulator.test.json --only firestore --project demo-patio-pro-log \"node --experimental-strip-types --test functions/tests/firestore/subscriptions.rules.test.mjs functions/tests/firestore/subscriptions.client.test.mjs functions/tests/firestore/chamados-update.rules.test.mjs\"",
+    "test:rules": "PATIO_FIRESTORE_EMULATOR_PORT=28080 firebase emulators:exec --config firebase.emulator.test.json --only firestore --project demo-patio-pro-log \"node --experimental-strip-types --test functions/tests/firestore/subscriptions.rules.test.mjs functions/tests/firestore/subscriptions.client.test.mjs functions/tests/firestore/chamados-update.rules.test.mjs functions/tests/firestore/separation-confirmations.rules.test.mjs\"",
     "test:saas-emulator": "PATIO_AUTH_EMULATOR_PORT=29099 PATIO_FIRESTORE_EMULATOR_PORT=28080 PATIO_FUNCTIONS_EMULATOR_PORT=25001 firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore,functions --project demo-patio-pro-log \"node scripts/firebase/test-saas-emulator.mjs\"",
     "dev:emulator": "vite --mode emulator",
     "auth:set-claims": "node scripts/firebase/set-custom-claims.mjs",

@@ -3,6 +3,8 @@ const FIREBASE_KEYS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/se
 const OAUTH_URL = "https://oauth2.googleapis.com/token";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore";
 const ACTIVE_ROLES = new Set(["Operador", "Supervisor", "Separador de Televendas", "Administrador da Empresa"]);
+const REQUESTER_ROLES = new Set(["Promotor", "Funcionário", "Televendas"]);
+const PUSH_ROLES = new Set([...ACTIVE_ROLES, ...REQUESTER_ROLES]);
 let firebaseKeysCache;
 let firebaseKeysExpiry = 0;
 let oauthCache;
@@ -103,10 +105,22 @@ async function loadPushTokens(env, companyId, supermarketId) {
     const adminEmpresaCanSeeUnit = profile.perfil === "Administrador da Empresa"
       && (profile.supermercado_id === null || (Array.isArray(profile.supermercado_ids) && profile.supermercado_ids.includes(supermarketId)));
     if (profile.status !== "Ativo" || profile.empresa_id !== companyId || (profile.supermercado_id !== supermarketId && !adminEmpresaCanSeeUnit)) continue;
-    if (token.uid !== match[1] || token.empresa_id !== profile.empresa_id || token.supermercado_id !== profile.supermercado_id || token.perfil !== profile.perfil || token.status !== "Ativo" || profile.empresa_id !== companyId || !ACTIVE_ROLES.has(profile.perfil) || typeof token.token !== "string") continue;
-    tokens.push({ uid: match[1], token: token.token });
+    if (token.uid !== match[1] || token.empresa_id !== profile.empresa_id || token.supermercado_id !== profile.supermercado_id || token.perfil !== profile.perfil || token.status !== "Ativo" || profile.empresa_id !== companyId || !PUSH_ROLES.has(profile.perfil) || typeof token.token !== "string") continue;
+    tokens.push({ uid: match[1], token: token.token, perfil: profile.perfil });
   }
   return tokens;
+}
+
+export function selectCallNotificationRecipients(recipients, action, call, actorUid) {
+  const isTelevendas = call.categoria === "televendas" || call.tipo_servico === "Atendimento Televendas";
+  return recipients.filter((recipient) => {
+    if (recipient.uid === actorUid) return false;
+    const canReceiveQueueEvent = isTelevendas
+      ? ["Supervisor", "Separador de Televendas", "Administrador da Empresa"].includes(recipient.perfil)
+      : ACTIVE_ROLES.has(recipient.perfil);
+    return canReceiveQueueEvent
+      || (action !== "chamado_criado" && recipient.uid === call.solicitante_uid);
+  });
 }
 
 async function claimDelivery(env, eventKey, auditId) {
@@ -329,7 +343,7 @@ async function handleNotify(request, env) {
       if (prior.state === "sent") return json({ ok: true, duplicate: true });
       return json({ error: "Entrega anterior incompleta ou em processamento; requer reconciliação antes de reenviar." }, 409);
     }
-    const recipients = (await loadPushTokens(env, companyId, supermarketId)).filter((item) => item.uid !== claims.sub);
+    const recipients = selectCallNotificationRecipients(await loadPushTokens(env, companyId, supermarketId), audit.action, call, claims.sub);
     const data = eventCopy(audit.action, call, auditId);
     const results = await Promise.allSettled(recipients.map(({ token }) => sendFcm(env, token, data)));
     const recipientRecords = await recipientDeliveryRecords(recipients, results);

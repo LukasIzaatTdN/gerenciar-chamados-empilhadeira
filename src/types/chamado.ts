@@ -28,11 +28,22 @@ export interface ItemTelevendas {
   quantidadeSolicitada: number;
   quantidadeEncontrada: number;
   quantidadeFaltante: number;
+  /** Set when a finalized forklift call receipt has been confirmed for this item. */
+  recebimentoEmpilhadeiraConfirmado?: boolean;
 }
 
 export interface Chamado {
   id: string;
   categoria: CategoriaChamado;
+  /** Link for operational calls created to service a Televendas pedido. */
+  pedido_origem_id?: string | null;
+  pedido_origem_item_index?: number | null;
+  pedido_origem_produto?: string | null;
+  localizacao_pallet?: string | null;
+  /** Call IDs already confirmed against this pedido; canonical records live in its confirmation subcollection. */
+  confirmacoes_empilhadeira?: Record<string, boolean | { item_index: number; quantidade: number; unidade_medida: UnidadeMedidaTelevendas }> | null;
+  /** Immutable manual confirmation receipt markers, written by the trusted callable. */
+  confirmacoes_manuais?: Record<string, { item_index: number; quantidade: number; unidade_medida: UnidadeMedidaTelevendas }> | null;
   empresa_id: string;
   supermercado_id: string;
   solicitante_nome: string;

@@ -463,6 +463,7 @@ export default function App() {
     marcarACaminho,
     marcarChegada,
     atualizarItensTelevendas,
+    confirmarSeparacaoEmpilhadeira,
     iniciarAtendimento,
     finalizarChamado,
   } = useChamados(
@@ -1746,6 +1747,10 @@ export default function App() {
           onMarcarACaminho={marcarACaminho}
           onMarcarChegada={marcarChegada}
           onAtualizarItensTelevendas={atualizarItensTelevendas}
+          onConfirmarSeparacaoEmpilhadeira={(pedidoId, chamadoId, itemIndex, quantidade, justificativa) =>
+            confirmarSeparacaoEmpilhadeira(pedidoId, chamadoId, itemIndex, quantidade, justificativa, operadorNome)
+          }
+          onCreateLinkedCall={criarChamado}
           onIniciar={iniciarAtendimento}
           onFinalizar={finalizarChamado}
           onCreateChecklist={handleCreateChecklistEmpilhadeira}

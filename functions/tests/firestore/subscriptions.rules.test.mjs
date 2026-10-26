@@ -77,6 +77,8 @@ test("push tokens are private and can only be registered under the active owner'
     platform: "web",
   };
   await assertSucceeds(setDoc(tokenRef, token));
+  await assertSucceeds(setDoc(doc(ownerDb, "usuarios/operator-push/push_tokens/android-1"), { ...token, platform: "android" }));
+  await assertFails(setDoc(doc(ownerDb, "usuarios/operator-push/push_tokens/invalid-platform"), { ...token, platform: "desktop" }));
   await assertFails(getDoc(tokenRef));
   await assertFails(setDoc(doc(ownerDb, "usuarios/operator-push/push_tokens/forged"), { ...token, empresa_id: "empresa-b" }));
 

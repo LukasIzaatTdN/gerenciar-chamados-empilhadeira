@@ -1,6 +1,34 @@
 {
   "indexes": [
     {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresa_id", "order": "ASCENDING" },
+        { "fieldPath": "supermercado_id", "order": "ASCENDING" },
+        { "fieldPath": "categoria", "order": "ASCENDING" },
+        { "fieldPath": "pedido_origem_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresa_id", "order": "ASCENDING" },
+        { "fieldPath": "supermercado_id", "order": "ASCENDING" },
+        { "fieldPath": "categoria", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresa_id", "order": "ASCENDING" },
+        { "fieldPath": "supermercado_id", "order": "ASCENDING" },
+        { "fieldPath": "tipo_servico", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "auditoria",
       "queryScope": "COLLECTION",
       "fields": [

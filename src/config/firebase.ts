@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, initializeFirestore, type Firestore } from "firebase/firestore";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const runtimeEnv = import.meta.env ?? {};
 const firebaseConfig = {
@@ -39,10 +40,12 @@ if (app) {
 
 export const db = firestoreInstance;
 export const auth = app ? getAuth(app) : null;
+export const functions = app ? getFunctions(app, "us-central1") : null;
 
-if (useFirebaseEmulators && auth && db) {
+if (useFirebaseEmulators && auth && db && functions) {
   connectAuthEmulator(auth, `http://127.0.0.1:${import.meta.env.VITE_AUTH_EMULATOR_PORT || "9099"}`, { disableWarnings: true });
   connectFirestoreEmulator(db, "127.0.0.1", Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || "8080"));
+  connectFunctionsEmulator(functions, "127.0.0.1", Number(import.meta.env.VITE_FUNCTIONS_EMULATOR_PORT || "5001"));
 }
 
 export default app;

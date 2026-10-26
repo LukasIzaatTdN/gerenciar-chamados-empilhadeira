@@ -58,7 +58,11 @@ export default function ChamadoForm({
   });
 
   const [nomeSolicitante, setNomeSolicitante] = useState(solicitanteNome || "");
-  const [categoria, setCategoria] = useState<CategoriaChamado>("operacional");
+  const [categoria, setCategoria] = useState<CategoriaChamado>(() =>
+    solicitantePerfil === "Televendas" || solicitantePerfil === "Separador de Televendas"
+      ? "televendas"
+      : "operacional"
+  );
   const [setor, setSetor] = useState<Setor>("");
   const [localExato, setLocalExato] = useState("");
   const [tipoServico, setTipoServico] = useState<TipoServico>("Descarga");
@@ -74,6 +78,7 @@ export default function ChamadoForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isTelevendas = solicitantePerfil === "Televendas";
+  const isSeparadorTelevendas = solicitantePerfil === "Separador de Televendas";
   const isModoTelevendas = categoria === "televendas";
 
   useEffect(() => {
@@ -81,11 +86,11 @@ export default function ChamadoForm({
   }, [solicitanteNome]);
 
   useEffect(() => {
-    if (isTelevendas) {
+    if (isTelevendas || isSeparadorTelevendas) {
       setCategoria("televendas");
       setTipoServico("Atendimento Televendas");
     }
-  }, [isTelevendas]);
+  }, [isSeparadorTelevendas, isTelevendas]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -295,11 +300,14 @@ export default function ChamadoForm({
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">Categoria do chamado</label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(["operacional", "televendas"] as CategoriaChamado[]).map((item) => (
+              {(isSeparadorTelevendas
+                ? (["televendas"] as CategoriaChamado[])
+                : (["operacional", "televendas"] as CategoriaChamado[])
+              ).map((item) => (
                 <button
                   key={item}
                   type="button"
-                  disabled={isTelevendas}
+                  disabled={isTelevendas || isSeparadorTelevendas}
                   onClick={() => {
                     setCategoria(item);
                     if (item === "televendas") {
@@ -314,7 +322,7 @@ export default function ChamadoForm({
                         ? "border-indigo-300 bg-indigo-50 text-indigo-700 ring-4 ring-indigo-100"
                         : "border-[#0f3d75] bg-blue-50 text-[#0f3d75] ring-4 ring-blue-100"
                       : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-                  } ${isTelevendas ? "cursor-not-allowed opacity-80" : ""}`}
+                } ${isTelevendas || isSeparadorTelevendas ? "cursor-not-allowed opacity-80" : ""}`}
                 >
                   {item === "televendas" ? "📞 Televendas" : "🏗️ Operacional"}
                 </button>

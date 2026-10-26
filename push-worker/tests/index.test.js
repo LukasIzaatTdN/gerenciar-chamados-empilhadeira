@@ -1,6 +1,37 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, recipientIdentityKey, recoveryPlan, eventMatchesCurrentCall, stableEventKey } from "../src/index.js";
+import worker, { actorCanNotify, deliveryOutcome, reconciliationStatus, classifyFcmResult, recipientDeliveryRecords, recipientIdentityKey, recoveryPlan, eventMatchesCurrentCall, stableEventKey, selectCallNotificationRecipients } from "../src/index.js";
+
+test("operational call notifications continue targeting operators and the requester for updates", () => {
+  const recipients = [
+    { uid: "operator", perfil: "Operador" },
+    { uid: "promoter", perfil: "Promotor" },
+    { uid: "other-promoter", perfil: "Promotor" },
+    { uid: "actor", perfil: "Operador" },
+  ];
+  const call = { solicitante_uid: "promoter" };
+  assert.deepEqual(selectCallNotificationRecipients(recipients, "chamado_criado", call, "actor"), [recipients[0]]);
+  assert.deepEqual(selectCallNotificationRecipients(recipients, "chamado_assumido", call, "actor"), [recipients[0], recipients[1]]);
+});
+
+test("Televendas pedido notifications target separators without routing them to operators", () => {
+  const recipients = [
+    { uid: "operator", perfil: "Operador" },
+    { uid: "separator", perfil: "Separador de Televendas" },
+    { uid: "supervisor", perfil: "Supervisor" },
+    { uid: "company-admin", perfil: "Administrador da Empresa" },
+    { uid: "creator", perfil: "Televendas" },
+  ];
+  const call = { categoria: "televendas", tipo_servico: "Atendimento Televendas", solicitante_uid: "creator" };
+  assert.deepEqual(
+    selectCallNotificationRecipients(recipients, "chamado_criado", call, "creator"),
+    recipients.slice(1, 4)
+  );
+  assert.deepEqual(
+    selectCallNotificationRecipients(recipients, "chamado_assumido", call, "separator"),
+    [recipients[2], recipients[3], recipients[4]]
+  );
+});
 
 const env = { FIREBASE_PROJECT_ID: "demo-patio-pro-log", ALLOWED_ORIGIN: "https://app.example.test", FIREBASE_SERVICE_ACCOUNT_JSON: "{}" };
 
