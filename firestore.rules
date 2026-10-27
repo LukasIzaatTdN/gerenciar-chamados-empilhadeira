@@ -207,6 +207,23 @@ service cloud.firestore {
         : null;
     }
 
+    // The web client resolves a user's company from the linked unit when older
+    // user documents do not carry empresa_id. Keep Separator reads aligned with
+    // that behavior, while still constraining access to the user's exact unit.
+    function isCurrentUserInEmpresaScope(empresaId) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let user = get(userPath).data;
+      let unitId = user.get("supermercado_id", null);
+      let safeUnitId = unitId is string && unitId.size() > 0 ? unitId : "__unidade_nao_definida__";
+      let unitPath = /databases/$(database)/documents/supermercados/$(safeUnitId);
+      return user.get("empresa_id", null) == empresaId
+        || (user.get("empresa_id", null) == null
+          && unitId is string
+          && unitId.size() > 0
+          && exists(unitPath)
+          && get(unitPath).data.get("empresa_id", null) == empresaId);
+    }
+
     function currentUserPerfil() {
       return hasCurrentUserDoc()
         && "perfil" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
@@ -400,8 +417,251 @@ service cloud.firestore {
       return perfil == "Supervisor"
         || perfil == "Administrador da Empresa"
         || perfil == "Administrador Geral"
-        || (perfil == "Operador" && !isTelevendasChamado(data))
         || (perfil == "Separador de Televendas" && isTelevendasChamado(data));
+    }
+
+    // Bounded transition for the Televendas separator taking an open order.
+    // Keep this separate from the general update validator: the latter checks
+    // unrelated order/receipt fields and can exceed Firestore's expression cap.
+    function isScopedTelevendasAssumeUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.get("categoria", null) == "televendas"
+        && resource.data.status == "Aberto"
+        && request.resource.data.status == "Em separação"
+        && changed.hasOnly(["status", "operador_nome", "assumido_em", "atualizado_em"])
+        && changed.hasAll(["status", "operador_nome", "assumido_em", "atualizado_em"])
+        && currentUserPerfil() == "Separador de Televendas"
+        && isCurrentUserActive()
+        && isCurrentUserInEmpresaScope(resource.data.empresa_id)
+        && currentUserSupermercadoId() == resource.data.supermercado_id
+        && isCampoVazio(resource.data.get("operador_nome", null))
+        && isCampoVazio(resource.data.get("assumido_em", null))
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.empresa_id == resource.data.empresa_id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && isTextoNaoVazio(request.resource.data.operador_nome)
+        && isTextoNaoVazio(request.resource.data.assumido_em)
+        && isTextoNaoVazio(request.resource.data.atualizado_em);
+    }
+
+    function isScopedTelevendasLegacyObservationUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.get("categoria", null) == "televendas"
+        && changed.hasOnly(["observacao_operador"])
+        && currentUserPerfil() == "Separador de Televendas"
+        && isCurrentUserActive()
+        && currentUserSupermercadoId() == resource.data.supermercado_id
+        && isCurrentUserInEmpresaScope(resource.data.empresa_id)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.empresa_id == resource.data.empresa_id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.observacao_operador is string;
+    }
+
+    function isActiveOperatorScopedToCall(data) {
+      let actorPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let actor = get(actorPath).data;
+      return actor.get("perfil", null) == "Operador"
+        && actor.get("status", null) == "Ativo"
+        && actor.get("supermercado_id", null) == data.supermercado_id
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id);
+    }
+
+    function currentOperatorProfileName() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get("nome", null);
+    }
+
+    function isOperatorEquipmentAssignmentValid(data) {
+      let equipmentChanged = request.resource.data.get("empilhadeira_id", null)
+          != resource.data.get("empilhadeira_id", null)
+        || request.resource.data.get("empilhadeira_identificacao", null)
+          != resource.data.get("empilhadeira_identificacao", null);
+      let equipmentId = request.resource.data.get("empilhadeira_id", null);
+      let equipmentPath = /databases/$(database)/documents/empilhadeiras/$(equipmentId);
+      return !equipmentChanged
+        || (
+          (isCampoVazio(equipmentId)
+            && isCampoVazio(request.resource.data.get("empilhadeira_identificacao", null)))
+          || (
+            isTextoNaoVazio(equipmentId)
+            && isTextoNaoVazio(request.resource.data.get("empilhadeira_identificacao", null))
+            && exists(equipmentPath)
+            && get(equipmentPath).data.id == equipmentId
+            && get(equipmentPath).data.identificacao == request.resource.data.empilhadeira_identificacao
+            && get(equipmentPath).data.empresa_id == resource.data.empresa_id
+            && get(equipmentPath).data.supermercado_id == resource.data.supermercado_id
+            && isStatusEmpilhadeiraCompativelComChamado(get(equipmentPath).data.status)
+          )
+        );
+    }
+
+    function isOperatorAssumeCallUpdate(changed) {
+      return resource.data.status == "Aguardando"
+        && isCampoVazio(resource.data.get("operador_nome", null))
+        && isCampoVazio(resource.data.get("assumido_em", null))
+        && request.resource.data.status == "Aguardando"
+        && request.resource.data.operador_nome == currentOperatorProfileName()
+        && isTextoNaoVazio(request.resource.data.operador_nome)
+        && isCampoVazio(resource.data.get("a_caminho_em", null))
+        && isCampoVazio(resource.data.get("cheguei_em", null))
+        && isCampoVazio(resource.data.get("iniciado_em", null))
+        && isCampoVazio(resource.data.get("finalizado_em", null))
+        && changed.hasOnly([
+          "operador_nome", "assumido_em", "atualizado_em",
+          "empilhadeira_id", "empilhadeira_identificacao"
+        ])
+        && changed.hasAll(["operador_nome", "assumido_em", "atualizado_em"])
+        && isTextoNaoVazio(request.resource.data.assumido_em)
+        && isTextoNaoVazio(request.resource.data.atualizado_em)
+        && isOperatorEquipmentAssignmentValid(request.resource.data);
+    }
+
+    function isOperatorRouteUpdate(changed) {
+      return resource.data.status == "Aguardando"
+        && resource.data.operador_nome == currentOperatorProfileName()
+        && isTextoNaoVazio(resource.data.operador_nome)
+        && isTextoNaoVazio(resource.data.get("assumido_em", null))
+        && isCampoVazio(resource.data.get("a_caminho_em", null))
+        && isCampoVazio(resource.data.get("cheguei_em", null))
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.operador_nome == resource.data.operador_nome
+        && request.resource.data.assumido_em == resource.data.assumido_em
+        && isTextoNaoVazio(request.resource.data.a_caminho_em)
+        && isCampoVazio(request.resource.data.get("cheguei_em", null))
+        && changed.hasOnly(["status", "operador_nome", "assumido_em", "a_caminho_em", "atualizado_em"])
+        && changed.hasAll(["a_caminho_em", "atualizado_em"])
+        && isTextoNaoVazio(request.resource.data.atualizado_em);
+    }
+
+    function isOperatorArrivalUpdate(changed) {
+      return resource.data.status == "Aguardando"
+        && resource.data.operador_nome == currentOperatorProfileName()
+        && isTextoNaoVazio(resource.data.operador_nome)
+        && isTextoNaoVazio(resource.data.get("assumido_em", null))
+        && isTextoNaoVazio(resource.data.get("a_caminho_em", null))
+        && isCampoVazio(resource.data.get("cheguei_em", null))
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.operador_nome == resource.data.operador_nome
+        && request.resource.data.assumido_em == resource.data.assumido_em
+        && request.resource.data.a_caminho_em == resource.data.a_caminho_em
+        && isTextoNaoVazio(request.resource.data.cheguei_em)
+        && changed.hasOnly([
+          "status", "operador_nome", "assumido_em", "a_caminho_em", "cheguei_em", "atualizado_em"
+        ])
+        && changed.hasAll(["cheguei_em", "atualizado_em"])
+        && isTextoNaoVazio(request.resource.data.atualizado_em);
+    }
+
+    function isOperatorStartUpdate(changed) {
+      return resource.data.status == "Aguardando"
+        && resource.data.operador_nome == currentOperatorProfileName()
+        && isTextoNaoVazio(resource.data.operador_nome)
+        && isCampoVazio(resource.data.get("iniciado_em", null))
+        && request.resource.data.status == "Em atendimento"
+        && request.resource.data.operador_nome == resource.data.operador_nome
+        && request.resource.data.atualizado_por == currentOperatorProfileName()
+        && isTextoNaoVazio(request.resource.data.iniciado_em)
+        && (isCampoVazio(resource.data.get("assumido_em", null))
+          ? request.resource.data.assumido_em == request.resource.data.iniciado_em
+          : request.resource.data.assumido_em == resource.data.assumido_em)
+        && (isCampoVazio(resource.data.get("a_caminho_em", null))
+          ? request.resource.data.a_caminho_em == request.resource.data.iniciado_em
+          : request.resource.data.a_caminho_em == resource.data.a_caminho_em)
+        && (isCampoVazio(resource.data.get("cheguei_em", null))
+          ? request.resource.data.cheguei_em == request.resource.data.iniciado_em
+          : request.resource.data.cheguei_em == resource.data.cheguei_em)
+        && isCampoVazio(request.resource.data.get("finalizado_em", null))
+        && isCampoVazio(request.resource.data.get("cancelado_em", null))
+        && isTextoNaoVazio(request.resource.data.atualizado_em)
+        && changed.hasOnly([
+          "status", "iniciado_em", "operador_nome", "assumido_em", "a_caminho_em",
+          "cheguei_em", "finalizado_em", "cancelado_em", "atualizado_em", "atualizado_por",
+          "empilhadeira_id", "empilhadeira_identificacao"
+        ])
+        && changed.hasAll(["status", "iniciado_em", "atualizado_em", "atualizado_por"])
+        && isOperatorEquipmentAssignmentValid(request.resource.data);
+    }
+
+    function isOperatorFinishUpdate(changed) {
+      return resource.data.status == "Em atendimento"
+        && resource.data.operador_nome == currentOperatorProfileName()
+        && isTextoNaoVazio(resource.data.get("iniciado_em", null))
+        && request.resource.data.status == "Finalizado"
+        && request.resource.data.operador_nome == resource.data.operador_nome
+        && request.resource.data.atualizado_por == currentOperatorProfileName()
+        && isTextoNaoVazio(request.resource.data.finalizado_em)
+        && changed.hasOnly([
+          "status", "finalizado_em", "operador_nome", "cancelado_em", "atualizado_em", "atualizado_por"
+        ])
+        // `atualizado_por` is already set by the start action and can remain
+        // unchanged in Firestore's diff; still require it to match the actor.
+        && changed.hasAll(["status", "finalizado_em", "atualizado_em"])
+        && isTextoNaoVazio(request.resource.data.atualizado_em);
+    }
+
+    function isScopedOperatorCallUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.get("categoria", null) != "televendas"
+        && resource.data.get("tipo_servico", null) != "Atendimento Televendas"
+        && isActiveOperatorScopedToCall(resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.empresa_id == resource.data.empresa_id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && (changed.hasAny(["finalizado_em"])
+          ? isOperatorFinishUpdate(changed)
+          : changed.hasAny(["iniciado_em"])
+            ? isOperatorStartUpdate(changed)
+            : changed.hasAny(["cheguei_em"])
+              ? isOperatorArrivalUpdate(changed)
+              : changed.hasAny(["a_caminho_em"])
+                ? isOperatorRouteUpdate(changed)
+                : isOperatorAssumeCallUpdate(changed));
+    }
+
+    // Keep the Operator's transition audit small and bound it to the call
+    // changed in the same atomic commit. This avoids falling through the
+    // generic audit scope checks, which require a stored empresa_id on older
+    // user profiles and can exceed the expression budget.
+    function isOperatorCallActionAudit(id) {
+      let callPath = /databases/$(database)/documents/chamados/$(request.resource.data.entityId);
+      let actorPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let afterCall = getAfter(callPath).data;
+      let actor = get(actorPath).data;
+      return request.resource.data.action in [
+          "chamado_assumido", "chamado_iniciado", "chamado_finalizado"
+        ]
+        && request.resource.data.keys().hasOnly([
+          "action", "actorUid", "actorName", "entityType", "entityId",
+          "details", "occurredAt", "empresa_id", "supermercado_id"
+        ])
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName == actor.get("nome", null)
+        && request.resource.data.entityType == "chamado"
+        && request.resource.data.entityId is string
+        && request.resource.data.details is map
+        && request.resource.data.occurredAt is string
+        && actor.get("status", null) == "Ativo"
+        && actor.get("perfil", null) == "Operador"
+        && actor.get("supermercado_id", null) == request.resource.data.supermercado_id
+        && afterCall.empresa_id == request.resource.data.empresa_id
+        && afterCall.supermercado_id == request.resource.data.supermercado_id
+        && afterCall.operador_nome == actor.get("nome", null)
+        && request.resource.data.details.empresa_id == request.resource.data.empresa_id
+        && request.resource.data.details.supermercado_id == request.resource.data.supermercado_id
+        && request.resource.data.details.operador_nome == actor.get("nome", null)
+        && request.resource.data.details.statusAtual == afterCall.status
+        && exists(callPath)
+        && exists(actorPath)
+        && (request.resource.data.action == "chamado_assumido"
+          ? afterCall.status == "Aguardando"
+            && isTextoNaoVazio(afterCall.get("assumido_em", null))
+            && isCampoVazio(afterCall.get("iniciado_em", null))
+          : request.resource.data.action == "chamado_iniciado"
+            ? afterCall.status == "Em atendimento"
+              && isTextoNaoVazio(afterCall.get("iniciado_em", null))
+            : afterCall.status == "Finalizado"
+              && isTextoNaoVazio(afterCall.get("finalizado_em", null)));
     }
 
     function isStatusUsuarioValido(status) {
@@ -621,7 +881,7 @@ service cloud.firestore {
         && exists(userPath)
         && get(userPath).data.get("status", null) == "Ativo"
         && get(userPath).data.get("perfil", null) == "Separador de Televendas"
-        && get(userPath).data.empresa_id == data.empresa_id
+        && isCurrentUserInEmpresaScope(data.empresa_id)
         && get(userPath).data.supermercado_id == data.supermercado_id
         && isTelevendasPedidoVinculadoLegivel(data);
     }
@@ -637,7 +897,7 @@ service cloud.firestore {
     function canSeparatorReadChamado(data) {
       return currentUserPerfil() == "Separador de Televendas"
         && isCurrentUserActive()
-        && data.empresa_id == currentUserEmpresaId()
+        && isCurrentUserInEmpresaScope(data.empresa_id)
         && data.supermercado_id == currentUserSupermercadoId()
         && (
           isTelevendasChamado(data)
@@ -701,6 +961,10 @@ service cloud.firestore {
     }
 
     function isAtualizacaoChamadoValida() {
+      let empilhadeiraAlterada = request.resource.data.get("empilhadeira_id", null)
+          != resource.data.get("empilhadeira_id", null)
+        || request.resource.data.get("empilhadeira_identificacao", null)
+          != resource.data.get("empilhadeira_identificacao", null);
       return request.resource.data.id == resource.data.id
         && (
           request.resource.data.categoria == resource.data.categoria
@@ -730,7 +994,9 @@ service cloud.firestore {
         && (isCampoVazio(request.resource.data.iniciado_em) || isTextoNaoVazio(request.resource.data.iniciado_em))
         && (isCampoVazio(request.resource.data.finalizado_em) || isTextoNaoVazio(request.resource.data.finalizado_em))
         && (isCampoVazio(request.resource.data.cancelado_em) || isTextoNaoVazio(request.resource.data.cancelado_em))
-        && isEmpilhadeiraCompativelComChamado(request.resource.data);
+        // Validate the equipment document when its assignment changes. Re-reading
+        // it on every status transition can exceed Firestore's expression budget.
+        && (!empilhadeiraAlterada || isEmpilhadeiraCompativelComChamado(request.resource.data));
     }
 
     // Bind the call-side marker to a newly created audit document in the
@@ -906,18 +1172,24 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(["ultima_auditoria_atualizacao_id"])
           ? isScopedTelevendasAuditUpdate()
-          : (
-            (
-              canAccessCurrentSupermercado(resource.data.supermercado_id)
-              || canAccessEmpresa(resource.data.empresa_id)
+          : currentUserPerfil() == "Operador"
+            ? isScopedOperatorCallUpdate()
+            : (
+              isScopedTelevendasLegacyObservationUpdate()
+              || (resource.data.get("categoria", null) == "televendas"
+                && isScopedTelevendasAssumeUpdate())
+              || ((
+                canAccessCurrentSupermercado(resource.data.supermercado_id)
+                || canAccessEmpresa(resource.data.empresa_id)
+              )
+              && canManageChamado(resource.data)
+              && !(resource.data.categoria == "televendas"
+                && request.resource.data.diff(resource.data).affectedKeys().hasAny(["itens"])
+                && (resource.data.get("confirmacoes_empilhadeira", {}).size() > 0
+                  || resource.data.get("confirmacoes_manuais", {}).size() > 0))
+              && isAtualizacaoChamadoValida()
+              )
             )
-            && canManageChamado(resource.data)
-            && !(resource.data.categoria == "televendas"
-              && request.resource.data.diff(resource.data).affectedKeys().hasAny(["itens"])
-              && (resource.data.get("confirmacoes_empilhadeira", {}).size() > 0
-                || resource.data.get("confirmacoes_manuais", {}).size() > 0))
-            && isAtualizacaoChamadoValida()
-          )
         );
 
       allow delete: if isAdminGeral();
@@ -1058,7 +1330,14 @@ service cloud.firestore {
         && isTelevendasUpdateAuditAuthentic(id, request.resource.data);
 
       allow create: if isSignedIn()
-        && request.resource.data.keys().hasAll([
+        && (request.resource.data.get("action", null) == "chamado_assumido"
+          && request.resource.data.get("details", {}).get("statusAtual", null) == "Aguardando")
+          || (request.resource.data.get("action", null) == "chamado_iniciado"
+            && request.resource.data.get("details", {}).get("statusAtual", null) == "Em atendimento")
+          || (request.resource.data.get("action", null) == "chamado_finalizado"
+            && request.resource.data.get("details", {}).get("statusAtual", null) == "Finalizado")
+          ? isOperatorCallActionAudit(id)
+          : request.resource.data.keys().hasAll([
           "action",
           "actorUid",
           "actorName",

@@ -49,6 +49,10 @@ before(async () => {
       perfil: "Separador de Televendas", status: "Ativo", nome: "Separador A",
       empresa_id: "empresa-a", supermercado_id: "loja-a",
     });
+    await setDoc(doc(db, "usuarios/separator-legacy-company"), {
+      perfil: "Separador de Televendas", status: "Ativo", nome: "Separador legado",
+      supermercado_id: "loja-a",
+    });
     await setDoc(doc(db, "usuarios/operator-b"), {
       perfil: "Separador de Televendas", status: "Ativo", nome: "Separador B",
       empresa_id: "empresa-b", supermercado_id: "loja-b",
@@ -80,6 +84,10 @@ before(async () => {
     await setDoc(doc(db, "chamados/tv-a"), initial);
     // Keep linked-call creation independent from tests that advance tv-a's status.
     await setDoc(doc(db, "chamados/tv-linked"), { ...initial, id: "tv-linked" });
+    await setDoc(doc(db, "chamados/tv-assumed"), {
+      ...initial, id: "tv-assumed", status: "Em separação", operador_nome: "Separador A",
+      assumido_em: stamp,
+    });
     await setDoc(doc(db, "chamados/tv-regression"), { ...initial, id: "tv-regression" });
     await setDoc(doc(db, "chamados/tv-gap"), { ...initial, id: "tv-gap" });
     await setDoc(doc(db, "chamados/tv-b"), {
@@ -227,13 +235,17 @@ test("an Operator can assume and advance a linked operational call without chang
   }));
   await assertSucceeds(updateDoc(callRef, {
     a_caminho_em: "2026-10-19T10:01:00.000Z",
-    atualizado_em: "2026-10-19T10:01:00.000Z", atualizado_por: "Operador Real",
+    atualizado_em: "2026-10-19T10:01:00.000Z",
   }));
   await assertSucceeds(runTransaction(db, async (transaction) => {
     const current = await transaction.get(callRef);
     const time = "2026-10-19T10:02:00.000Z";
     transaction.update(callRef, {
       status: "Em atendimento", iniciado_em: time, atualizado_em: time, atualizado_por: "Operador Real",
+      operador_nome: "Operador Real", assumido_em: current.data().assumido_em,
+      a_caminho_em: current.data().a_caminho_em, cheguei_em: time,
+      finalizado_em: null, cancelado_em: null,
+      empilhadeira_id: null, empilhadeira_identificacao: null,
     });
     transaction.set(doc(db, "auditoria/operator-transition-start"), {
       action: "chamado_iniciado", actorUid: "real-operator", actorName: "Operador Real",
@@ -353,6 +365,34 @@ test("a separator reads only linked calls in the authorized unit and receives li
   } finally {
     unsubscribe();
   }
+});
+
+test("a Televendas separator can still query a pedido after assuming it for separation", async () => {
+  const separatorDb = environment.authenticatedContext("operator-a").firestore();
+  const assignedOrderQuery = query(
+    collection(separatorDb, "chamados"),
+    where("empresa_id", "==", "empresa-a"),
+    where("supermercado_id", "==", "loja-a"),
+    where("categoria", "==", "televendas")
+  );
+  const snapshot = await getDocs(assignedOrderQuery);
+  const assignedOrder = snapshot.docs.find((entry) => entry.id === "tv-assumed");
+  assert.ok(assignedOrder, "an assigned Em separação pedido remains readable to its separator");
+  assert.equal(assignedOrder.data().status, "Em separação");
+  assert.equal(assignedOrder.data().operador_nome, "Separador A");
+});
+
+test("a separator without empresa_id can read pedidos through the linked unit scope only", async () => {
+  const separatorDb = environment.authenticatedContext("separator-legacy-company").firestore();
+  const pedidosQuery = query(
+    collection(separatorDb, "chamados"),
+    where("empresa_id", "==", "empresa-a"),
+    where("supermercado_id", "==", "loja-a"),
+    where("categoria", "==", "televendas")
+  );
+  const snapshot = await getDocs(pedidosQuery);
+  assert(snapshot.docs.some((entry) => entry.id === "tv-assumed"));
+  await assertFails(getDoc(doc(separatorDb, "chamados/tv-b")));
 });
 
 test("a foreign-company separator cannot update or audit another company's call", async () => {
