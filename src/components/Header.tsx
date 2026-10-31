@@ -78,7 +78,7 @@ export default function Header({
   const isPlatformAdmin = perfilAcesso === "Administrador Geral";
   const unidadesActionVisible = showUnidadesAction || showSupermercadosAction;
   const showProfileAction = Boolean(perfilAcesso && usuarioNome && !isPlatformAdmin);
-  const showDashboardNavigationAction = showDashboardAction && !isPlatformAdmin;
+  const showDashboardNavigationAction = showDashboardAction;
   const showCompanyNavigationAction = showEmpresasAction && !isPlatformAdmin;
   const showUnitNavigationAction = unidadesActionVisible && !isPlatformAdmin;
   const showUsersNavigationAction = showUsuariosAction && !isPlatformAdmin;
@@ -123,7 +123,7 @@ export default function Header({
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
   const dashboardActionLabel =
     perfilAcesso === "Administrador Geral"
-      ? "Gestão Plataforma"
+      ? "Visão geral"
       : perfilAcesso === "Gerente da Empresa"
       ? "Unidades atribuídas"
       : perfilAcesso === "Administrador da Empresa"
