@@ -77,7 +77,7 @@ test("separator query reads only unit Televendas, including legacy type_servico 
   );
   const result = await assertSucceeds(getDocs(calls));
   const ids = result.docs.map((entry) => entry.id).sort();
-  if (ids.join(",") !== "pedido-aberto,pedido-cancelacao,pedido-legado,pedido-legado-sem-itens") throw new Error(`Unexpected result set: ${ids.join(",")}`);
+  if (ids.join(",") !== "pedido-aberto,pedido-cancelacao,pedido-legado,pedido-legado-sem-itens,pedido-legado-sem-uid-em-andamento,pedido-uid-ownership") throw new Error(`Unexpected result set: ${ids.join(",")}`);
   await assertFails(getDocs(query(collection(db, "chamados"), where("empresa_id", "==", "empresa-a"))));
   await assertFails(getDocs(query(collection(db, "chamados"), where("supermercado_id", "==", "loja-b"))));
 });
