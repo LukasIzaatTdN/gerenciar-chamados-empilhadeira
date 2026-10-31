@@ -424,7 +424,7 @@ service cloud.firestore {
       return newData.diff(oldData).affectedKeys().hasOnly([
         "itens", "produto", "quantidade", "total_solicitado", "total_encontrado",
         "percentual_atendido", "status", "motivo_incompleto", "observacao_operador",
-        "atualizado_em", "atualizado_por", "operador_nome", "assumido_em", "cancelado_em"
+        "atualizado_em", "atualizado_por", "operador_nome", "separador_uid", "assumido_em", "cancelado_em"
       ]);
     }
 
@@ -433,14 +433,28 @@ service cloud.firestore {
       let starting = oldData.status == "Aberto"
         && newData.status == "Em separação"
         && isCampoVazio(oldData.operador_nome)
+        && isCampoVazio(oldData.get("separador_uid", null))
         && newData.operador_nome is string
         && newData.operador_nome.size() > 0
+        && newData.separador_uid == request.auth.uid
         && newData.assumido_em is string
         && newData.assumido_em.size() > 0;
       let completing = oldData.status == "Em separação"
         && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.get("separador_uid", null) == request.auth.uid
+        && newData.separador_uid == request.auth.uid
         && oldData.operador_nome == newData.operador_nome;
       let retrying = oldData.status == "Incompleto"
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.get("separador_uid", null) == request.auth.uid
+        && newData.separador_uid == request.auth.uid
+        && oldData.operador_nome == newData.operador_nome;
+      // One-time ownership claim for legacy in-progress records that predate separador_uid.
+      // The authenticated user's profile name must match the stored separator name.
+      let claimingLegacy = oldData.status in ["Em separação", "Incompleto"]
+        && isCampoVazio(oldData.get("separador_uid", null))
+        && oldData.operador_nome == userData.get("nome", null)
+        && newData.separador_uid == request.auth.uid
         && newData.status in ["Pronto", "Incompleto", "Cancelado"]
         && oldData.operador_nome == newData.operador_nome;
       return (!("status" in userData) || userData.status == "Ativo")
@@ -454,7 +468,7 @@ service cloud.firestore {
         && isChamadoTelevendas(newData)
         && (("id" in oldData && newData.id == oldData.id)
           || (!("id" in oldData) && !("id" in newData)))
-        && (starting || completing || retrying)
+        && (starting || completing || retrying || claimingLegacy)
         && separatorChangedFieldsAllowed(oldData, newData)
         && (newData.itens is list
           || (starting && !("itens" in oldData) && !("itens" in newData)))
