@@ -3,6 +3,7 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
+import AdminSidebar from "./components/AdminSidebar";
 import AdminScopeSelector from "./components/AdminScopeSelector";
 import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
 import OperationalAlerts from "./components/OperationalAlerts";
@@ -1783,6 +1784,9 @@ export default function App() {
     return (
       <>
         <div className="app-page min-h-screen bg-transparent">
+          <div className={isPlatformAdmin ? "grid min-h-screen md:grid-cols-[260px_minmax(0,1fr)]" : ""}>
+          {isPlatformAdmin && <div className="p-3 md:p-5"><AdminSidebar activeView={view} dark={tema === "dark"} userName={operadorNome ?? "Administrador"} onNavigate={navigateTo} onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")} /></div>}
+          <div className="min-w-0">
           <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
@@ -1821,7 +1825,7 @@ export default function App() {
           }
         />
 
-          <main className="app-main px-2 py-4 sm:px-0 sm:py-6">
+          <main className={`app-main px-2 py-4 sm:px-0 sm:py-6 ${isPlatformAdmin ? "admin-dashboard" : ""}`}>
           {canViewAllUnits && (
             <AdminScopeSelector
               empresaValue={adminEmpresaFiltro}
@@ -2032,6 +2036,8 @@ export default function App() {
             </>
           )}
           </main>
+          </div>
+          </div>
         </div>
         {renderGlobalOverlays()}
       </>

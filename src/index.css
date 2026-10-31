@@ -84,6 +84,26 @@ body {
   margin-inline: auto;
 }
 
+.admin-dashboard .professional-panel {
+  border-radius: 20px;
+  border-color: var(--border-soft);
+  background: var(--surface-primary);
+  color: var(--text-strong);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="dark"] .admin-dashboard :is(.bg-white, .bg-slate-50, .bg-slate-50\/90) {
+  background-color: #111c30;
+}
+
+html[data-theme="dark"] .admin-dashboard :is(.text-slate-900, .text-slate-800, .text-slate-700) {
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .admin-dashboard :is(.border-slate-200, .border-slate-300) {
+  border-color: #334155;
+}
+
 @media (min-width: 640px) {
   .app-main {
     width: min(1240px, 100% - 3rem);
