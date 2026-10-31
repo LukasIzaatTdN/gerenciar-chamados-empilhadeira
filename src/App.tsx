@@ -1844,8 +1844,8 @@ export default function App() {
     return (
       <>
         <div className="app-page min-h-screen bg-transparent">
-          <div className={isPlatformAdmin ? "grid min-h-screen md:grid-cols-[260px_minmax(0,1fr)]" : ""}>
-          {isPlatformAdmin && <div className="p-3 md:p-5"><AdminSidebar activeView={view} dark={tema === "dark"} userName={operadorNome ?? "Administrador"} onNavigate={navigateTo} onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")} /></div>}
+          <div className={isPlatformAdmin ? "admin-shell min-h-screen" : ""}>
+          {isPlatformAdmin && <div className="p-2 sm:p-3 md:p-5"><AdminSidebar activeView={view} dark={tema === "dark"} userName={operadorNome ?? "Administrador"} onNavigate={navigateTo} onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")} /></div>}
           <div className="min-w-0">
           <Header
           onNovoChamado={handleNovoChamadoAccess}
@@ -1873,10 +1873,10 @@ export default function App() {
           onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isCompanyAdmin && !isPlatformAdmin && permissions.canAccessOperatorPanel}
-          showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
-          showEmpresasAction={canViewAllCompanies}
-          showUnidadesAction={permissions.canManageUnits}
-          showUsuariosAction={canViewAllUnits}
+          showDashboardAction={!isPlatformAdmin && perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
+          showEmpresasAction={!isPlatformAdmin && canViewAllCompanies}
+          showUnidadesAction={!isPlatformAdmin && permissions.canManageUnits}
+          showUsuariosAction={!isPlatformAdmin && canViewAllUnits}
           showEmpilhadeirasAction={
             !isPlatformAdmin &&
             permissions.canAccessOperatorPanel &&
