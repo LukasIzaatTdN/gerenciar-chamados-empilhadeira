@@ -32,7 +32,12 @@ before(async () => {
     await setDoc(doc(firestore, "supermercados/loja-a"), { empresa_id: "empresa-a", status: "Ativo" });
     await setDoc(doc(firestore, "supermercados/loja-b"), { empresa_id: "empresa-a", status: "Ativo" });
     await setDoc(doc(firestore, "usuarios/separador-a"), {
-      perfil: "Separador de Televendas", status: "Ativo", empresa_id: "empresa-a", supermercado_id: "loja-a",
+      perfil: "Separador de Televendas", status: "Ativo", nome: "Separador teste",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
+    });
+    await setDoc(doc(firestore, "usuarios/separador-b"), {
+      perfil: "Separador de Televendas", status: "Ativo", nome: "Separador teste",
+      empresa_id: "empresa-a", supermercado_id: "loja-a",
     });
     await setDoc(doc(firestore, "usuarios/operador-a"), {
       perfil: "Operador", status: "Ativo", empresa_id: "empresa-a", supermercado_id: "loja-a",
@@ -76,14 +81,14 @@ test("separator can assume, record item counts, and mark ready or incomplete wit
   const db = environment.authenticatedContext("separador-a").firestore();
   const ref = doc(db, "chamados/pedido-aberto");
   await assertSucceeds(updateDoc(ref, {
-    status: "Em separação", operador_nome: "Separador teste", assumido_em: "2026-10-29T01:00:00.000Z",
+    status: "Em separação", operador_nome: "Separador teste", separador_uid: "separador-a", assumido_em: "2026-10-29T01:00:00.000Z",
   }));
   const found = { ...item, quantidadeEncontrada: 2, quantidadeFaltante: 0 };
   await assertSucceeds(updateDoc(ref, {
     itens: [found], produto: "Arroz", quantidade: "2", total_solicitado: 2,
     total_encontrado: 2, percentual_atendido: 100, status: "Pronto", motivo_incompleto: null,
     atualizado_em: "2026-10-29T01:01:00.000Z", atualizado_por: "Separador teste",
-    operador_nome: "Separador teste", cancelado_em: null,
+    operador_nome: "Separador teste", separador_uid: "separador-a", cancelado_em: null,
   }));
 
   const incomplete = doc(db, "chamados/pedido-legado");
@@ -111,6 +116,29 @@ test("separator can assume, record item counts, and mark ready or incomplete wit
     details: { empresa_id: "empresa-a", supermercado_id: "loja-a", statusAnterior: "Aberto", statusAtual: "Em separação", operador_nome: "Separador teste" },
   });
   await assertSucceeds(batch.commit());
+});
+
+test("separator ownership is tied to auth UID even when another separator has the same display name", async () => {
+  const ownerDb = environment.authenticatedContext("separador-a").firestore();
+  const ref = doc(ownerDb, "chamados/pedido-cancelacao");
+  await assertSucceeds(updateDoc(ref, {
+    status: "Em separação", operador_nome: "Separador teste",
+    separador_uid: "separador-a", assumido_em: "2026-10-29T02:45:00.000Z",
+  }));
+
+  const otherDb = environment.authenticatedContext("separador-b").firestore();
+  await assertFails(updateDoc(doc(otherDb, "chamados/pedido-cancelacao"), {
+    status: "Cancelado", itens: [item], cancelado_em: "2026-10-29T02:46:00.000Z",
+    atualizado_em: "2026-10-29T02:46:00.000Z", operador_nome: "Separador teste",
+    separador_uid: "separador-b",
+  }));
+
+  await assertSucceeds(updateDoc(ref, {
+    status: "Pronto", itens: [{ ...item, quantidadeEncontrada: 2, quantidadeFaltante: 0 }],
+    total_solicitado: 2, total_encontrado: 2, percentual_atendido: 100,
+    atualizado_em: "2026-10-29T02:47:00.000Z", operador_nome: "Separador teste",
+    separador_uid: "separador-a", cancelado_em: null,
+  }));
 });
 
 test("separator cannot change operational fields, unit scope, or incompatible status", async () => {
@@ -153,7 +181,7 @@ test("operator operational update remains available and separator cancellation r
   }));
   await assertSucceeds(updateDoc(ref, {
     status: "Cancelado", itens: [item], cancelado_em: "2026-10-29T03:01:00.000Z",
-    atualizado_em: "2026-10-29T03:01:00.000Z", operador_nome: "Separador teste",
+    atualizado_em: "2026-10-29T03:01:00.000Z", operador_nome: "Separador teste", separador_uid: "separador-a",
   }));
 });
 
