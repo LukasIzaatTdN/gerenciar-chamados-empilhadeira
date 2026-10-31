@@ -93,20 +93,20 @@ test("separator can assume, record item counts, and mark ready or incomplete wit
 
   const incomplete = doc(db, "chamados/pedido-legado");
   await assertSucceeds(updateDoc(incomplete, {
-    status: "Em separação", operador_nome: "Separador teste", assumido_em: "2026-10-29T02:00:00.000Z",
+    status: "Em separação", operador_nome: "Separador teste", separador_uid: "separador-a", assumido_em: "2026-10-29T02:00:00.000Z",
   }));
   await assertFails(updateDoc(incomplete, { status: "Incompleto", motivo_incompleto: null }));
   await assertSucceeds(updateDoc(incomplete, {
     itens: [item], status: "Incompleto", motivo_incompleto: "Estoque insuficiente",
     atualizado_em: "2026-10-29T02:01:00.000Z", atualizado_por: "Separador teste",
-    operador_nome: "Separador teste", cancelado_em: null,
+    operador_nome: "Separador teste", separador_uid: "separador-a", cancelado_em: null,
   }));
 
   const legacyWithoutItems = doc(db, "chamados/pedido-legado-sem-itens");
   const audit = doc(collection(db, "auditoria"));
   const batch = writeBatch(db);
   batch.update(legacyWithoutItems, {
-    status: "Em separação", operador_nome: "Separador teste", assumido_em: "2026-10-29T02:30:00.000Z",
+    status: "Em separação", operador_nome: "Separador teste", separador_uid: "separador-a", assumido_em: "2026-10-29T02:30:00.000Z",
     atualizado_em: "2026-10-29T02:30:00.000Z",
   });
   batch.set(audit, {
@@ -177,7 +177,7 @@ test("operator operational update remains available and separator cancellation r
   const ref = doc(separatorDb, "chamados/pedido-cancelacao");
   await assertFails(updateDoc(ref, { status: "Cancelado" }));
   await assertSucceeds(updateDoc(ref, {
-    status: "Em separação", operador_nome: "Separador teste", assumido_em: "2026-10-29T03:00:00.000Z",
+    status: "Em separação", operador_nome: "Separador teste", separador_uid: "separador-a", assumido_em: "2026-10-29T03:00:00.000Z",
   }));
   await assertSucceeds(updateDoc(ref, {
     status: "Cancelado", itens: [item], cancelado_em: "2026-10-29T03:01:00.000Z",
