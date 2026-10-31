@@ -372,6 +372,55 @@ service cloud.firestore {
         || isAdminGeral();
     }
 
+    function isChamadoTelevendas(data) {
+      return data.get("categoria", null) == "televendas"
+        || data.get("tipo_servico", null) == "Atendimento Televendas";
+    }
+
+    function canOperatorUpdateTelevendas(oldData, newData) {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      let assuming = oldData.status == "Aberto"
+        && isCampoVazio(oldData.operador_nome)
+        && newData.status == "Em separação"
+        && newData.operador_nome == userData.nome
+        && newData.assumido_em is string
+        && newData.assumido_em.size() > 0;
+      let updatingSeparation = oldData.status in ["Em separação", "Incompleto"]
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.operador_nome == userData.nome
+        && newData.operador_nome == oldData.operador_nome
+        && newData.itens is list
+        && (newData.status != "Incompleto" || isTextoNaoVazio(newData.motivo_incompleto))
+        && (newData.status != "Cancelado"
+          || (newData.cancelado_em is string && newData.cancelado_em.size() > 0));
+      let finalizing = oldData.status == "Pronto"
+        && newData.status == "Finalizado"
+        && oldData.operador_nome == userData.nome
+        && newData.operador_nome == oldData.operador_nome
+        && newData.finalizado_em is string
+        && newData.finalizado_em.size() > 0
+        && newData.cancelado_em == null;
+      return isCurrentUserActive()
+        && userData.perfil == "Operador"
+        && userData.get("nome", null) is string
+        && userData.nome.size() > 0
+        && currentUserEmpresaId() == oldData.empresa_id
+        && canAccessCurrentSupermercado(oldData.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(oldData.empresa_id, oldData.supermercado_id)
+        && oldData.empresa_id == newData.empresa_id
+        && oldData.supermercado_id == newData.supermercado_id
+        && isChamadoTelevendas(oldData)
+        && isChamadoTelevendas(newData)
+        && newData.id == oldData.id
+        && (assuming || updatingSeparation || finalizing)
+        && newData.diff(oldData).affectedKeys().hasOnly([
+          "itens", "produto", "quantidade", "total_solicitado", "total_encontrado",
+          "percentual_atendido", "status", "motivo_incompleto", "observacao_operador",
+          "atualizado_em", "atualizado_por", "operador_nome", "assumido_em",
+          "finalizado_em", "cancelado_em"
+        ]);
+    }
+
     function isStatusUsuarioValido(status) {
       return status == "Ativo" || status == "Inativo";
     }
@@ -647,12 +696,14 @@ service cloud.firestore {
         );
 
       allow update: if isSignedIn()
-        && canManageChamado()
-        && isAtualizacaoChamadoValida()
-        && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
-        );
+        && (currentUserPerfil() == "Operador" && isChamadoTelevendas(resource.data)
+          ? canOperatorUpdateTelevendas(resource.data, request.resource.data)
+          : canManageChamado()
+            && isAtualizacaoChamadoValida()
+            && (
+              canAccessCurrentSupermercado(resource.data.supermercado_id)
+              || canAccessEmpresa(resource.data.empresa_id)
+            ));
 
       allow delete: if isAdminGeral();
     }
