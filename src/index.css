@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --app-bg: #eef3f8;
-  --app-bg-soft: #f8fbff;
-  --surface-primary: rgba(255, 255, 255, 0.94);
-  --surface-secondary: rgba(255, 255, 255, 0.82);
-  --border-soft: rgba(148, 163, 184, 0.18);
-  --text-strong: #0f172a;
-  --text-muted: #64748b;
-  --brand-amber: #f59e0b;
-  --brand-orange: #f97316;
-  --brand-slate: #0f172a;
-  --brand-blue: #0f3d75;
+  color-scheme: light;
+  --app-bg: #e9eff4;
+  --app-bg-soft: #f5f8fa;
+  --surface-primary: #ffffff;
+  --surface-secondary: #f7fafc;
+  --border-soft: #d9e2ea;
+  --text-strong: #142333;
+  --text-muted: #647789;
+  --brand-amber: #f4a51c;
+  --brand-orange: #e88418;
+  --brand-slate: #102235;
+  --brand-blue: #123b5d;
+  --brand-teal: #087f8c;
   --status-waiting: #f59e0b;
   --status-progress: #0f3d75;
   --status-done: #10b981;
@@ -19,21 +21,23 @@
 }
 
 html[data-theme="dark"] {
-  --app-bg: #020617;
-  --app-bg-soft: #0f172a;
-  --surface-primary: rgba(15, 23, 42, 0.84);
-  --surface-secondary: rgba(15, 23, 42, 0.7);
-  --border-soft: rgba(71, 85, 105, 0.35);
-  --text-strong: #e2e8f0;
-  --text-muted: #94a3b8;
+  color-scheme: dark;
+  --app-bg: #0b1723;
+  --app-bg-soft: #101f2e;
+  --surface-primary: #142536;
+  --surface-secondary: #192d40;
+  --border-soft: #2a4054;
+  --text-strong: #edf4f8;
+  --text-muted: #a8bac8;
 }
 
 html {
-  background:
-    radial-gradient(circle at 8% 2%, rgba(15, 61, 117, 0.11), transparent 22%),
-    radial-gradient(circle at 92% 4%, rgba(249, 115, 22, 0.1), transparent 18%),
-    radial-gradient(circle at 50% 105%, rgba(59, 130, 246, 0.08), transparent 26%),
+  background-color: var(--app-bg);
+  background-image:
+    linear-gradient(rgba(18, 59, 93, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 59, 93, 0.025) 1px, transparent 1px),
     linear-gradient(180deg, var(--app-bg-soft) 0%, var(--app-bg) 100%);
+  background-size: 32px 32px, 32px 32px, auto;
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
@@ -42,10 +46,11 @@ html {
 }
 
 html[data-theme="dark"] {
-  background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.1), transparent 22%),
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 20%),
-    linear-gradient(180deg, #020617 0%, #0f172a 100%);
+  background-color: var(--app-bg);
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, var(--app-bg-soft) 0%, var(--app-bg) 100%);
 }
 
 body {
@@ -55,7 +60,7 @@ body {
   color: var(--text-strong);
   transition: background 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
-  font-family: "Manrope", "IBM Plex Sans", "Segoe UI", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "IBM Plex Sans", "Manrope", "Segoe UI", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 #root {
@@ -161,11 +166,11 @@ html[data-theme="dark"] .admin-dashboard :is(.border-slate-200, .border-slate-30
 }
 
 .professional-panel {
-  border-radius: 28px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-primary);
+  box-shadow: 0 8px 24px rgba(16, 34, 53, 0.07);
+  backdrop-filter: blur(12px);
 }
 
 *,
@@ -227,16 +232,17 @@ canvas {
 .glass-card {
   background: var(--surface-primary);
   border: 1px solid var(--border-soft);
-  box-shadow:
-    0 12px 28px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(18px);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(16, 34, 53, 0.07);
+  backdrop-filter: blur(12px);
 }
 
 .glass-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(16px);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(16, 34, 53, 0.06);
+  backdrop-filter: blur(12px);
 }
 
 .touch-target {
@@ -292,5 +298,125 @@ canvas {
 
   .touch-target {
     min-height: 44px;
+  }
+}
+
+/* Shared visual language for dispatch, administration and operator screens. */
+::selection {
+  color: #fff;
+  background: var(--brand-teal);
+}
+
+header.sticky {
+  border-color: rgba(210, 226, 237, 0.2) !important;
+  background: linear-gradient(112deg, #10283d 0%, #123b5d 56%, #0f334e 100%);
+  box-shadow: 0 8px 24px rgba(12, 30, 47, 0.2);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-teal), transparent 54%);
+  outline-offset: 2px;
+}
+
+body :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: var(--border-soft);
+  border-radius: 12px;
+  background-color: var(--surface-secondary);
+  color: var(--text-strong);
+}
+
+body :is(input, select, textarea)::placeholder {
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+body :is(input, select, textarea):focus {
+  border-color: var(--brand-teal);
+  background-color: var(--surface-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-teal), transparent 88%);
+}
+
+.professional-panel,
+.glass-card,
+.glass-panel,
+main [class*="rounded-[24px]"],
+main [class*="rounded-[28px]"],
+main [class*="rounded-[30px]"] {
+  border-color: var(--border-soft);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(16, 34, 53, 0.07);
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html[data-theme="dark"] body {
+  color: var(--text-strong);
+}
+
+html[data-theme="dark"] :is(.professional-panel, .glass-card, .glass-panel) {
+  border-color: var(--border-soft);
+  background: var(--surface-primary);
+  color: var(--text-strong);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="dark"] main [class*="bg-white"],
+html[data-theme="dark"] main [class*="bg-slate-50"] {
+  background-color: var(--surface-primary);
+}
+
+html[data-theme="dark"] main [class~="text-slate-900"],
+html[data-theme="dark"] main [class~="text-slate-800"],
+html[data-theme="dark"] main [class~="text-slate-700"] {
+  color: var(--text-strong);
+}
+
+html[data-theme="dark"] main [class*="border-slate-200"],
+html[data-theme="dark"] main [class*="border-slate-300"] {
+  border-color: var(--border-soft);
+}
+
+html[data-theme="dark"] body :is(input, select, textarea) {
+  border-color: var(--border-soft);
+  background-color: var(--surface-secondary);
+  color: var(--text-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
