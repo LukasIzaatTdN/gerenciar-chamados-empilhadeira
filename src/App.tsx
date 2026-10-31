@@ -1003,6 +1003,7 @@ export default function App() {
     setView(nextView);
     if (typeof window !== "undefined") {
       window.history.pushState({ appView: nextView }, "");
+      window.requestAnimationFrame(() => window.scrollTo(0, 0));
     }
   }
 
