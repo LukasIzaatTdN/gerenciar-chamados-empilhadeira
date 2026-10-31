@@ -6,6 +6,7 @@ import type { Empresa } from "../types/empresa";
 import { runSubscriptionAdminOperation, type SubscriptionAdminOperation } from "../services/subscriptions";
 import { explainSubscriptionError } from "../utils/subscriptionErrors";
 import type { AssinaturaCiclo, PlanoComercialStatus } from "../types/empresa";
+import PageHeading from "./PageHeading";
 
 interface Props { empresas: Empresa[]; onBack: () => void; actorName: string }
 const cycles = ["Mensal", "Trimestral", "Semestral", "Anual"] as const;
@@ -88,7 +89,12 @@ export default function AssinaturasAdmin({ empresas, onBack, actorName }: Props)
   const chosenPlan = activePlans.find((plan) => plan.id === selectedPlanId);
 
   return <main className="app-main space-y-6 px-3 py-6 sm:px-0">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-wide text-sky-700">Administrador da Plataforma</p><h2 className="text-2xl font-black text-slate-900">Planos e assinaturas SaaS</h2><p className="text-sm text-slate-600">Uma assinatura por empresa, independente do número de filiais. Ativação e renovação manuais.</p></div><button onClick={onBack} className="rounded-xl border px-4 py-2 font-semibold">Voltar</button></div>
+    <PageHeading
+      eyebrow="Administrador da plataforma"
+      title="Planos e assinaturas SaaS"
+      description="Uma assinatura por empresa, independente do número de filiais. Ativação e renovação manuais."
+      actions={<button onClick={onBack} className="touch-target rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">Voltar ao painel</button>}
+    />
     {(message || error) && <div role="status" className={`rounded-xl p-3 ${error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-800"}`}>{error || message}</div>}
     <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
       <div className="rounded-2xl border bg-white p-5 shadow-sm"><h3 className="mb-4 text-lg font-bold">{editingPlanId ? "Editar plano" : "Cadastrar plano"}</h3><form className="grid gap-3 sm:grid-cols-2" onSubmit={savePlan}>
