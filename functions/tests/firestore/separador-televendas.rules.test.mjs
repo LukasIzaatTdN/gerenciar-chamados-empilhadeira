@@ -54,6 +54,7 @@ before(async () => {
       categoria: "operacional", tipo_servico: "Descarga", status: "Aguardando", itens: [],
     }));
     await setDoc(doc(firestore, "chamados/pedido-cancelacao"), baseCall("pedido-cancelacao"));
+    await setDoc(doc(firestore, "chamados/pedido-uid-ownership"), baseCall("pedido-uid-ownership"));
     await setDoc(doc(firestore, "chamados/outra-unidade"), baseCall("outra-unidade", { supermercado_id: "loja-b" }));
   });
 });
@@ -120,14 +121,14 @@ test("separator can assume, record item counts, and mark ready or incomplete wit
 
 test("separator ownership is tied to auth UID even when another separator has the same display name", async () => {
   const ownerDb = environment.authenticatedContext("separador-a").firestore();
-  const ref = doc(ownerDb, "chamados/pedido-cancelacao");
+  const ref = doc(ownerDb, "chamados/pedido-uid-ownership");
   await assertSucceeds(updateDoc(ref, {
     status: "Em separação", operador_nome: "Separador teste",
     separador_uid: "separador-a", assumido_em: "2026-10-29T02:45:00.000Z",
   }));
 
   const otherDb = environment.authenticatedContext("separador-b").firestore();
-  await assertFails(updateDoc(doc(otherDb, "chamados/pedido-cancelacao"), {
+  await assertFails(updateDoc(doc(otherDb, "chamados/pedido-uid-ownership"), {
     status: "Cancelado", itens: [item], cancelado_em: "2026-10-29T02:46:00.000Z",
     atualizado_em: "2026-10-29T02:46:00.000Z", operador_nome: "Separador teste",
     separador_uid: "separador-b",
