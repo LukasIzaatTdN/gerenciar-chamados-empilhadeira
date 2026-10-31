@@ -449,14 +449,6 @@ service cloud.firestore {
         && oldData.get("separador_uid", null) == request.auth.uid
         && newData.separador_uid == request.auth.uid
         && oldData.operador_nome == newData.operador_nome;
-      // One-time ownership claim for legacy in-progress records that predate separador_uid.
-      // The authenticated user's profile name must match the stored separator name.
-      let claimingLegacy = oldData.status in ["Em separação", "Incompleto"]
-        && isCampoVazio(oldData.get("separador_uid", null))
-        && oldData.operador_nome == userData.get("nome", null)
-        && newData.separador_uid == request.auth.uid
-        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
-        && oldData.operador_nome == newData.operador_nome;
       return (!("status" in userData) || userData.status == "Ativo")
         && userData.perfil == "Separador de Televendas"
         && userData.get("empresa_id", null) == oldData.empresa_id
@@ -468,7 +460,7 @@ service cloud.firestore {
         && isChamadoTelevendas(newData)
         && (("id" in oldData && newData.id == oldData.id)
           || (!("id" in oldData) && !("id" in newData)))
-        && (starting || completing || retrying || claimingLegacy)
+        && (starting || completing || retrying)
         && separatorChangedFieldsAllowed(oldData, newData)
         && (newData.itens is list
           || (starting && !("itens" in oldData) && !("itens" in newData)))
