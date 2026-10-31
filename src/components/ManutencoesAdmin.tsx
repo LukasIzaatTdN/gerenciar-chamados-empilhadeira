@@ -13,6 +13,7 @@ import {
 } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
 import type { Supermercado } from "../types/supermercado";
+import PageHeading from "./PageHeading";
 
 interface ManutencoesAdminProps {
   manutencoes: Manutencao[];
@@ -255,31 +256,27 @@ export default function ManutencoesAdmin({
   return (
     <div className="min-h-screen bg-transparent">
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mb-6 flex flex-col gap-3 rounded-[30px] border border-white/70 bg-white/75 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Controle técnico multiunidade
-            </p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-              Manutenções
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Acompanhe manutenções preventivas e corretivas por unidade, mantendo o isolamento operacional entre supermercados.
-            </p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+        <PageHeading
+          eyebrow="Controle técnico multiunidade"
+          title="Manutenções"
+          description="Acompanhe manutenções preventivas e corretivas por unidade, mantendo o isolamento operacional entre supermercados."
+          context={(
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-300" />
               {isAdminGeral ? `Recorte atual: ${currentSupermercadoNome}` : `Unidade atual: ${currentSupermercadoNome}`}
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={onVoltar}
-            className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-          >
-            <span>←</span>
-            Voltar ao painel
-          </button>
-        </div>
+          )}
+          actions={(
+            <button
+              type="button"
+              onClick={onVoltar}
+              className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <span aria-hidden="true">←</span>
+              Voltar ao painel
+            </button>
+          )}
+        />
 
         {canCreate && (
           <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
