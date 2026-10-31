@@ -4,7 +4,7 @@ type AdminSidebarProps = {
   activeView: string;
   dark: boolean;
   userName: string;
-  onNavigate: (view: "dashboard" | "empresas" | "unidades" | "usuarios" | "assinaturas") => void;
+  onNavigate: (view: "dashboard" | "empresas" | "unidades" | "usuarios" | "assinaturas" | "perfil") => void;
   onThemeToggle: () => void;
 };
 
@@ -14,6 +14,7 @@ const links = [
   ["unidades", "Unidades", "⌖"],
   ["usuarios", "Usuários", "♙"],
   ["assinaturas", "Assinaturas", "◇"],
+  ["perfil", "Meu perfil", "⚙"],
 ] as const;
 
 export default function AdminSidebar({ activeView, dark, userName, onNavigate, onThemeToggle }: AdminSidebarProps) {
