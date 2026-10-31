@@ -436,6 +436,7 @@ service cloud.firestore {
         && isCampoVazio(oldData.get("separador_uid", null))
         && newData.operador_nome is string
         && newData.operador_nome.size() > 0
+        && newData.operador_nome == userData.get("nome", null)
         && newData.separador_uid == request.auth.uid
         && newData.assumido_em is string
         && newData.assumido_em.size() > 0;
