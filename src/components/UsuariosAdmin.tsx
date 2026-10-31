@@ -4,6 +4,7 @@ import type { Supermercado } from "../types/supermercado";
 import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
 import { MAX_UNIDADES_POR_USUARIO } from "../utils/tenant";
 import type { AdminInvite } from "../types/adminInvite";
+import PageHeading from "./PageHeading";
 
 interface UsuariosAdminProps {
   empresas: Empresa[];
@@ -241,27 +242,21 @@ export default function UsuariosAdmin({
   return (
     <div className="min-h-screen bg-transparent">
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mb-6 flex flex-col gap-3 rounded-[30px] border border-white/70 bg-white/75 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Administração de acesso
-            </p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-              Usuários
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Altere perfil, empresa, unidade e status de acesso mantendo isolamento por cliente.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onVoltar}
-            className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-          >
-            <span>←</span>
-            Voltar ao painel
-          </button>
-        </div>
+        <PageHeading
+          eyebrow="Administração de acesso"
+          title="Usuários"
+          description="Altere perfil, empresa, unidade e status de acesso mantendo isolamento por cliente."
+          actions={(
+            <button
+              type="button"
+              onClick={onVoltar}
+              className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <span aria-hidden="true">←</span>
+              Voltar ao painel
+            </button>
+          )}
+        />
 
         {canCreateAdminInvite && (
           <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
