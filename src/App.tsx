@@ -2779,7 +2779,7 @@ export default function App() {
               Dashboard
             </button>
           )}
-          {permissions.canAccessOperatorPanel && (
+          {permissions.canAccessOperatorPanel && perfilAcesso !== "Administrador da Empresa" && (
             <button
               onClick={handleOperadorAccess}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
@@ -2788,13 +2788,15 @@ export default function App() {
               Operador
             </button>
           )}
-          <button
-            onClick={isAuthenticated ? handleAccessProfile : openLoginModal}
-            className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-          >
-            <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
-            {isAuthenticated ? "Conta" : "Entrar"}
-          </button>
+          {perfilAcesso !== "Administrador da Empresa" && (
+            <button
+              onClick={isAuthenticated ? handleAccessProfile : openLoginModal}
+              className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            >
+              <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
+              {isAuthenticated ? "Conta" : "Entrar"}
+            </button>
+          )}
           {!isPlatformAdmin && permissions.canCreateChamado && (
             <button
               onClick={handleNovoChamadoAccess}
