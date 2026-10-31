@@ -218,6 +218,10 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
       typeof data.operador_nome === "string" && data.operador_nome.trim()
         ? data.operador_nome
         : null,
+    separador_uid:
+      typeof data.separador_uid === "string" && data.separador_uid.trim()
+        ? data.separador_uid
+        : null,
     criado_em: sanitizeDateString(data.criado_em) ?? new Date().toISOString(),
     assumido_em: sanitizeDateString((data as Partial<Chamado>).assumido_em),
     a_caminho_em: sanitizeDateString((data as Partial<Chamado>).a_caminho_em),
@@ -723,6 +727,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           batch.update(doc(db, CHAMADOS_COLLECTION, id), {
             status: isTelevendasChamado(chamadoAtual) ? ("Em separação" as Status) : ("Aguardando" as Status),
             operador_nome: operadorNome,
+            ...(scope.perfil === "Separador de Televendas" && isTelevendasChamado(chamadoAtual)
+              ? { separador_uid: auth?.currentUser?.uid ?? null }
+              : {}),
             assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
             ...(isTelevendasChamado(chamadoAtual) ? {} : equipamentoPayload),
@@ -769,6 +776,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
                 ...c,
                 status: isTelevendasChamado(c) ? ("Em separação" as Status) : c.status,
                 operador_nome: operadorNome,
+                ...(scope.perfil === "Separador de Televendas" && isTelevendasChamado(c)
+                  ? { separador_uid: auth?.currentUser?.uid ?? null }
+                  : {}),
                 assumido_em: c.assumido_em ?? new Date().toISOString(),
                 ...equipamentoPayload,
               }
@@ -1155,6 +1165,9 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         atualizado_em: atualizadoEm,
         atualizado_por: input.operadorNome,
         operador_nome: input.operadorNome,
+        ...(scope.perfil === "Separador de Televendas"
+          ? { separador_uid: auth?.currentUser?.uid ?? null }
+          : {}),
         cancelado_em: statusFinal === "Cancelado" ? atualizadoEm : null,
       };
 
