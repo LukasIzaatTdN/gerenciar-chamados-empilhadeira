@@ -50,10 +50,11 @@ export function useOperationalEscalations({ unitIds = [], canReadAll = false, ow
     }
     setItems([]);
     setSyncError(null);
-    const scopedQuery = scopes.length === 1
-      ? query(ref, where("unitId", "==", scopes[0]), orderBy("updatedAt", "desc"), limit(20))
-      : query(ref, where("unitId", "in", scopes), orderBy("updatedAt", "desc"), limit(20));
-    const q = canReadAll ? query(ref, orderBy("updatedAt", "desc"), limit(20)) : scopedQuery;
+    const q = canReadAll
+      ? query(ref, orderBy("updatedAt", "desc"), limit(20))
+      : scopes.length === 1
+        ? query(ref, where("unitId", "==", scopes[0]), orderBy("updatedAt", "desc"), limit(20))
+        : query(ref, where("unitId", "in", scopes), orderBy("updatedAt", "desc"), limit(20));
     return onSnapshot(q, (snapshot) => {
       const nextItems = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,

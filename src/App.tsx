@@ -195,7 +195,7 @@ export default function App() {
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
   const canViewAllCompanies = permissions.canViewAllCompanies;
-  const isAuthenticated = Boolean(usuarioAtual?.nome && perfilAcesso);
+  const isAuthenticated = authHydrated && Boolean(usuarioAtual?.nome && perfilAcesso);
   const { unitIds: assignedUnitIds, syncError: assignmentSyncError } = useUnidadesAtribuidas(
     isAuthenticated ? usuarioAtual : null
   );

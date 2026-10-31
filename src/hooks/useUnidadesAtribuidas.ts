@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { UsuarioSistema } from "../types/usuario";
 import { MAX_UNIDADES_POR_USUARIO, resolveAuthorizedUnitIds } from "../utils/tenant";
@@ -19,12 +19,13 @@ export function useUnidadesAtribuidas(usuario: UsuarioSistema | null) {
   const [state, setState] = useState<UnitAssignmentState>({ ownerId: null, unitIds: [], error: null });
 
   useEffect(() => {
+    const firestore = db;
     if (!userId || !usuario || perfil === "Administrador Geral") {
       setState({ ownerId: userId, unitIds: [], error: null });
       return;
     }
 
-    if (!db) {
+    if (!firestore) {
       setState({ ownerId: userId, unitIds: candidates, error: null });
       return;
     }
@@ -37,21 +38,27 @@ export function useUnidadesAtribuidas(usuario: UsuarioSistema | null) {
     setState({ ownerId: userId, unitIds: [], error: null });
     if (!empresaId || candidates.length === 0) return;
 
-    const candidateSet = new Set(candidates);
-    return onSnapshot(
-      collection(db, "usuarios", userId, "unidades"),
+    // Read only the declared links; do not require collection-wide list access.
+    const validated = new Set<string>();
+    const failures = new Map<string, string>();
+    const publish = () => setState({
+      ownerId: userId,
+      unitIds: candidates.filter((id) => validated.has(id)),
+      error: failures.size
+        ? `Falha ao validar os vínculos de unidade (${[...new Set(failures.values())].join(", ")}).`
+        : null,
+    });
+    const unsubscribers = candidates.slice(0, MAX_UNIDADES_POR_USUARIO).map((unitId) => onSnapshot(
+      doc(firestore, "usuarios", userId, "unidades", unitId),
       (snapshot) => {
-        const unitIds = snapshot.docs
-          .filter((assignment) => {
-            const data = assignment.data();
-            return candidateSet.has(assignment.id)
-              && data.supermercado_id === assignment.id
-              && data.empresa_id === empresaId
-              && data.status === "Ativo";
-          })
-          .map((assignment) => assignment.id)
-          .slice(0, MAX_UNIDADES_POR_USUARIO);
-        setState({ ownerId: userId, unitIds, error: null });
+        const data = snapshot.data();
+        if (data?.supermercado_id === unitId && data.empresa_id === empresaId && data.status === "Ativo") {
+          validated.add(unitId);
+        } else {
+          validated.delete(unitId);
+        }
+        failures.delete(unitId);
+        publish();
       },
       (error) => {
         console.warn("[firestore] unit assignments listen failed", {
@@ -59,13 +66,12 @@ export function useUnidadesAtribuidas(usuario: UsuarioSistema | null) {
           collection: "usuarios/{uid}/unidades",
           code: error.code || "unknown",
         });
-        setState({
-          ownerId: userId,
-          unitIds: [],
-          error: `Falha ao validar os vínculos de unidade (${error.code || "unknown"}).`,
-        });
+        validated.delete(unitId);
+        failures.set(unitId, error.code || "unknown");
+        publish();
       }
-    );
+    ));
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [userId, empresaId, perfil, requiresAssignmentDocs, candidates.join("|")]);
 
   return {

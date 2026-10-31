@@ -13,6 +13,10 @@ export function initializeOneSignal(): Promise<void> {
     safari_web_id: import.meta.env.VITE_ONESIGNAL_SAFARI_WEB_ID?.trim() || undefined,
     serviceWorkerPath: "onesignal/OneSignalSDKWorker.js",
     serviceWorkerParam: { scope: "/onesignal/" },
+  }).catch(() => {
+    // Push setup must not interrupt the operational application or expose config.
+    console.warn("[push] OneSignal initialization failed. Verifique o AppID e a origem configurada no OneSignal.");
+    initialization = undefined;
   });
 
   return initialization;
