@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { type ReactNode, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
@@ -945,6 +945,29 @@ export default function App() {
     }
   }
 
+  function renderAdminScreen(content: ReactNode, activeView: View, frameDashboard = false) {
+    if (!isPlatformAdmin) {
+      return frameDashboard ? <div className="app-page min-h-screen bg-transparent">{content}</div> : content;
+    }
+
+    return (
+      <div className="app-page min-h-screen bg-transparent">
+        <div className="admin-shell min-h-screen">
+          <div className="p-2 sm:p-3 md:p-5">
+            <AdminSidebar
+              activeView={activeView}
+              dark={tema === "dark"}
+              userName={operadorNome ?? "Administrador"}
+              onNavigate={navigateTo}
+              onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")}
+            />
+          </div>
+          <div className="min-w-0">{content}</div>
+        </div>
+      </div>
+    );
+  }
+
   function openLoginModal() {
     setShowLoginModal(true);
   }
@@ -1750,7 +1773,7 @@ export default function App() {
   if (view === "perfil" && operadorNome && perfilAcesso) {
     return (
       <>
-        <ProfileSettings
+        {renderAdminScreen(<ProfileSettings
           nome={operadorNome}
           perfil={perfilAcesso}
           supermercadoId={supermercadoId}
@@ -1774,7 +1797,7 @@ export default function App() {
           showManageUnidadesAction={permissions.canManageUnits}
           onManageUnidades={handleOpenUnidadesAdmin}
           onLogout={handleLogoutToLogin}
-        />
+        />, view)}
         {renderGlobalOverlays()}
       </>
     );
@@ -1783,10 +1806,7 @@ export default function App() {
   if (view === "dashboard" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)) {
     return (
       <>
-        <div className="app-page min-h-screen bg-transparent">
-          <div className={isPlatformAdmin ? "admin-shell min-h-screen" : ""}>
-          {isPlatformAdmin && <div className="p-2 sm:p-3 md:p-5"><AdminSidebar activeView={view} dark={tema === "dark"} userName={operadorNome ?? "Administrador"} onNavigate={navigateTo} onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")} /></div>}
-          <div className="min-w-0">
+        {renderAdminScreen(<>
           <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
@@ -2036,9 +2056,7 @@ export default function App() {
             </>
           )}
           </main>
-          </div>
-          </div>
-        </div>
+        </>, view, true)}
         {renderGlobalOverlays()}
       </>
     );
@@ -2047,6 +2065,7 @@ export default function App() {
   if (view === "unidades" && permissions.canManageUnits) {
     return (
       <>
+        {renderAdminScreen(<>
         <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
@@ -2094,6 +2113,7 @@ export default function App() {
           canSelectEmpresa={canViewAllCompanies}
           currentEmpresaId={empresaSelecionadaId}
         />
+        </>, view)}
         {renderGlobalOverlays()}
       </>
     );
@@ -2102,6 +2122,7 @@ export default function App() {
   if (view === "empresas" && permissions.canViewAllCompanies) {
     return (
       <>
+        {renderAdminScreen(<>
         <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
@@ -2147,18 +2168,20 @@ export default function App() {
           onVoltar={goBackToPreviousView}
           onOpenSubscriptions={() => navigateTo("assinaturas")}
         />
+        </>, view)}
         {renderGlobalOverlays()}
       </>
     );
   }
 
   if (view === "assinaturas" && permissions.canViewAllCompanies && perfilAcesso === "Administrador Geral") {
-    return <><AssinaturasAdmin empresas={empresas} actorName={operadorNome ?? "Administrador da Plataforma"} onBack={goBackToPreviousView} />{renderGlobalOverlays()}</>;
+    return <>{renderAdminScreen(<AssinaturasAdmin empresas={empresas} actorName={operadorNome ?? "Administrador da Plataforma"} onBack={goBackToPreviousView} />, view)}{renderGlobalOverlays()}</>;
   }
 
   if (view === "usuarios" && permissions.canViewAllUnits) {
     return (
       <>
+        {renderAdminScreen(<>
         <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
@@ -2221,6 +2244,7 @@ export default function App() {
           canSelectEmpresa={canViewAllCompanies}
           currentEmpresaId={empresaSelecionadaId}
         />
+        </>, view)}
         {renderGlobalOverlays()}
       </>
     );
