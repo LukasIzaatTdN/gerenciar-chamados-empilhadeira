@@ -10,6 +10,7 @@ import {
 } from "../types/empilhadeira";
 import { getEmpilhadeiraStatusEfetivo } from "../utils/empilhadeiraStatus";
 import { isChecklistEmpilhadeiraAprovado } from "../utils/checklistEmpilhadeira";
+import PageHeading from "./PageHeading";
 
 interface EmpilhadeirasAdminProps {
   empilhadeiras: Empilhadeira[];
@@ -292,31 +293,27 @@ export default function EmpilhadeirasAdmin({
   return (
     <div className="min-h-screen bg-transparent">
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mb-6 flex flex-col gap-3 rounded-[30px] border border-white/70 bg-white/75 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Administração de ativos
-            </p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-              Empilhadeiras
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Controle dos equipamentos da unidade atual, mantendo separação operacional entre supermercados.
-            </p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+        <PageHeading
+          eyebrow="Administração de ativos"
+          title="Empilhadeiras"
+          description="Controle dos equipamentos da unidade atual, mantendo separação operacional entre supermercados."
+          context={(
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-300" />
               {isAdminGeral ? `Recorte atual: ${currentSupermercadoNome}` : `Unidade atual: ${currentSupermercadoNome}`}
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={onVoltar}
-            className="touch-target inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all hover:bg-slate-50"
-          >
-            <span>←</span>
-            Voltar ao painel
-          </button>
-        </div>
+          )}
+          actions={(
+            <button
+              type="button"
+              onClick={onVoltar}
+              className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <span aria-hidden="true">←</span>
+              Voltar ao painel
+            </button>
+          )}
+        />
 
         <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           {[
