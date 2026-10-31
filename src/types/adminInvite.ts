@@ -3,7 +3,7 @@ export type AdminInviteStatus = "Pendente" | "Usado" | "Expirado" | "Cancelado";
 export interface AdminInvite {
   id: string;
   empresa_id: string;
-  perfil: "Administrador da Empresa";
+  perfil: "Gerente da Empresa" | "Administrador da Empresa";
   status: AdminInviteStatus;
   criado_em: string;
   expira_em: string;

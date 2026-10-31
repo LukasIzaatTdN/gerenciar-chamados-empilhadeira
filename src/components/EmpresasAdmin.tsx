@@ -71,20 +71,6 @@ function parseNullableNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "Nao definido";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return "Nao definido";
-  return date.toLocaleDateString("pt-BR");
-}
-
-function getPlanStatusClassName(status: PlanoStatus) {
-  if (status === "Ativo") return "bg-emerald-100 text-emerald-700";
-  if (status === "Teste") return "bg-sky-100 text-sky-700";
-  if (status === "Suspenso") return "bg-amber-100 text-amber-700";
-  return "bg-rose-100 text-rose-700";
-}
-
 export default function EmpresasAdmin({
   empresas,
   onCreate,

@@ -248,10 +248,10 @@ test("platform admin writes must reject unknown statuses and invalid amounts", a
   await assertFails(updateDoc(doc(db, "empresas/empresa-a/assinaturas/atual"), { status: "Unexpected" }));
 });
 
-test("company administrators and clients cannot cross tenant subscription or history boundaries", async () => {
+test("legacy company administrator profile has no inherited subscription or history access", async () => {
   const companyA = environment.authenticatedContext("company-admin-a").firestore();
-  await assertSucceeds(getDoc(doc(companyA, "empresas/empresa-a/assinaturas/atual")));
-  await assertSucceeds(getDoc(doc(companyA, "empresas/empresa-a/historico_assinatura/evento-1")));
+  await assertFails(getDoc(doc(companyA, "empresas/empresa-a/assinaturas/atual")));
+  await assertFails(getDoc(doc(companyA, "empresas/empresa-a/historico_assinatura/evento-1")));
   await assertFails(getDoc(doc(companyA, "empresas/empresa-b/assinaturas/atual")));
   await assertFails(getDoc(doc(companyA, "empresas/empresa-b/historico_assinatura/evento-1")));
   await assertFails(setDoc(doc(companyA, "planos/empresa-plan"), { nome: "Plano indevido", valor_centavos: 1 }));

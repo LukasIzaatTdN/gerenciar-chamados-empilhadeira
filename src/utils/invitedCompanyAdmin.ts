@@ -1,8 +1,8 @@
 import type { UsuarioSistema } from "../types/usuario";
 
-export function isInvitedCompanyAdmin(usuario: UsuarioSistema): boolean {
+export function isInvitedCompanyManager(usuario: UsuarioSistema): boolean {
   return (
-    usuario.perfil === "Administrador da Empresa" &&
+    usuario.perfil === "Gerente da Empresa" &&
     typeof usuario.convite_token === "string" &&
     usuario.convite_token.trim().length > 0
   );

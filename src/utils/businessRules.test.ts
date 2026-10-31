@@ -61,13 +61,14 @@ assert.doesNotThrow(() =>
   })
 );
 
-assert.doesNotThrow(() =>
+assert.throws(() =>
   assertUserAccess({
     isAuthenticated: true,
     userId: "user-1",
-    perfil: "Administrador da Empresa",
+    perfil: "Gerente da Empresa",
     requiredAction: "manage_usuario",
-  })
+  }),
+  /autorização/
 );
 
 assert.throws(

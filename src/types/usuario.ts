@@ -5,6 +5,7 @@ export type PerfilAcesso =
   | "Supervisor"
   | "Televendas"
   | "Separador de Televendas"
+  | "Gerente da Empresa"
   | "Administrador da Empresa"
   | "Administrador Geral";
 
@@ -17,6 +18,7 @@ export interface UsuarioSistema {
   empresa_id: string | null;
   supermercado_id: string | null;
   supermercado_ids?: string[];
+  vinculos_unidades_v2?: boolean;
   status?: UsuarioStatus;
   email?: string;
   telefone?: string;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Empresa } from "../types/empresa";
 import type { Supermercado } from "../types/supermercado";
 import type { PerfilAcesso, UsuarioSistema } from "../types/usuario";
+import { MAX_UNIDADES_POR_USUARIO } from "../utils/tenant";
 import type { AdminInvite } from "../types/adminInvite";
 
 interface UsuariosAdminProps {
@@ -29,14 +30,11 @@ interface UsuariosAdminProps {
 }
 
 const PERFIS: PerfilAcesso[] = [
-  "Promotor",
-  "Funcionário",
+  "Administrador Geral",
+  "Gerente da Empresa",
   "Operador",
-  "Supervisor",
   "Televendas",
   "Separador de Televendas",
-  "Administrador da Empresa",
-  "Administrador Geral",
 ];
 
 function formatDate(iso?: string) {
@@ -149,9 +147,9 @@ export default function UsuariosAdmin({
         : (canSelectEmpresa ? editEmpresaId : currentEmpresaId) || null;
 
     const selectedSupermercadoIds =
-      editPerfil === "Administrador Geral" || editPerfil === "Administrador da Empresa"
+      editPerfil === "Administrador Geral"
         ? []
-        : editPerfil === "Promotor"
+        : editPerfil === "Gerente da Empresa"
           ? editSupermercadoIds.length > 0
             ? editSupermercadoIds
             : editSupermercadoId
@@ -170,7 +168,7 @@ export default function UsuariosAdmin({
 
     if (
       editPerfil !== "Administrador Geral" &&
-      editPerfil !== "Administrador da Empresa" &&
+      editPerfil !== "Gerente da Empresa" &&
       selectedSupermercadoIds.length === 0
     ) {
       setError("Selecione pelo menos uma unidade para este perfil.");
@@ -268,7 +266,7 @@ export default function UsuariosAdmin({
         {canCreateAdminInvite && (
           <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Convite Admin da Empresa
+              Convite Gerente da Empresa
             </h2>
             <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
               {canSelectEmpresa ? (
@@ -398,11 +396,11 @@ export default function UsuariosAdmin({
                               setEditSupermercadoId("");
                               setEditSupermercadoIds([]);
                             }
-                            if (next === "Administrador da Empresa") {
+                            if (next === "Gerente da Empresa") {
                               setEditSupermercadoId("");
                               setEditSupermercadoIds([]);
                             }
-                            if (next === "Promotor") {
+                            if (next === "Gerente da Empresa") {
                               setEditSupermercadoIds((prev) => prev.length > 0 ? prev : editSupermercadoId ? [editSupermercadoId] : []);
                             }
                           }}
@@ -456,7 +454,7 @@ export default function UsuariosAdmin({
                       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Unidade</p>
                       {isEditing ? (
                         <>
-                          {editPerfil === "Promotor" ? (
+                          {editPerfil === "Gerente da Empresa" ? (
                             <>
                               <select
                                 multiple
@@ -464,6 +462,11 @@ export default function UsuariosAdmin({
                                 value={editSupermercadoIds}
                                 onChange={(e) => {
                                   const nextValues = Array.from(e.target.selectedOptions, (option) => option.value);
+                                  if (nextValues.length > MAX_UNIDADES_POR_USUARIO) {
+                                    setError(`Cada usuário pode ter até ${MAX_UNIDADES_POR_USUARIO} unidades atribuídas.`);
+                                    return;
+                                  }
+                                  setError(null);
                                   setEditSupermercadoIds(nextValues);
                                   setEditSupermercadoId(nextValues[0] ?? "");
                                 }}
@@ -476,16 +479,13 @@ export default function UsuariosAdmin({
                                 ))}
                               </select>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                Mantém todas as lojas selecionadas e usa a primeira como ativa.
+                                Até {MAX_UNIDADES_POR_USUARIO} lojas. A primeira selecionada é a unidade principal.
                               </p>
                             </>
                           ) : (
                             <select
                               value={editSupermercadoId}
-                              disabled={
-                                editPerfil === "Administrador Geral" ||
-                                editPerfil === "Administrador da Empresa"
-                              }
+                              disabled={editPerfil === "Administrador Geral"}
                               onChange={(e) => {
                                 const nextValue = e.target.value;
                                 setEditSupermercadoId(nextValue);
@@ -494,9 +494,7 @@ export default function UsuariosAdmin({
                               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100"
                             >
                               <option value="">
-                                {editPerfil === "Administrador da Empresa"
-                                  ? "Todas as unidades da empresa"
-                                  : editPerfil === "Administrador Geral"
+                                {editPerfil === "Administrador Geral"
                                     ? "Todas as unidades"
                                     : "Selecione a unidade"}
                               </option>

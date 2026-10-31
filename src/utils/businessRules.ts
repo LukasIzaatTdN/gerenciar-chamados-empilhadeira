@@ -93,46 +93,35 @@ export function assertUserAccess(input: UserAccessInput): void {
 
   const allowedByAction: Record<BusinessAction, readonly string[]> = {
     create_chamado: [
-      "Promotor",
-      "Funcionário",
       "Televendas",
       "Separador de Televendas",
-      "Administrador da Empresa",
       "Administrador Geral",
     ],
     assume_chamado: [
       "Operador",
-      "Supervisor",
       "Separador de Televendas",
-      "Administrador da Empresa",
       "Administrador Geral",
     ],
     start_chamado: [
       "Operador",
-      "Supervisor",
       "Separador de Televendas",
-      "Administrador da Empresa",
       "Administrador Geral",
     ],
     finish_chamado: [
       "Operador",
-      "Supervisor",
       "Separador de Televendas",
-      "Administrador da Empresa",
       "Administrador Geral",
     ],
-    manage_empilhadeira: ["Supervisor", "Administrador da Empresa", "Administrador Geral"],
-    manage_manutencao: ["Supervisor", "Administrador da Empresa", "Administrador Geral"],
-    manage_empresa: ["Administrador da Empresa", "Administrador Geral"],
-    manage_unidade: ["Administrador da Empresa", "Administrador Geral"],
-    manage_usuario: ["Administrador da Empresa", "Administrador Geral"],
+    manage_empilhadeira: ["Administrador Geral"],
+    manage_manutencao: ["Operador", "Separador de Televendas", "Administrador Geral"],
+    manage_empresa: ["Administrador Geral"],
+    manage_unidade: ["Administrador Geral"],
+    manage_usuario: ["Administrador Geral"],
     view_dashboard: [
-      "Supervisor",
-      "Separador de Televendas",
-      "Administrador da Empresa",
+      "Gerente da Empresa",
       "Administrador Geral",
     ],
-    manage_users: ["Administrador da Empresa", "Administrador Geral"],
+    manage_users: ["Administrador Geral"],
   };
 
   const allowed = allowedByAction[input.requiredAction];

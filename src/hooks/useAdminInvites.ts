@@ -21,7 +21,7 @@ function normalizeInvite(data: Partial<AdminInvite>, fallbackId: string): AdminI
   return {
     id: data.id ?? fallbackId,
     empresa_id: typeof data.empresa_id === "string" ? data.empresa_id : "",
-    perfil: "Administrador da Empresa",
+    perfil: data.perfil === "Administrador da Empresa" ? "Administrador da Empresa" : "Gerente da Empresa",
     status:
       data.status === "Usado" || data.status === "Expirado" || data.status === "Cancelado"
         ? data.status
@@ -114,7 +114,7 @@ export function useAdminInvites(scope: AdminInvitesScope) {
       const invite: AdminInvite = {
         id: token,
         empresa_id: input.empresa_id,
-        perfil: "Administrador da Empresa",
+        perfil: "Gerente da Empresa",
         status: "Pendente",
         criado_em: now.toISOString(),
         expira_em: expiraEm.toISOString(),

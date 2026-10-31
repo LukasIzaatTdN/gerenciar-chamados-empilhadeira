@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { Manutencao, NovaManutencaoInput } from "../types/manutencao";
 import type { Empilhadeira } from "../types/empilhadeira";
 import { resolveEmpresaId } from "../utils/tenant";
 import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
+import { matchesFirestoreUnitScope, queryByUnitScope } from "../utils/firestoreUnitScope";
 
 const MANUTENCOES_COLLECTION = "manutencoes";
 
 interface ManutencaoScope {
+  userId?: string | null;
   empresaId: string | null;
   supermercadoId: string | null;
+  supermercadoIds?: string[];
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
   perfil?: string | null;
@@ -45,29 +48,25 @@ function createLocalId() {
 
 export function useManutencoes(scope: ManutencaoScope) {
   const [manutencoes, setManutencoes] = useState<Manutencao[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!db) {
       setManutencoes([]);
+      setSyncError(null);
       return;
     }
-
-    if (!scope.canViewAllCompanies && !scope.empresaId) {
+    setManutencoes([]);
+    setSyncError(null);
+    const manutencoesQuery = queryByUnitScope(
+      collection(db, MANUTENCOES_COLLECTION),
+      "supermercado_id",
+      scope
+    );
+    if (!manutencoesQuery) {
       setManutencoes([]);
       return;
     }
-
-    const manutencoesQuery = scope.canViewAllCompanies
-      ? query(collection(db, MANUTENCOES_COLLECTION))
-      : !scope.canViewAllUnits && scope.supermercadoId
-        ? query(
-            collection(db, MANUTENCOES_COLLECTION),
-            where("supermercado_id", "==", scope.supermercadoId)
-          )
-        : query(
-            collection(db, MANUTENCOES_COLLECTION),
-            where("empresa_id", "==", scope.empresaId)
-          );
 
     return onSnapshot(
       manutencoesQuery,
@@ -76,8 +75,7 @@ export function useManutencoes(scope: ManutencaoScope) {
           .map((snapshotDoc) =>
             normalizeManutencao(snapshotDoc.data() as Partial<Manutencao>, snapshotDoc.id)
           )
-          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
-          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => matchesFirestoreUnitScope(scope, item.empresa_id, item.supermercado_id))
           .sort(
             (a, b) =>
               new Date(b.data_abertura).getTime() - new Date(a.data_abertura).getTime()
@@ -85,9 +83,17 @@ export function useManutencoes(scope: ManutencaoScope) {
 
         setManutencoes(remote);
       },
-      () => setManutencoes([])
+      (error) => {
+        console.warn("[firestore] manutencoes.listen failed", {
+          operation: "manutencoes.listen",
+          collection: MANUTENCOES_COLLECTION,
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar manutenções (${error.code || "unknown"}).`);
+        setManutencoes([]);
+      }
     );
-  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
+  }, [scope.userId, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId, scope.supermercadoIds?.join("|")]);
 
   const createManutencao = useCallback(
     async (input: NovaManutencaoInput, empilhadeira: Empilhadeira) => {
@@ -205,6 +211,7 @@ export function useManutencoes(scope: ManutencaoScope) {
 
   return {
     manutencoes,
+    syncError,
     createManutencao,
     updateManutencao,
   };

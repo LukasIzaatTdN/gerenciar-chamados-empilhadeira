@@ -42,6 +42,7 @@ import { useManutencoes } from "./hooks/useManutencoes";
 import { useAdminInvites } from "./hooks/useAdminInvites";
 import { useAuditoria } from "./hooks/useAuditoria";
 import { useOperationalEscalations } from "./hooks/useOperationalEscalations";
+import { useUnidadesAtribuidas } from "./hooks/useUnidadesAtribuidas";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -53,7 +54,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import type { Chamado } from "./types/chamado";
 import type { EmpilhadeiraStatus } from "./types/empilhadeira";
 import type {
@@ -65,7 +66,8 @@ import type {
 import { auth, db, hasFirebaseConfig } from "./config/firebase";
 import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
-import { isInvitedCompanyAdmin } from "./utils/invitedCompanyAdmin";
+import { isInvitedCompanyManager } from "./utils/invitedCompanyAdmin";
+import { resolveAuthorizedUnitIds } from "./utils/tenant";
 import { normalizeGovernanceMessage } from "./utils/governanceMessages";
 import { getOperationalAlerts } from "./utils/operationalAlerts";
 import { getOperationalActionPlan } from "./utils/operationalActionPlan";
@@ -107,6 +109,7 @@ function isPerfilAcesso(value: unknown): value is UsuarioSistema["perfil"] {
     value === "Supervisor" ||
     value === "Televendas" ||
     value === "Separador de Televendas" ||
+    value === "Gerente da Empresa" ||
     value === "Administrador da Empresa" ||
     value === "Administrador Geral"
   );
@@ -116,6 +119,7 @@ function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
   if (perfil === "Operador" || perfil === "Separador de Televendas") return "operador";
   if (
     perfil === "Supervisor" ||
+    perfil === "Gerente da Empresa" ||
     perfil === "Administrador da Empresa" ||
     perfil === "Administrador Geral"
   ) {
@@ -185,11 +189,15 @@ export default function App() {
   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
   const [adminChamadoSupermercadoId, setAdminChamadoSupermercadoId] = useState<string>("");
+  const [selectedAssignedUnitId, setSelectedAssignedUnitId] = useState<string>("");
   const criticalEscalationUnitIdsRef = useRef(new Set<string>());
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
   const canViewAllCompanies = permissions.canViewAllCompanies;
   const isAuthenticated = Boolean(usuarioAtual?.nome && perfilAcesso);
+  const { unitIds: assignedUnitIds, syncError: assignmentSyncError } = useUnidadesAtribuidas(
+    isAuthenticated ? usuarioAtual : null
+  );
   const {
     empresas,
     createEmpresa,
@@ -203,12 +211,15 @@ export default function App() {
   });
   const {
     unidades: supermercados,
+    syncError: unidadesSyncError,
     createUnidade: createSupermercado,
     updateUnidade: updateSupermercado,
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
+    userId: usuarioAtual?.id ?? null,
     empresaId: isAuthenticated ? usuarioAtual?.empresa_id ?? null : null,
     supermercadoId: isAuthenticated ? usuarioAtual?.supermercado_id ?? null : null,
+    supermercadoIds: assignedUnitIds,
     canViewAllUnits: permissions.canViewAllUnits,
     canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
     perfil: perfilAcesso,
@@ -253,13 +264,35 @@ export default function App() {
         : supermercados,
     [empresaSelecionadaId, supermercados]
   );
+  const activeAssignedUnitIds = useMemo(
+    () => assignedUnitIds.filter((unitId) => supermercados.some(
+      (unit) => unit.id === unitId && unit.status === "Ativo" && unit.empresa_id === empresaId
+    )),
+    [assignedUnitIds, empresaId, supermercados]
+  );
+  const activeAssignedUnits = useMemo(
+    () => supermercados.filter((unit) => activeAssignedUnitIds.includes(unit.id)),
+    [activeAssignedUnitIds, supermercados]
+  );
   const supermercadoSelecionadoId =
     canViewAllUnits && adminSupermercadoFiltro !== "todos"
       ? adminSupermercadoFiltro
-      : supermercadoId;
+      : canViewAllUnits
+      ? null
+      : selectedAssignedUnitId && activeAssignedUnitIds.includes(selectedAssignedUnitId)
+      ? selectedAssignedUnitId
+      : perfilAcesso === "Gerente da Empresa"
+      ? null
+      : activeAssignedUnitIds.includes(supermercadoId ?? "")
+      ? supermercadoId
+      : activeAssignedUnitIds[0] ?? null;
+  const queryAssignedUnitIds = canViewAllUnits ? [] : activeAssignedUnitIds;
+  const canViewAssignedConsolidated = perfilAcesso === "Gerente da Empresa";
   const unidadeAtualNome =
     canViewAllUnits && adminSupermercadoFiltro === "todos"
       ? "Todas as unidades"
+      : perfilAcesso === "Gerente da Empresa" && !supermercadoSelecionadoId
+      ? "Todas as unidades atribuídas"
       : getUnidadeById(supermercadoSelecionadoId, supermercados)?.nome ?? supermercadoNome ?? "Unidade não definida";
   const nomeEscopoAtual =
     canViewAllCompanies && adminEmpresaFiltro === "todas"
@@ -278,25 +311,32 @@ export default function App() {
   );
   const {
     empilhadeiras,
+    syncError: empilhadeirasSyncError,
     createEmpilhadeira,
     updateEmpilhadeira,
     updateEmpilhadeiraStatus,
   } = useEmpilhadeiras({
+    userId: operadorId,
     empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
+    supermercadoIds: queryAssignedUnitIds,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
     canViewAllCompanies,
     perfil: perfilAcesso,
   });
-  const { checklists, createChecklist } = useChecklistsEmpilhadeira({
+  const { checklists, syncError: checklistsSyncError, createChecklist } = useChecklistsEmpilhadeira({
+    userId: operadorId,
     empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
+    supermercadoIds: queryAssignedUnitIds,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
     canViewAllCompanies,
   });
-  const { manutencoes, createManutencao, updateManutencao } = useManutencoes({
+  const { manutencoes, syncError: manutencoesSyncError, createManutencao, updateManutencao } = useManutencoes({
+    userId: operadorId,
     empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
+    supermercadoIds: queryAssignedUnitIds,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
     canViewAllCompanies,
     perfil: perfilAcesso,
@@ -457,8 +497,10 @@ export default function App() {
     finalizarChamado,
   } = useChamados(
     {
+      userId: operadorId,
       empresaId: empresaSelecionadaId,
       supermercadoId: supermercadoSelecionadoId,
+      supermercadoIds: queryAssignedUnitIds,
       canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
       canViewAllCompanies,
       perfil: perfilAcesso,
@@ -491,7 +533,17 @@ export default function App() {
     () => getOperationalEscalationSummary(allChamados, supermercados),
     [allChamados, supermercados]
   );
-  const operationalEscalationHistory = useOperationalEscalations();
+  const { items: operationalEscalationHistory, syncError: escalationsSyncError } = useOperationalEscalations({
+    unitIds: canViewAllUnits
+      ? []
+      : supermercadoSelecionadoId
+        ? [supermercadoSelecionadoId]
+        : canViewAssignedConsolidated
+          ? queryAssignedUnitIds
+          : [],
+    canReadAll: permissions.canViewAllCompanies,
+    ownerId: operadorId,
+  });
   useEffect(() => {
     const canReceiveOperationalAlerts =
       authHydrated &&
@@ -524,7 +576,7 @@ export default function App() {
         .filter(
           (usuario) =>
             usuario.perfil === "Supervisor" &&
-            usuario.supermercado_id === item.unitId &&
+            resolveAuthorizedUnitIds(usuario.supermercado_id, usuario.supermercado_ids).includes(item.unitId) &&
             typeof usuario.telefone === "string" &&
             usuario.telefone.trim()
         )
@@ -563,11 +615,13 @@ export default function App() {
     [allChamados, supermercados]
   );
   const slaSummary = useMemo(() => getUnitSlaSummary(allChamados, supermercados), [allChamados, supermercados]);
-  const auditoriaRecente = useAuditoria({
+  const { items: auditoriaRecente, syncError: auditoriaSyncError } = useAuditoria({
     empresaId: empresaSelecionadaId,
     supermercadoId: supermercadoSelecionadoId,
+    supermercadoIds: queryAssignedUnitIds,
     canViewAllCompanies,
     canViewAllUnits: canViewAllUnits && adminSupermercadoFiltro === "todos",
+    ownerId: operadorId,
   });
   const dashboardStats = useMemo(
     () => ({
@@ -740,15 +794,12 @@ export default function App() {
                       typeof userData.supermercado_id === "string"
                         ? userData.supermercado_id
                         : null,
-                    supermercado_ids:
-                      Array.isArray(userData.supermercado_ids)
-                        ? userData.supermercado_ids.filter(
-                            (item): item is string =>
-                              typeof item === "string" && item.trim().length > 0
-                          )
-                        : typeof userData.supermercado_id === "string"
-                        ? [userData.supermercado_id]
-                        : [],
+                    supermercado_ids: resolveAuthorizedUnitIds(
+                      userData.supermercado_id,
+                      userData.supermercado_ids
+                    ),
+                    vinculos_unidades_v2:
+                      userData.vinculos_unidades_v2 === true || Array.isArray(userData.supermercado_ids),
                   };
                   await applyUsuarioResolved(usuarioResolved);
                   setAuthHydrated(true);
@@ -820,6 +871,10 @@ export default function App() {
     }
   }, [canViewAllUnits]);
 
+  useEffect(() => {
+    setSelectedAssignedUnitId("");
+  }, [operadorId]);
+
   const chamadosVisiveis = useMemo(() => {
     if (permissions.canTrackOwnChamados && operadorNome) {
       return chamados.filter((chamado) => chamado.solicitante_nome === operadorNome);
@@ -863,6 +918,16 @@ export default function App() {
   }, [isAuthenticated, perfilAcesso, safeFallbackView, view]);
 
   function renderGlobalOverlays() {
+    const syncErrors = [
+      assignmentSyncError,
+      unidadesSyncError,
+      syncError,
+      empilhadeirasSyncError,
+      checklistsSyncError,
+      manutencoesSyncError,
+      escalationsSyncError,
+      auditoriaSyncError,
+    ].filter((message): message is string => Boolean(message));
     return (
       <>
         {showForm && (
@@ -872,17 +937,17 @@ export default function App() {
             supermercadoNome={
               permissions.canViewAllUnits
                 ? getUnidadeById(adminChamadoSupermercadoId, supermercados)?.nome ?? null
-                : supermercadoNome
+                : unidadeAtualNome
             }
             isAdminGeral={permissions.canViewAllUnits}
-            supermercados={supermercadosDoEscopo}
+            supermercados={permissions.canViewAllUnits ? supermercadosDoEscopo : activeAssignedUnits}
             supermercadoSelecionadoId={adminChamadoSupermercadoId}
             onSupermercadoSelecionadoChange={setAdminChamadoSupermercadoId}
             onSubmit={async (data) => {
               await runGovernanceAction("Não foi possível abrir o chamado", async () => {
                 const supermercadoChamadoId = permissions.canViewAllUnits
                   ? adminChamadoSupermercadoId
-                  : supermercadoId;
+                  : supermercadoSelecionadoId;
                 const empresaChamadoId =
                   getUnidadeById(supermercadoChamadoId, supermercados)?.empresa_id ?? empresaId;
 
@@ -915,6 +980,15 @@ export default function App() {
             authMode={hasFirebaseConfig ? "firebase" : "local"}
             hasActiveSession={Boolean(auth?.currentUser)}
           />
+        )}
+
+        {syncErrors.length > 0 && (
+          <div role="alert" aria-live="polite" className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-900 shadow-xl">
+            <p className="font-bold">Falhas de sincronização</p>
+            <ul className="mt-1 list-inside list-disc">
+              {[...new Set(syncErrors)].map((message) => <li key={message}>{message}</li>)}
+            </ul>
+          </div>
         )}
 
         <NotificationToast toasts={toasts} onDismiss={dismissToast} />
@@ -995,6 +1069,7 @@ export default function App() {
 
     if (
       usuarioPersistido.perfil === "Supervisor" ||
+      usuarioPersistido.perfil === "Gerente da Empresa" ||
       usuarioPersistido.perfil === "Administrador da Empresa" ||
       usuarioPersistido.perfil === "Administrador Geral"
     ) {
@@ -1108,9 +1183,9 @@ export default function App() {
         invite = await validateInviteToken(inviteToken);
       }
 
-      const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
-      const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
-      const supermercadoFinal = invite ? null : input.supermercado_id;
+      const perfilFinal = invite ? ("Gerente da Empresa" as const) : input.perfil;
+      const empresaFinal = invite ? invite.empresa_id : null;
+      const supermercadoFinal = null;
 
       await setDoc(
         doc(db, "usuarios", createdUid),
@@ -1198,9 +1273,9 @@ export default function App() {
         invite = await validateInviteToken(inviteToken);
       }
 
-      const perfilFinal = invite ? ("Administrador da Empresa" as const) : input.perfil;
-      const empresaFinal = invite ? invite.empresa_id : input.empresa_id;
-      const supermercadoFinal = invite ? null : input.supermercado_id;
+      const perfilFinal = invite ? ("Gerente da Empresa" as const) : input.perfil;
+      const empresaFinal = invite ? invite.empresa_id : null;
+      const supermercadoFinal = null;
       const nomeFinal =
         input.nome.trim() || credential.user.displayName?.trim() || "Usuário";
       const emailFinal = credential.user.email?.trim().toLowerCase() ?? null;
@@ -1616,33 +1691,18 @@ export default function App() {
     await runGovernanceAction(
       "Não foi possível trocar de unidade",
       async () => {
-        if (!usuarioAtual) return;
-        if (!nextSupermercadoId || nextSupermercadoId === usuarioAtual.supermercado_id) return;
-
-        const unidadeAtiva = supermercados.find(
-          (item) => item.id === nextSupermercadoId && item.status === "Ativo"
-        );
-        if (!unidadeAtiva) return;
-
-        if (hasFirebaseConfig && db && auth?.currentUser?.uid === usuarioAtual.id) {
-          await updateDoc(doc(db, "usuarios", usuarioAtual.id), {
-            empresa_id: unidadeAtiva.empresa_id,
-            supermercado_id: nextSupermercadoId,
-            supermercado_ids: [nextSupermercadoId],
-            atualizado_em: new Date().toISOString(),
-          });
+        if (!usuarioAtual || !nextSupermercadoId) return;
+        if (!activeAssignedUnitIds.includes(nextSupermercadoId)) {
+          throw new Error("A unidade não está atribuída a este usuário ou está inativa.");
         }
 
-        setUsuarioAtual((prev) =>
-          prev
-            ? {
-                ...prev,
-                empresa_id: unidadeAtiva.empresa_id,
-                supermercado_id: nextSupermercadoId,
-                supermercado_ids: [nextSupermercadoId],
-              }
-            : prev
+        const unidadeAtiva = supermercados.find(
+          (item) => item.id === nextSupermercadoId
+            && item.status === "Ativo"
+            && item.empresa_id === usuarioAtual.empresa_id
         );
+        if (!unidadeAtiva) throw new Error("A unidade não está ativa na empresa vinculada.");
+        setSelectedAssignedUnitId(nextSupermercadoId);
       },
       {
         title: "Unidade atualizada",
@@ -1719,7 +1779,7 @@ export default function App() {
           operadorId={operadorId ?? ""}
           operadorNome={operadorNome}
           supermercadoId={supermercadoId}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
           operadorStatus={operadorStatus}
           onStatusChange={setOperadorStatus}
           onAssumir={assumirChamado}
@@ -1753,7 +1813,7 @@ export default function App() {
           nome={operadorNome}
           perfil={perfilAcesso}
           supermercadoId={supermercadoId}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
           supermercados={supermercados}
           setorPrincipal={setorPrincipal}
           notificacoesAtivas={notificacoesAtivas}
@@ -1802,7 +1862,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isCompanyAdmin && !isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2060,7 +2124,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2115,7 +2183,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2172,7 +2244,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2194,7 +2270,7 @@ export default function App() {
           empresas={empresas}
           usuarios={
             canViewAllCompanies
-              ? usuarios.filter(isInvitedCompanyAdmin)
+              ? usuarios.filter(isInvitedCompanyManager)
               : usuarios.filter((usuario) => usuario.empresa_id === empresaSelecionadaId)
           }
           supermercados={supermercadosDoEscopo}
@@ -2242,7 +2318,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2308,7 +2388,11 @@ export default function App() {
           syncMode={hasFirebaseConfig ? "firebase" : "local"}
           perfilAcesso={perfilAcesso}
           usuarioNome={operadorNome}
-          supermercadoNome={supermercadoNome}
+          supermercadoNome={unidadeAtualNome}
+          authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+          selectedUnitId={supermercadoSelecionadoId}
+          allowConsolidatedUnitView={canViewAssignedConsolidated}
+          onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
           showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
           showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
           showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}
@@ -2372,7 +2456,11 @@ export default function App() {
         syncMode={hasFirebaseConfig ? "firebase" : "local"}
         perfilAcesso={perfilAcesso}
         usuarioNome={operadorNome}
-        supermercadoNome={supermercadoNome}
+        supermercadoNome={unidadeAtualNome}
+        authorizedUnits={canViewAllUnits ? [] : activeAssignedUnits}
+        selectedUnitId={supermercadoSelecionadoId}
+        allowConsolidatedUnitView={canViewAssignedConsolidated}
+        onAuthorizedUnitChange={(unitId) => setSelectedAssignedUnitId(unitId ?? "")}
         showCreateAction={!isPlatformAdmin && permissions.canCreateChamado}
         showOperatorAction={!isPlatformAdmin && permissions.canAccessOperatorPanel}
         showDashboardAction={perfilAcesso !== "Separador de Televendas" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)}

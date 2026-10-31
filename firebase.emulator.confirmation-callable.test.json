@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "source": "functions/tests/emulator/confirmation-callable-prototype",
+    "runtime": "nodejs22"
+  },
+  "firestore": { "rules": "firestore.rules" },
+  "emulators": {
+    "auth": { "host": "127.0.0.1", "port": 18991 },
+    "functions": { "host": "127.0.0.1", "port": 18992 },
+    "firestore": { "host": "127.0.0.1", "port": 18993 },
+    "hub": { "host": "127.0.0.1", "port": 18990 },
+    "logging": { "host": "127.0.0.1", "port": 18994 },
+    "ui": { "enabled": false }
+  }
+}

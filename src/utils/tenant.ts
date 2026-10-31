@@ -1,5 +1,28 @@
 export const LEGACY_EMPRESA_ID = "empresa-padrao";
 export const LEGACY_EMPRESA_NOME = "Empresa Padrão";
+export const MAX_UNIDADES_POR_USUARIO = 8;
+
+export function resolveAuthorizedUnitIds(
+  supermercadoId: string | null | undefined,
+  supermercadoIds: unknown,
+  maxUnits = MAX_UNIDADES_POR_USUARIO
+) {
+  if (Array.isArray(supermercadoIds)) {
+    const cleaned = supermercadoIds.filter(
+      (item): item is string => typeof item === "string" && item.trim().length > 0
+    ).map((item) => item.trim());
+    if (
+      cleaned.length !== supermercadoIds.length ||
+      new Set(cleaned).size !== cleaned.length ||
+      cleaned.length > maxUnits
+    ) return [];
+    return cleaned;
+  }
+
+  return typeof supermercadoId === "string" && supermercadoId.trim()
+    ? [supermercadoId.trim()]
+    : [];
+}
 
 export function sanitizeTenantId(value: string) {
   return value

@@ -1,0 +1,1401 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasCurrentUserDoc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function isCurrentUserActive() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn() && userData.get("status", "Ativo") == "Ativo";
+    }
+
+    function isAdminGeral() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn()
+        && userData.get("status", "Ativo") == "Ativo"
+        && userData.get("perfil", null) == "Administrador Geral";
+    }
+
+    // SaaS privilege is intentionally stricter than the shared operational helper:
+    // a missing user status must never grant platform subscription management.
+    function isActiveSaasPlatformAdmin() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn()
+        && userData.get("perfil", null) == "Administrador Geral"
+        && userData.get("status", null) == "Ativo";
+    }
+
+    function isActiveSaasCompanyAdmin(empresaId) {
+      return false;
+    }
+
+    function isSaasPlanValid(planId, data) {
+      return data.keys().hasOnly([
+          "id", "nome", "descricao", "valor_centavos", "ciclo", "limite_usuarios",
+          "limite_filiais", "status", "criado_em", "atualizado_em", "ultima_operacao_id"
+        ])
+        && data.id == planId
+        && data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 80
+        && data.descricao is string && data.descricao.size() <= 500
+        && data.valor_centavos is int && data.valor_centavos >= 0 && data.valor_centavos <= 100000000
+        && data.ciclo in ["Mensal", "Trimestral", "Semestral", "Anual"]
+        && (data.limite_usuarios == null || (data.limite_usuarios is int && data.limite_usuarios >= 1 && data.limite_usuarios <= 100000))
+        && (data.limite_filiais == null || (data.limite_filiais is int && data.limite_filiais >= 1 && data.limite_filiais <= 100000))
+        && data.status in ["Ativo", "Inativo"]
+        && data.criado_em is timestamp && data.atualizado_em == request.time
+        && data.ultima_operacao_id is string;
+    }
+
+    function saasHistoryPath(empresaId, operationId) {
+      return /databases/$(database)/documents/empresas/$(empresaId)/historico_assinatura/$(operationId);
+    }
+
+    function saasAuditPath(operationId) {
+      return /databases/$(database)/documents/auditoria_assinaturas/$(operationId);
+    }
+
+    function saasOperationPath(operationId) {
+      return /databases/$(database)/documents/assinatura_operacoes/$(operationId);
+    }
+
+    function isSaasSubscriptionValid(empresaId, data, oldData, operationId, action) {
+      let planPath = /databases/$(database)/documents/planos/$(data.plano_id);
+      let plan = get(planPath).data;
+      let companyPath = /databases/$(database)/documents/empresas/$(empresaId);
+      let event = getAfter(saasHistoryPath(empresaId, operationId)).data;
+      let priorStatus = "status" in oldData ? oldData.status : null;
+      let allowedTransition = action == "assignPlan"
+          ? (priorStatus == null ? data.status == "Pendente" : priorStatus in ["Pendente", "Ativa", "Expirada"] && data.status == priorStatus)
+          : action == "activate"
+            ? priorStatus == "Pendente" && data.status == "Ativa"
+            : action == "renew" && priorStatus in ["Ativa", "Expirada"] && data.status == "Ativa";
+      return exists(companyPath) && exists(planPath)
+        && plan.status == "Ativo"
+        && data.keys().hasOnly([
+          "empresa_id", "plano_id", "plano_nome", "status", "ciclo", "valor_centavos",
+          "inicio_em", "vence_em", "renovacao_manual", "cobranca_automatica", "provedor_pagamento",
+          "criado_em", "atualizado_em", "atualizado_por", "ultima_operacao_id"
+        ])
+        && data.empresa_id == empresaId
+        && data.plano_id is string && data.plano_nome == plan.nome
+        && data.ciclo == plan.ciclo && data.valor_centavos == plan.valor_centavos
+        && data.status in ["Pendente", "Ativa", "Expirada"]
+        && data.renovacao_manual == true && data.cobranca_automatica == false && data.provedor_pagamento == null
+        && data.criado_em is timestamp && data.atualizado_em == request.time
+        && data.atualizado_por == request.auth.uid && data.ultima_operacao_id == operationId
+        && allowedTransition
+        && (
+          action == "assignPlan"
+            ? data.inicio_em == ("inicio_em" in oldData ? oldData.inicio_em : null)
+              && data.vence_em == ("vence_em" in oldData ? oldData.vence_em : null)
+            : data.inicio_em is timestamp && data.vence_em is timestamp
+              && event.detalhes.inicio_em is timestamp
+              && event.detalhes.vence_em is timestamp
+              && data.vence_em > event.detalhes.inicio_em
+              && event.detalhes.vence_em == data.vence_em
+              && (
+                action == "activate"
+                  ? data.inicio_em == request.time && event.detalhes.inicio_em == request.time
+                  : data.inicio_em == oldData.inicio_em
+                    && (
+                      oldData.vence_em is timestamp && oldData.vence_em > request.time
+                        ? event.detalhes.inicio_em == oldData.vence_em
+                        : event.detalhes.inicio_em == request.time
+                    )
+              )
+              && (
+                plan.ciclo == "Mensal" ? data.vence_em - event.detalhes.inicio_em >= duration.value(27, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(32, "d")
+                  : plan.ciclo == "Trimestral" ? data.vence_em - event.detalhes.inicio_em >= duration.value(88, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(93, "d")
+                  : plan.ciclo == "Semestral" ? data.vence_em - event.detalhes.inicio_em >= duration.value(180, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(185, "d")
+                  : plan.ciclo == "Anual" && data.vence_em - event.detalhes.inicio_em >= duration.value(364, "d") && data.vence_em - event.detalhes.inicio_em <= duration.value(367, "d")
+              )
+        )
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.operation_id == operationId
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.empresa_id == empresaId
+        && getAfter(saasHistoryPath(empresaId, operationId)).data.plano_id == data.plano_id
+        && (
+          action == "assignPlan" ? getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "plano_vinculado"
+            : action == "activate" ? getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "assinatura_ativada"
+            : getAfter(saasHistoryPath(empresaId, operationId)).data.acao == "assinatura_renovada"
+        );
+    }
+
+    function isSaasHistoryValid(empresaId, operationId, data) {
+      let op = getAfter(saasOperationPath(operationId)).data;
+      return data.keys().hasOnly(["acao", "empresa_id", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+        && data.empresa_id == empresaId && data.plano_id is string
+        && data.operation_id == operationId && data.ator_uid == request.auth.uid
+        && data.ator_nome is string && data.ocorrido_em == request.time
+        && data.acao in ["plano_vinculado", "assinatura_ativada", "assinatura_renovada"]
+        && data.detalhes is map
+        && op.target_id == empresaId && op.action in ["assignPlan", "activate", "renew"]
+        && op.actor_uid == request.auth.uid
+        && op.request_data.empresaId == empresaId
+        && op.request_data.planId == data.plano_id
+        && (
+          data.acao == "plano_vinculado"
+            ? op.action == "assignPlan" && data.detalhes.plano_nome is string
+            : data.acao == "assinatura_ativada"
+              ? op.action == "activate"
+              : op.action == "renew"
+        );
+    }
+
+    function isSaasOperationValid(operationId, data) {
+      return data.keys().hasOnly(["operation_id", "actor_uid", "action", "request_data", "target_id", "result", "processed_at"])
+        && data.operation_id == operationId && data.actor_uid == request.auth.uid
+        && data.action in ["savePlan", "assignPlan", "activate", "renew"]
+        && data.request_data is map && data.result is map && data.processed_at == request.time
+        && data.target_id is string
+        && (data.action == "savePlan" ? data.request_data.plan is map : data.request_data.empresaId == data.target_id && data.request_data.planId is string);
+    }
+
+    function isAdminEmpresa() {
+      return false;
+    }
+
+    function hasAdminManagementAccess() {
+      return isAdminGeral() || isAdminEmpresa();
+    }
+
+    function currentUserEmpresaId() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let empresaId = userData.get("empresa_id", null);
+      return empresaId is string && empresaId.size() > 0 ? empresaId : null;
+    }
+
+    function currentUserSupermercadoId() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let supermercadoId = userData.get("supermercado_id", null);
+      return supermercadoId is string && supermercadoId.size() > 0 ? supermercadoId : null;
+    }
+
+    function currentUserSupermercadoIds() {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      return userData.get("supermercado_ids", []) is list
+        && userData.get("supermercado_ids", []).size() > 0
+        ? userData.get("supermercado_ids", [])
+        : (currentUserSupermercadoId() is string ? [currentUserSupermercadoId()] : []);
+    }
+
+    function currentUserPerfil() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let perfil = userData.get("perfil", null);
+      return perfil is string && perfil.size() > 0 ? perfil : null;
+    }
+
+    function isSupervisorDaUnidade(supermercadoId) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn()
+        && userData.get("status", "Ativo") == "Ativo"
+        && userData.get("perfil", null) == "Separador de Televendas"
+        && effectiveUnitIds(userData).hasAny([supermercadoId])
+        && isSupermercadoDaEmpresaAtivo(userData.get("empresa_id", null), supermercadoId);
+    }
+
+    function isAdminEmpresaDaEmpresa(empresaId) {
+      return isAdminGeral();
+    }
+
+    function isPerfilValido(perfilInput) {
+      return perfilInput == "Gerente da Empresa"
+        || perfilInput == "Operador"
+        || perfilInput == "Televendas"
+        || perfilInput == "Separador de Televendas"
+        || perfilInput == "Administrador Geral";
+    }
+
+    function isPerfilAutoCadastroPermitido(perfilInput) {
+      return perfilInput == "Operador"
+        || perfilInput == "Televendas"
+        || perfilInput == "Separador de Televendas";
+    }
+
+    function isConviteGerenteValido(token) {
+      return token is string
+        && token.size() > 0
+        && exists(/databases/$(database)/documents/convites_admin_empresa/$(token))
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.status == "Pendente"
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.perfil == "Gerente da Empresa"
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.empresa_id
+          == request.resource.data.empresa_id
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.expira_em_ms
+          > request.time.toMillis();
+    }
+
+    function isCadastroGerentePorConviteValido() {
+      return request.resource.data.perfil == "Gerente da Empresa"
+        && request.resource.data.supermercado_id == null
+        && request.resource.data.get("supermercado_ids", []) == []
+        && request.resource.data.convite_token is string
+        && isConviteGerenteValido(request.resource.data.convite_token);
+    }
+
+    function isEmpresaAtiva(empresaId) {
+      let path = /databases/$(database)/documents/empresas/$(empresaId);
+      let company = empresaId is string && empresaId.size() > 0
+        ? get(path).data
+        : {};
+      return empresaId is string
+        && empresaId.size() > 0
+        && company.get("status", "Ativa") == "Ativa";
+    }
+
+    function isSupermercadoAtivo(supermercadoId) {
+      let path = /databases/$(database)/documents/supermercados/$(supermercadoId);
+      let unit = supermercadoId is string && supermercadoId.size() > 0
+        ? get(path).data
+        : {};
+      return supermercadoId is string
+        && supermercadoId.size() > 0
+        && unit.get("status", "Ativo") == "Ativo";
+    }
+
+    function isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId) {
+      let companyPath = /databases/$(database)/documents/empresas/$(empresaId);
+      let unitPath = /databases/$(database)/documents/supermercados/$(supermercadoId);
+      let company = empresaId is string && empresaId.size() > 0
+        ? get(companyPath).data
+        : {};
+      let unit = supermercadoId is string && supermercadoId.size() > 0
+        ? get(unitPath).data
+        : {};
+      return empresaId is string
+        && empresaId.size() > 0
+        && company.get("status", "Ativa") == "Ativa"
+        && supermercadoId is string
+        && supermercadoId.size() > 0
+        && unit.get("status", "Ativo") == "Ativo"
+        && unit.get("empresa_id", null) == empresaId;
+    }
+
+    function effectiveUnitIds(data) {
+      let listed = data.get("supermercado_ids", []);
+      return listed is list && listed.size() > 0
+        ? listed
+        : (data.get("supermercado_id", null) is string
+          ? [data.get("supermercado_id", null)]
+          : []);
+    }
+
+    function isUnitAssignmentsValid(data) {
+      let units = effectiveUnitIds(data);
+      return (!("supermercado_ids" in data) || data.supermercado_ids is list)
+        && units is list
+        // Eight assigned units leave room for the user document and both old/new link
+        // documents under Firestore's 20 access-call ceiling for one atomic batch.
+        && units.size() <= 8
+        && units.toSet().size() == units.size()
+        && (units.size() == 0 || data.get("supermercado_id", units[0]) == units[0]);
+    }
+
+    function userUnitAssignmentPath(userId, unitId) {
+      return /databases/$(database)/documents/usuarios/$(userId)/unidades/$(unitId);
+    }
+
+    function hasActiveManagerUnitAssignment(userData, unitId) {
+      let path = userUnitAssignmentPath(request.auth.uid, unitId);
+      let assignment = get(path).data;
+      return assignment.get("status", null) == "Ativo"
+        && assignment.get("empresa_id", null) == userData.get("empresa_id", null);
+    }
+
+    function canAccessAssignedUnit(userData, supermercadoId, empresaId) {
+      return userData.get("status", "Ativo") == "Ativo"
+        && userData.perfil in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+        && userData.get("empresa_id", null) is string
+        && userData.get("empresa_id", null) == empresaId
+        && effectiveUnitIds(userData).hasAny([supermercadoId])
+        && ((userData.perfil != "Gerente da Empresa"
+            && !userData.get("vinculos_unidades_v2", false))
+          || hasActiveManagerUnitAssignment(userData, supermercadoId));
+    }
+
+    function isEmpresaVinculoValido(perfilInput, empresaId) {
+      return (
+        perfilInput == "Administrador Geral" && empresaId == null
+      ) || (
+        perfilInput != "Administrador Geral" && isEmpresaAtiva(empresaId)
+      );
+    }
+
+    function isSupermercadoVinculoValido(perfilInput, empresaId, supermercadoId) {
+      return (perfilInput == "Administrador Geral" && supermercadoId == null)
+        || (perfilInput in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+          && (supermercadoId == null || supermercadoId is string));
+    }
+
+    function isUsuarioVinculoValido(data) {
+      return isPerfilValido(data.perfil)
+        && (!("status" in data) || isStatusUsuarioValido(data.status))
+        && (!("vinculos_unidades_v2" in data) || data.vinculos_unidades_v2 is bool)
+        && isEmpresaVinculoValido(data.perfil, data.empresa_id)
+        && isSupermercadoVinculoValido(
+          data.perfil,
+          data.empresa_id,
+          data.supermercado_id
+        );
+    }
+
+    function canAdminEmpresaManageUser(existingData, newData) {
+      return false;
+    }
+
+    function hasOnlyUserManagementChanges(existingData, newData) {
+      return newData.diff(existingData).affectedKeys().hasOnly([
+        "perfil",
+        "empresa_id",
+        "supermercado_id",
+        "supermercado_ids",
+        "vinculos_unidades_v2",
+        "status",
+        "atualizado_em"
+      ]);
+    }
+
+    function unitChangesUseV2Links(existingData, newData) {
+      return !newData.diff(existingData).affectedKeys().hasAny([
+          "supermercado_id", "supermercado_ids"
+        ])
+        || newData.get("vinculos_unidades_v2", false) == true;
+    }
+
+    function canAccessEmpresa(empresaId) {
+      return isAdminGeral();
+    }
+
+    function belongsToEmpresa(empresaId) {
+      return false;
+    }
+
+    function canAccessCurrentSupermercado(supermercadoId) {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      return isSignedIn()
+        && userData.empresa_id is string
+        && canAccessAssignedUnit(userData, supermercadoId, userData.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(userData.empresa_id, supermercadoId);
+    }
+
+    function canCreateChamado() {
+      return isCurrentUserActive()
+        && currentUserPerfil() in ["Operador", "Televendas", "Separador de Televendas"];
+    }
+
+    function isCurrentUserSeparator() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+        == "Separador de Televendas";
+    }
+
+    function canManageChamado() {
+      return currentUserPerfil() == "Operador"
+        || isAdminGeral();
+    }
+
+    function isChamadoTelevendas(data) {
+      return ("categoria" in data && data.categoria == "televendas")
+        || ("tipo_servico" in data && data.tipo_servico == "Atendimento Televendas");
+    }
+
+    function canSeparatorReadChamado(data) {
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Separador de Televendas"
+        && data.get("supermercado_id", null) is string
+        && data.get("supermercado_id", "").size() > 0
+        && data.get("empresa_id", null) == currentUserEmpresaId()
+        && canAccessCurrentSupermercado(data.get("supermercado_id", null))
+        && isChamadoTelevendas(data);
+    }
+
+    function separatorChangedFieldsAllowed(oldData, newData) {
+      return newData.diff(oldData).affectedKeys().hasOnly([
+        "itens", "produto", "quantidade", "total_solicitado", "total_encontrado",
+        "percentual_atendido", "status", "motivo_incompleto", "observacao_operador",
+        "atualizado_em", "atualizado_por", "operador_nome", "assumido_em", "cancelado_em"
+      ]);
+    }
+
+    function canSeparatorUpdateTelevendas(oldData, newData) {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      let starting = oldData.status == "Aberto"
+        && newData.status == "Em separação"
+        && isCampoVazio(oldData.operador_nome)
+        && newData.operador_nome is string
+        && newData.operador_nome.size() > 0
+        && newData.assumido_em is string
+        && newData.assumido_em.size() > 0;
+      let completing = oldData.status == "Em separação"
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.operador_nome == newData.operador_nome;
+      let retrying = oldData.status == "Incompleto"
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.operador_nome == newData.operador_nome;
+      return (!("status" in userData) || userData.status == "Ativo")
+        && userData.perfil == "Separador de Televendas"
+        && userData.get("empresa_id", null) == oldData.empresa_id
+        && canAccessAssignedUnit(userData, oldData.supermercado_id, oldData.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(oldData.empresa_id, oldData.supermercado_id)
+        && oldData.empresa_id == newData.empresa_id
+        && oldData.supermercado_id == newData.supermercado_id
+        && isChamadoTelevendas(oldData)
+        && isChamadoTelevendas(newData)
+        && (("id" in oldData && newData.id == oldData.id)
+          || (!("id" in oldData) && !("id" in newData)))
+        && (starting || completing || retrying)
+        && separatorChangedFieldsAllowed(oldData, newData)
+        && (newData.itens is list
+          || (starting && !("itens" in oldData) && !("itens" in newData)))
+        && (newData.status != "Incompleto" || isTextoNaoVazio(newData.motivo_incompleto))
+        && (newData.status == "Cancelado"
+          ? newData.cancelado_em is string && newData.cancelado_em.size() > 0
+          : newData.cancelado_em == null)
+        && (newData.status == "Em separação"
+          ? newData.assumido_em is string && newData.assumido_em.size() > 0
+          : newData.assumido_em == oldData.assumido_em);
+    }
+
+    function isStatusUsuarioValido(status) {
+      return status == "Ativo" || status == "Inativo";
+    }
+
+    function isTextoNaoVazio(valor) {
+      return valor is string && valor.size() > 0;
+    }
+
+    function isCampoVazio(valor) {
+      return valor == null || (valor is string && valor.size() == 0);
+    }
+
+    function isStatusChamadoValido(status) {
+      return status == "Aguardando"
+        || status == "Em atendimento"
+        || status == "Finalizado"
+        || status == "Aberto"
+        || status == "Em separação"
+        || status == "Incompleto"
+        || status == "Pronto"
+        || status == "Cancelado";
+    }
+
+    function isPrioridadeValida(prioridade) {
+      return prioridade == "Normal" || prioridade == "Urgente";
+    }
+
+    function isTipoServicoValido(tipo) {
+      return tipo == "Descarga"
+        || tipo == "Reposição"
+        || tipo == "Retirada"
+        || tipo == "Movimentação"
+        || tipo == "Apoio interno"
+        || tipo == "Atendimento Televendas";
+    }
+
+    function isCategoriaValida(categoria) {
+      return categoria == "operacional" || categoria == "televendas";
+    }
+
+    function isStatusEmpilhadeiraValido(status) {
+      return status == "Disponível"
+        || status == "Em uso"
+        || status == "Em manutenção"
+        || status == "Inativa"
+        || status == "Necessita atenção"
+        || status == "Reserva";
+    }
+
+    function isStatusEmpilhadeiraCompativelComChamado(status) {
+      return status == "Disponível"
+        || status == "Em uso"
+        || status == "Reserva";
+    }
+
+    function isEmpilhadeiraValida(data, id) {
+      return data.id == id
+        && isTextoNaoVazio(data.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
+        && isTextoNaoVazio(data.identificacao)
+        && isTextoNaoVazio(data.modelo)
+        && isTextoNaoVazio(data.numero_interno)
+        && isStatusEmpilhadeiraValido(data.status)
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes))
+        && isTextoNaoVazio(data.criado_em)
+        && isTextoNaoVazio(data.atualizado_em);
+    }
+
+    function isChecklistEmpilhadeiraValido(data, id) {
+      return data.id == id
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
+        && isTextoNaoVazio(data.empilhadeira_id)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isTextoNaoVazio(data.operador_id)
+        && isTextoNaoVazio(data.operador_nome)
+        && isTextoNaoVazio(data.data)
+        && data.bateria_ok is bool
+        && data.garfo_ok is bool
+        && data.pneus_ok is bool
+        && data.freio_ok is bool
+        && data.sem_avaria is bool
+        && data.reprovado is bool
+        && data.itens_reprovados is list
+        && (isCampoVazio(data.ocorrencia_tecnica) || isTextoNaoVazio(data.ocorrencia_tecnica))
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes))
+        && (isCampoVazio(data.tratado_em) || isTextoNaoVazio(data.tratado_em))
+        && (isCampoVazio(data.tratado_por) || isTextoNaoVazio(data.tratado_por))
+        && isTextoNaoVazio(data.criado_em);
+    }
+
+    function canCreateChecklistEmpilhadeira(data) {
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
+        || (
+          isCurrentUserActive()
+          && (
+            currentUserPerfil() == "Operador"
+            || currentUserPerfil() == "Separador de Televendas"
+          )
+          && canAccessCurrentSupermercado(data.supermercado_id)
+        );
+    }
+
+    function isTipoManutencaoValido(tipo) {
+      return tipo == "Preventiva"
+        || tipo == "Corretiva"
+        || tipo == "Inspecao"
+        || tipo == "Revisao"
+        || tipo == "Bateria";
+    }
+
+    function isPrioridadeManutencaoValida(prioridade) {
+      return prioridade == "Baixa"
+        || prioridade == "Media"
+        || prioridade == "Alta"
+        || prioridade == "Critica";
+    }
+
+    function isStatusManutencaoValido(status) {
+      return status == "Aberta"
+        || status == "Em andamento"
+        || status == "Concluida"
+        || status == "Cancelada";
+    }
+
+    function isManutencaoValida(data, id) {
+      return data.id == id
+        && isSupermercadoDaEmpresaAtivo(data.empresa_id, data.supermercado_id)
+        && isTextoNaoVazio(data.empilhadeira_id)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isTipoManutencaoValido(data.tipo)
+        && isTextoNaoVazio(data.descricao)
+        && isPrioridadeManutencaoValida(data.prioridade)
+        && isStatusManutencaoValido(data.status)
+        && (isCampoVazio(data.responsavel) || isTextoNaoVazio(data.responsavel))
+        && isTextoNaoVazio(data.data_abertura)
+        && (isCampoVazio(data.data_prevista) || isTextoNaoVazio(data.data_prevista))
+        && (isCampoVazio(data.data_conclusao) || isTextoNaoVazio(data.data_conclusao))
+        && isTextoNaoVazio(data.criado_por)
+        && (isCampoVazio(data.observacoes) || isTextoNaoVazio(data.observacoes));
+    }
+
+    function canCreateManutencao(data) {
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
+        || isSupervisorDaUnidade(data.supermercado_id)
+        || (
+          isCurrentUserActive()
+          && currentUserPerfil() == "Operador"
+          && currentUserSupermercadoId() != null
+          && currentUserSupermercadoId() == data.supermercado_id
+        );
+    }
+
+    function canUpdateManutencao(data) {
+      return isAdminGeral()
+        || isAdminEmpresaDaEmpresa(data.empresa_id)
+        || isSupervisorDaUnidade(data.supermercado_id);
+    }
+
+    function isEmpilhadeiraCompativelComChamado(data) {
+      return (
+        isCampoVazio(data.empilhadeira_id)
+        && isCampoVazio(data.empilhadeira_identificacao)
+      ) || (
+        isTextoNaoVazio(data.empilhadeira_id)
+        && isTextoNaoVazio(data.empilhadeira_identificacao)
+        && exists(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id))
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.empresa_id == data.empresa_id
+        && get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.supermercado_id == data.supermercado_id
+        && isStatusEmpilhadeiraCompativelComChamado(
+          get(/databases/$(database)/documents/empilhadeiras/$(data.empilhadeira_id)).data.status
+        )
+      );
+    }
+
+    function isCriacaoChamadoValida() {
+      return isTextoNaoVazio(request.resource.data.id)
+        && isTextoNaoVazio(request.resource.data.empresa_id)
+        && isTextoNaoVazio(request.resource.data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(
+          request.resource.data.empresa_id,
+          request.resource.data.supermercado_id
+        )
+        && isTextoNaoVazio(request.resource.data.solicitante_nome)
+        && (!("solicitante_uid" in request.resource.data)
+          || request.resource.data.solicitante_uid == request.auth.uid)
+        && isTextoNaoVazio(request.resource.data.setor)
+        && isCategoriaValida(request.resource.data.categoria)
+        && isTipoServicoValido(request.resource.data.tipo_servico)
+        && isPrioridadeValida(request.resource.data.prioridade)
+        && isTextoNaoVazio(request.resource.data.criado_em)
+        && request.resource.data.itens is list
+        && (
+          (
+            request.resource.data.categoria == "operacional"
+            && request.resource.data.status == "Aguardando"
+          )
+          || (
+            request.resource.data.categoria == "televendas"
+            && request.resource.data.status == "Aberto"
+            && request.resource.data.tipo_servico == "Atendimento Televendas"
+            && isTextoNaoVazio(request.resource.data.numero_pedido)
+            && isTextoNaoVazio(request.resource.data.cliente)
+            && request.resource.data.itens.size() > 0
+            && isTextoNaoVazio(request.resource.data.local_separacao)
+            && isTextoNaoVazio(request.resource.data.prazo_limite)
+          )
+        )
+        && isEmpilhadeiraCompativelComChamado(request.resource.data)
+        && request.resource.data.operador_nome == null
+        && request.resource.data.assumido_em == null
+        && request.resource.data.a_caminho_em == null
+        && request.resource.data.cheguei_em == null
+        && request.resource.data.iniciado_em == null
+        && request.resource.data.finalizado_em == null
+        && request.resource.data.cancelado_em == null
+        && request.resource.data.atualizado_em == null
+        && request.resource.data.atualizado_por == null
+        && request.resource.data.motivo_incompleto == null
+        && request.resource.data.observacao_operador == null;
+    }
+
+    function isAtualizacaoChamadoValida() {
+      return request.resource.data.id == resource.data.id
+        && (
+          request.resource.data.categoria == resource.data.categoria
+          || isCampoVazio(resource.data.categoria)
+        )
+        && request.resource.data.empresa_id == resource.data.empresa_id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && (("solicitante_uid" in resource.data)
+          ? request.resource.data.solicitante_uid == resource.data.solicitante_uid
+          : !("solicitante_uid" in request.resource.data))
+        && isTextoNaoVazio(request.resource.data.id)
+        && isTextoNaoVazio(request.resource.data.empresa_id)
+        && isTextoNaoVazio(request.resource.data.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(
+          request.resource.data.empresa_id,
+          request.resource.data.supermercado_id
+        )
+        && isStatusChamadoValido(request.resource.data.status)
+        && (isCampoVazio(request.resource.data.operador_nome) || isTextoNaoVazio(request.resource.data.operador_nome))
+        && (isCampoVazio(request.resource.data.assumido_em) || isTextoNaoVazio(request.resource.data.assumido_em))
+        && (isCampoVazio(request.resource.data.a_caminho_em) || isTextoNaoVazio(request.resource.data.a_caminho_em))
+        && (isCampoVazio(request.resource.data.cheguei_em) || isTextoNaoVazio(request.resource.data.cheguei_em))
+        && (isCampoVazio(request.resource.data.iniciado_em) || isTextoNaoVazio(request.resource.data.iniciado_em))
+        && (isCampoVazio(request.resource.data.finalizado_em) || isTextoNaoVazio(request.resource.data.finalizado_em))
+        && (isCampoVazio(request.resource.data.cancelado_em) || isTextoNaoVazio(request.resource.data.cancelado_em))
+        && isEmpilhadeiraCompativelComChamado(request.resource.data);
+    }
+
+    match /chamados/{id} {
+    function signedIn() { return request.auth != null; }
+    function actor() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data; }
+    function activeSeparator() {
+      return signedIn() && actor().status == 'Ativo'
+        && actor().perfil == 'Separador de Televendas';
+    }
+    function parentOrder(pedidoId) {
+      return get(/databases/$(database)/documents/chamados/$(pedidoId)).data;
+    }
+    function unit(pedidoId) {
+      return get(/databases/$(database)/documents/supermercados/$(parentOrder(pedidoId).supermercado_id)).data;
+    }
+    function company(pedidoId) {
+      return get(/databases/$(database)/documents/empresas/$(parentOrder(pedidoId).empresa_id)).data;
+    }
+    function inScope(pedidoId) {
+      let order = parentOrder(pedidoId);
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Separador de Televendas"
+        && currentUserEmpresaId() == order.empresa_id
+        && canAccessCurrentSupermercado(order.supermercado_id)
+        && isChamadoTelevendas(order);
+    }
+    function canReadIndividualOrder(pedidoId) {
+      let order = parentOrder(pedidoId);
+      return isCurrentUserActive()
+        && (isAdminGeral()
+          || (currentUserPerfil() in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+            && currentUserEmpresaId() == order.empresa_id
+            && canAccessCurrentSupermercado(order.supermercado_id)
+            && isChamadoTelevendas(order)));
+    }
+    function linkedCallOrderMatches(data) {
+      let order = get(/databases/$(database)/documents/chamados/$(data.pedido_origem_id)).data;
+      return order.categoria == "televendas"
+        && order.status == "Em separação"
+        && order.empresa_id == data.empresa_id
+        && order.supermercado_id == data.supermercado_id
+        && currentUserEmpresaId() == order.empresa_id
+        && canAccessCurrentSupermercado(order.supermercado_id)
+        && isSupermercadoDaEmpresaAtivo(order.empresa_id, order.supermercado_id);
+    }
+    function linkedCallItemMatches(data) {
+      let item = get(/databases/$(database)/documents/chamados/$(data.pedido_origem_id)/itens/$(data.pedido_origem_item_id)).data;
+      return item.id == data.pedido_origem_item_id
+        && item.pedido_id == data.pedido_origem_id
+        && item.empresa_id == data.empresa_id
+        && item.supermercado_id == data.supermercado_id;
+    }
+    function canSeparatorReadLinkedCall(data) {
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Separador de Televendas"
+        && data.categoria == "operacional"
+        && data.status == "Finalizado"
+        && data.pedido_origem_id is string
+        && data.pedido_origem_item_id is string
+        && linkedCallOrderMatches(data)
+        && linkedCallItemMatches(data);
+    }
+    function manualPolicyValid(pedidoId, itemId, empresaId, supermercadoId) {
+      let policy = get(/databases/$(database)/documents/chamados/$(pedidoId)/itens/$(itemId)/politica_separacao/config).data;
+      return policy.pedido_id == pedidoId
+        && policy.item_id == itemId
+        && policy.empresa_id == empresaId
+        && policy.supermercado_id == supermercadoId
+        && policy.exige_empilhadeira == false
+        && policy.ativo == true;
+    }
+    function callData(callId) {
+      return get(/databases/$(database)/documents/chamados/$(callId)).data;
+    }
+    function receiptAfter(pedidoId, confirmationId) {
+      return getAfter(/databases/$(database)/documents/chamados/$(pedidoId)/separacao_confirmacoes/$(confirmationId)).data;
+    }
+    function auditAfter(auditId) {
+      return getAfter(/databases/$(database)/documents/auditoria/$(auditId)).data;
+    }
+    function itemAfter(pedidoId, itemId) {
+      return getAfter(/databases/$(database)/documents/chamados/$(pedidoId)/itens/$(itemId)).data;
+    }
+    function validItemUpdate(pedidoId, itemId) {
+      let old = resource.data;
+      let next = request.resource.data;
+      let confirmationId = next.get('ultima_confirmacao_id', '');
+      let auditId = next.get('ultima_auditoria_id', '');
+      let receipt = receiptAfter(pedidoId, confirmationId);
+      let audit = auditAfter(auditId);
+      return old.keys().hasOnly([
+          'id', 'pedido_id', 'empresa_id', 'supermercado_id', 'produto', 'unidade_medida',
+          'quantidade_solicitada', 'quantidade_encontrada', 'quantidade_faltante',
+          'recebimento_empilhadeira_confirmado', 'ultima_confirmacao_id', 'ultima_auditoria_id', 'politica_id'
+        ])
+        && next.keys().hasOnly([
+          'id', 'pedido_id', 'empresa_id', 'supermercado_id', 'produto', 'unidade_medida',
+          'quantidade_solicitada', 'quantidade_encontrada', 'quantidade_faltante',
+          'recebimento_empilhadeira_confirmado', 'ultima_confirmacao_id', 'ultima_auditoria_id', 'politica_id'
+        ])
+        && next.id == itemId && next.pedido_id == pedidoId
+        && old.id == itemId && old.pedido_id == pedidoId
+        && next.empresa_id == old.empresa_id && next.supermercado_id == old.supermercado_id
+        && next.produto == old.produto && next.unidade_medida == old.unidade_medida
+        && next.quantidade_solicitada == old.quantidade_solicitada
+        && next.politica_id == old.politica_id
+        && old.ultima_confirmacao_id != confirmationId
+        && old.ultima_auditoria_id != auditId
+        && next.diff(old).affectedKeys().hasOnly([
+          'quantidade_encontrada', 'quantidade_faltante', 'recebimento_empilhadeira_confirmado',
+          'ultima_confirmacao_id', 'ultima_auditoria_id'
+        ])
+        && receipt.item_id == itemId
+        && (receipt.origem == "manual"
+          ? receipt.chamado_id == null
+            && manualPolicyValid(pedidoId, itemId, old.empresa_id, old.supermercado_id)
+          : receipt.origem == "empilhadeira" && receipt.chamado_id == receipt.id)
+        && next.quantidade_encontrada == old.quantidade_encontrada + receipt.quantidade
+        && next.quantidade_encontrada >= old.quantidade_encontrada
+        && next.quantidade_encontrada <= old.quantidade_solicitada
+        && next.quantidade_faltante == next.quantidade_solicitada - next.quantidade_encontrada
+        && next.recebimento_empilhadeira_confirmado == (receipt.origem == 'empilhadeira')
+        && next.ultima_confirmacao_id == receipt.id
+        && next.ultima_auditoria_id == receipt.audit_id
+        && audit.action == 'separacao_item_confirmada'
+        && audit.actorUid == request.auth.uid
+        && audit.entityType == 'pedido_item'
+        && audit.entityId == itemId
+        && audit.details.pedido_id == pedidoId
+        && audit.details.confirmacao_id == receipt.id
+        && audit.empresa_id == old.empresa_id
+        && audit.supermercado_id == old.supermercado_id;
+    }
+
+      allow read: if isSignedIn()
+        && (
+          canSeparatorReadChamado(resource.data)
+          || (
+            currentUserPerfil() != "Separador de Televendas"
+            && (
+              canAccessCurrentSupermercado(resource.data.supermercado_id)
+              || canAccessEmpresa(resource.data.empresa_id)
+            )
+          )
+        );
+
+      allow get: if resource.data.get("categoria", null) == "operacional"
+        && canSeparatorReadLinkedCall(resource.data);
+
+      allow create: if isSignedIn()
+        && canCreateChamado()
+        && request.resource.data.id == id
+        && isCriacaoChamadoValida()
+        && (
+          canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+          || canAccessEmpresa(request.resource.data.empresa_id)
+        );
+
+      allow update: if isSignedIn()
+        && (resource.data.get("modelo_itens", "array") != "individual"
+          || (request.resource.data.get("modelo_itens", null) == resource.data.get("modelo_itens", null)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            "itens", "total_solicitado", "total_encontrado", "percentual_atendido"
+            ])))
+        && (currentUserPerfil() == "Separador de Televendas"
+          ? isChamadoTelevendas(resource.data)
+            && canSeparatorUpdateTelevendas(resource.data, request.resource.data)
+          : canManageChamado()
+            && isAtualizacaoChamadoValida()
+            && (
+              canAccessAssignedUnit(
+                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data,
+                resource.data.supermercado_id,
+                resource.data.empresa_id
+              )
+              || canAccessEmpresa(resource.data.empresa_id)
+            ));
+
+      allow delete: if isAdminGeral();
+      match /itens/{itemId} {
+        allow get, list: if canReadIndividualOrder(id);
+        allow create, delete: if false;
+        allow update: if inScope(id)
+          && parentOrder(id).status == 'Em separação'
+          && validItemUpdate(id, itemId);
+      }
+      match /separacao_confirmacoes/{confirmationId} {
+        allow get: if inScope(id);
+        allow list: if false;
+        allow create: if inScope(id)
+          && request.resource.data.keys().hasOnly([
+            'id', 'pedido_id', 'item_id', 'chamado_id', 'origem', 'operation_id', 'empresa_id', 'supermercado_id',
+            'actor_uid', 'quantidade', 'unidade_medida', 'justificativa', 'audit_id', 'confirmado_em'
+          ])
+          && request.resource.data.id == confirmationId
+          && request.resource.data.keys().hasAll([
+            'id', 'pedido_id', 'item_id', 'chamado_id', 'empresa_id', 'supermercado_id',
+            'actor_uid', 'quantidade', 'unidade_medida', 'audit_id', 'confirmado_em'
+          ])
+          && request.resource.data.pedido_id == id
+          && (request.resource.data.origem == "manual"
+            ? request.resource.data.chamado_id == null
+            : request.resource.data.chamado_id == confirmationId)
+          && request.resource.data.actor_uid == request.auth.uid
+          && request.resource.data.confirmado_em == request.time
+          && request.resource.data.empresa_id == parentOrder(id).empresa_id
+          && request.resource.data.supermercado_id == parentOrder(id).supermercado_id
+          && request.resource.data.quantidade is int && request.resource.data.quantidade >= 0
+          && (request.resource.data.quantidade > 0
+            || (request.resource.data.justificativa is string && request.resource.data.justificativa.size() > 0))
+          && request.resource.data.origem in ["manual", "empilhadeira"]
+          && request.resource.data.operation_id == confirmationId
+          && (request.resource.data.origem == "manual"
+            ? request.resource.data.chamado_id == null
+              && manualPolicyValid(pedidoId, request.resource.data.item_id, request.resource.data.empresa_id, request.resource.data.supermercado_id)
+            : request.resource.data.chamado_id == confirmationId
+              && callData(confirmationId).status == 'Finalizado'
+          && callData(confirmationId).categoria == 'operacional'
+          && callData(confirmationId).pedido_origem_id == id
+          && callData(confirmationId).pedido_origem_item_id == request.resource.data.item_id
+          && callData(confirmationId).empresa_id == request.resource.data.empresa_id
+          && callData(confirmationId).supermercado_id == request.resource.data.supermercado_id)
+          && itemAfter(id, request.resource.data.item_id).ultima_confirmacao_id == confirmationId
+          && itemAfter(id, request.resource.data.item_id).ultima_auditoria_id == request.resource.data.audit_id;
+        allow update, delete: if false;
+      }
+      match /itens/{itemId}/politica_separacao/{policyId} {
+        allow get: if isAdminGeral();
+        allow list: if false;
+        allow create: if isAdminGeral()
+          && request.resource.data.keys().hasOnly(["pedido_id", "item_id", "empresa_id", "supermercado_id", "exige_empilhadeira", "ativo"])
+          && request.resource.data.pedido_id == id
+          && request.resource.data.item_id == itemId
+          && request.resource.data.empresa_id == get(/databases/$(database)/documents/chamados/$(id)).data.empresa_id
+          && request.resource.data.supermercado_id == get(/databases/$(database)/documents/chamados/$(id)).data.supermercado_id
+          && request.resource.data.exige_empilhadeira is bool
+          && request.resource.data.ativo == true;
+        allow update, delete: if false;
+      }
+    }
+
+    match /auditoria/{id} {
+      allow create: if request.resource.data.action == "separacao_item_confirmada"
+        && request.resource.data.keys().hasOnly(["action", "actorUid", "actorName", "entityType", "entityId", "details", "occurredAt", "empresa_id", "supermercado_id"])
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName is string
+        && request.resource.data.occurredAt == request.time
+        && request.resource.data.entityType == "pedido_item"
+        && request.resource.data.details.pedido_id is string
+        && request.resource.data.details.item_id == request.resource.data.entityId
+        && request.resource.data.details.confirmacao_id is string
+        && request.resource.data.details.empresa_id == request.resource.data.empresa_id
+        && request.resource.data.details.supermercado_id == request.resource.data.supermercado_id
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/itens/$(request.resource.data.entityId)).ultima_auditoria_id == id
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/itens/$(request.resource.data.entityId)).ultima_confirmacao_id == request.resource.data.details.confirmacao_id
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/separacao_confirmacoes/$(request.resource.data.details.confirmacao_id)).audit_id == id
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/separacao_confirmacoes/$(request.resource.data.details.confirmacao_id)).actor_uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/separacao_confirmacoes/$(request.resource.data.details.confirmacao_id)).empresa_id == request.resource.data.empresa_id
+        && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/separacao_confirmacoes/$(request.resource.data.details.confirmacao_id)).supermercado_id == request.resource.data.supermercado_id;
+      allow read: if isCurrentUserActive()
+        && (
+          isAdminGeral()
+          || (
+            "empresa_id" in resource.data
+            && canAccessEmpresa(resource.data.empresa_id)
+          )
+          || (
+            "supermercado_id" in resource.data
+            && canAccessCurrentSupermercado(resource.data.supermercado_id)
+          )
+        );
+
+      allow create: if isSignedIn()
+        && isCurrentUserActive()
+        && request.resource.data.keys().hasAll([
+          "action",
+          "actorUid",
+          "actorName",
+          "entityType",
+          "entityId",
+          "details",
+          "occurredAt"
+        ])
+        && request.resource.data.keys().hasOnly([
+          "action",
+          "actorUid",
+          "actorName",
+          "entityType",
+          "entityId",
+          "details",
+          "occurredAt",
+          "empresa_id",
+          "supermercado_id",
+          "metadata"
+        ])
+        && request.resource.data.action in [
+          "chamado_criado",
+          "chamado_assumido",
+          "chamado_iniciado",
+          "chamado_finalizado",
+          "separacao_item_confirmada",
+          "empilhadeira_criada",
+          "empilhadeira_atualizada",
+          "empilhadeira_status_alterado",
+          "manutencao_criada",
+          "manutencao_atualizada"
+        ]
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName is string
+        && request.resource.data.entityType is string
+        && request.resource.data.entityId is string
+        && request.resource.data.occurredAt is string
+        && request.resource.data.details is map
+        && (request.resource.data.action != "separacao_item_confirmada"
+          || (request.resource.data.entityType == "pedido_item"
+            && request.resource.data.details.pedido_id is string
+            && request.resource.data.details.item_id == request.resource.data.entityId
+            && request.resource.data.details.confirmacao_id is string
+            && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/itens/$(request.resource.data.details.item_id)).data.ultima_auditoria_id == id
+            && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/itens/$(request.resource.data.details.item_id)).data.ultima_confirmacao_id == request.resource.data.details.confirmacao_id
+            && getAfter(/databases/$(database)/documents/chamados/$(request.resource.data.details.pedido_id)/separacao_confirmacoes/$(request.resource.data.details.confirmacao_id)).data.audit_id == id))
+        && (
+          !("empresa_id" in request.resource.data)
+          || (
+            request.resource.data.empresa_id is string
+            && request.resource.data.details.empresa_id == request.resource.data.empresa_id
+          )
+        )
+        && (
+          !("supermercado_id" in request.resource.data)
+          || (
+            request.resource.data.supermercado_id is string
+            && request.resource.data.details.supermercado_id == request.resource.data.supermercado_id
+          )
+        )
+        && (
+          isAdminGeral()
+          || (
+            "empresa_id" in request.resource.data
+            && canAccessEmpresa(request.resource.data.empresa_id)
+          )
+          || (
+            "supermercado_id" in request.resource.data
+            && canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+          )
+        );
+    }
+
+    match /empresas/{id} {
+      allow read: if !isSignedIn() || canAccessEmpresa(id) || belongsToEmpresa(id);
+      allow write: if isAdminGeral();
+
+      match /assinaturas/{assinaturaId} {
+        allow read: if isActiveSaasPlatformAdmin() || isActiveSaasCompanyAdmin(id);
+        allow create, update: if assinaturaId == "atual"
+          && isActiveSaasPlatformAdmin()
+          && request.resource.data.ultima_operacao_id is string
+          && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == id
+          && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action in ["assignPlan", "activate", "renew"]
+          && isSaasSubscriptionValid(
+            id,
+            request.resource.data,
+            resource == null ? {} : resource.data,
+            request.resource.data.ultima_operacao_id,
+            getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action
+          );
+        allow delete: if false;
+      }
+
+      match /historico_assinatura/{eventoId} {
+        allow read: if isActiveSaasPlatformAdmin() || isActiveSaasCompanyAdmin(id);
+        allow create: if isActiveSaasPlatformAdmin() && isSaasHistoryValid(id, eventoId, request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+
+    match /planos/{planoId} {
+      allow read: if isActiveSaasPlatformAdmin();
+      allow create, update: if isActiveSaasPlatformAdmin()
+        && isSaasPlanValid(planoId, request.resource.data)
+        && request.resource.data.ultima_operacao_id is string
+        && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.action == "savePlan"
+        && getAfter(saasOperationPath(request.resource.data.ultima_operacao_id)).data.target_id == planoId
+        && getAfter(saasAuditPath(request.resource.data.ultima_operacao_id)).data.plano_id == planoId
+        && (resource == null || request.resource.data.criado_em == resource.data.criado_em);
+      allow delete: if false;
+    }
+
+    match /auditoria_assinaturas/{eventoId} {
+      allow read: if isActiveSaasPlatformAdmin();
+      allow create: if isActiveSaasPlatformAdmin()
+        && request.resource.data.keys().hasOnly(["acao", "plano_id", "operation_id", "ator_uid", "ator_nome", "ocorrido_em", "detalhes"])
+        && request.resource.data.operation_id == eventoId
+        && request.resource.data.ator_uid == request.auth.uid
+        && request.resource.data.ator_nome is string
+        && request.resource.data.ocorrido_em == request.time
+        && request.resource.data.acao in ["plano_criado", "plano_editado"]
+        && request.resource.data.detalhes is map
+        && getAfter(saasOperationPath(eventoId)).data.action == "savePlan"
+        && getAfter(saasOperationPath(eventoId)).data.target_id == request.resource.data.plano_id
+        && getAfter(saasOperationPath(eventoId)).data.actor_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /assinatura_operacoes/{operationId} {
+      // The platform admin must read a prior operation to return its original result on retry.
+      allow get: if isActiveSaasPlatformAdmin();
+      allow list: if false;
+      allow create: if isActiveSaasPlatformAdmin() && isSaasOperationValid(operationId, request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /supermercados/{id} {
+      allow read: if !isSignedIn()
+        || canAccessEmpresa(resource.data.empresa_id)
+        || canAccessCurrentSupermercado(id);
+      allow create: if isAdminEmpresaDaEmpresa(request.resource.data.empresa_id);
+      allow update: if isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+        && isAdminEmpresaDaEmpresa(request.resource.data.empresa_id)
+        && request.resource.data.empresa_id == resource.data.empresa_id;
+      allow delete: if isAdminEmpresaDaEmpresa(resource.data.empresa_id);
+    }
+
+    match /empilhadeiras/{id} {
+      allow read: if isCurrentUserActive()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
+      allow create: if hasAdminManagementAccess()
+        && canAccessEmpresa(request.resource.data.empresa_id)
+        && isEmpilhadeiraValida(request.resource.data, id);
+      allow update: if (
+          isAdminGeral()
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+          || isSupervisorDaUnidade(resource.data.supermercado_id)
+        )
+        && (
+          isAdminGeral()
+          || request.resource.data.empresa_id == resource.data.empresa_id
+        )
+        && isEmpilhadeiraValida(request.resource.data, id)
+        && request.resource.data.criado_em == resource.data.criado_em
+        && (
+          isAdminGeral()
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+          || (
+            request.resource.data.empresa_id == resource.data.empresa_id
+            && request.resource.data.supermercado_id == resource.data.supermercado_id
+            && request.resource.data.identificacao == resource.data.identificacao
+            && request.resource.data.modelo == resource.data.modelo
+            && request.resource.data.numero_interno == resource.data.numero_interno
+          )
+        );
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
+    }
+
+    match /checklists_empilhadeira/{id} {
+      allow read: if isSignedIn()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
+      allow create: if isChecklistEmpilhadeiraValido(request.resource.data, id)
+        && canCreateChecklistEmpilhadeira(request.resource.data);
+      allow update: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+        || isSupervisorDaUnidade(resource.data.supermercado_id);
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
+    }
+
+    match /manutencoes/{id} {
+      allow read: if isCurrentUserActive()
+        && (
+          canAccessEmpresa(resource.data.empresa_id)
+          || canAccessCurrentSupermercado(resource.data.supermercado_id)
+        );
+      allow create: if isManutencaoValida(request.resource.data, id)
+        && canCreateManutencao(request.resource.data);
+      allow update: if isManutencaoValida(request.resource.data, id)
+        && canUpdateManutencao(resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.supermercado_id == resource.data.supermercado_id
+        && request.resource.data.empilhadeira_id == resource.data.empilhadeira_id
+        && request.resource.data.criado_por == resource.data.criado_por;
+      allow delete: if isAdminGeral()
+        || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
+    }
+
+    match /operational_escalations/{id} {
+      allow read: if isAdminGeral() || canAccessCurrentSupermercado(resource.data.unitId);
+      allow create: if isSignedIn()
+        && currentUserPerfil() == "Gerente da Empresa"
+        && canAccessCurrentSupermercado(request.resource.data.unitId)
+        && request.resource.data.keys().hasOnly([
+          "unitId", "unitName", "status", "severity", "openCalls", "urgentCalls",
+          "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
+        ])
+        && request.resource.data.unitId is string
+        && request.resource.data.unitId.size() > 0
+        && request.resource.data.unitName is string
+        && request.resource.data.unitName.size() > 0
+        && request.resource.data.status in ["active", "resolved"]
+        && request.resource.data.severity in ["critical", "medium", "low"]
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && (
+          request.resource.data.resolvedAt == null
+          || request.resource.data.resolvedAt is string
+        );
+      allow update: if (currentUserPerfil() == "Gerente da Empresa"
+          && request.resource.data.keys().hasOnly([
+            "unitId", "unitName", "status", "severity", "openCalls", "urgentCalls",
+            "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
+          ])
+          && resource.data.unitId == request.resource.data.unitId
+          && resource.data.unitName == request.resource.data.unitName
+          && resource.data.createdAt == request.resource.data.createdAt
+          && canAccessCurrentSupermercado(resource.data.unitId))
+        || isAdminGeral();
+      allow delete: if isAdminGeral();
+    }
+
+    match /usuarios/{id} {
+      allow read: if isSignedIn()
+        && (
+          request.auth.uid == id
+          || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
+          || isAdminGeral()
+        );
+
+      allow create: if isSignedIn()
+        && request.auth.uid == id
+        && request.resource.data.id == request.auth.uid
+        && request.resource.data.status == "Ativo"
+        && request.resource.data.get("vinculos_unidades_v2", false) == false
+        && isPerfilValido(request.resource.data.perfil)
+        && (
+          (isPerfilAutoCadastroPermitido(request.resource.data.perfil)
+            && request.resource.data.empresa_id == null
+            && request.resource.data.supermercado_id == null
+            && request.resource.data.get("supermercado_ids", []) == [])
+          || (
+            isCadastroGerentePorConviteValido()
+            && isEmpresaVinculoValido(request.resource.data.perfil, request.resource.data.empresa_id)
+            && isUnitAssignmentsValid(request.resource.data)
+            && isSupermercadoVinculoValido(
+              request.resource.data.perfil,
+              request.resource.data.empresa_id,
+              request.resource.data.supermercado_id
+            )
+          )
+        );
+
+      allow update: if isAdminGeral()
+        && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        && unitChangesUseV2Links(resource.data, request.resource.data)
+        && isUsuarioVinculoValido(request.resource.data)
+        && (!request.resource.data.get("vinculos_unidades_v2", false)
+          || isUnitAssignmentsValid(request.resource.data));
+
+      allow delete: if false;
+
+      match /unidades/{supermercadoId} {
+        function assignmentMatchesUserAfter(data) {
+          let userAfter = getAfter(/databases/$(database)/documents/usuarios/$(id)).data;
+          return isAdminGeral()
+            && (userAfter.perfil in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+              || (userAfter.perfil == "Administrador Geral" && data.status == "Inativo"))
+            && data.keys().hasOnly(["empresa_id", "supermercado_id", "status", "atualizado_em"])
+            && (data.empresa_id == userAfter.empresa_id || data.status == "Inativo")
+            && data.supermercado_id == supermercadoId
+            && data.status in ["Ativo", "Inativo"]
+            && (data.status == "Inativo"
+              || userAfter.get("supermercado_ids", []).hasAny([supermercadoId]))
+            && isSupermercadoDaEmpresaAtivo(data.empresa_id, supermercadoId);
+        }
+
+        allow read: if request.auth.uid == id || isAdminGeral();
+        allow create, update: if assignmentMatchesUserAfter(request.resource.data);
+        allow delete: if false;
+      }
+
+      match /push_tokens/{deviceId} {
+        allow read: if false;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == id
+          && isCurrentUserActive()
+          && get(/databases/$(database)/documents/usuarios/$(id)).data.status == "Ativo"
+          && request.resource.data.keys().hasOnly([
+            "token", "uid", "empresa_id", "supermercado_id", "perfil", "status", "updated_at", "platform"
+          ])
+          && request.resource.data.keys().hasAll([
+            "token", "uid", "empresa_id", "supermercado_id", "perfil", "status", "updated_at", "platform"
+          ])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 20
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.uid == id
+          && request.resource.data.empresa_id == get(/databases/$(database)/documents/usuarios/$(id)).data.empresa_id
+          && request.resource.data.supermercado_id == get(/databases/$(database)/documents/usuarios/$(id)).data.supermercado_id
+          && request.resource.data.perfil == get(/databases/$(database)/documents/usuarios/$(id)).data.perfil
+          && request.resource.data.status == "Ativo"
+          && request.resource.data.updated_at is string
+          && request.resource.data.platform == "web";
+        allow delete: if isSignedIn()
+          && request.auth.uid == id
+          && isCurrentUserActive();
+      }
+    }
+
+    match /convites_admin_empresa/{id} {
+      allow get: if (
+          isSignedIn() && hasAdminManagementAccess()
+        ) || (
+          resource.data.id == id
+          && resource.data.status == "Pendente"
+          && resource.data.expira_em_ms > request.time.toMillis()
+        );
+      allow list: if isSignedIn() && hasAdminManagementAccess();
+
+      allow create: if hasAdminManagementAccess()
+        && request.resource.data.id == id
+        && request.resource.data.perfil == "Gerente da Empresa"
+        && isEmpresaAtiva(request.resource.data.empresa_id)
+        && request.resource.data.status == "Pendente"
+        && request.resource.data.expira_em_ms is int
+        && request.resource.data.expira_em_ms > request.time.toMillis()
+        && isTextoNaoVazio(request.resource.data.criado_em)
+        && isTextoNaoVazio(request.resource.data.expira_em)
+        && (
+          request.resource.data.criado_por_uid == null
+          || isTextoNaoVazio(request.resource.data.criado_por_uid)
+        )
+        && (
+          request.resource.data.criado_por_nome == null
+          || isTextoNaoVazio(request.resource.data.criado_por_nome)
+        )
+        && request.resource.data.usado_em == null
+        && request.resource.data.usado_por_uid == null
+        && request.resource.data.usado_por_nome == null
+        && canAccessEmpresa(request.resource.data.empresa_id);
+
+      allow update: if (
+          hasAdminManagementAccess()
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.criado_em == resource.data.criado_em
+          && request.resource.data.expira_em == resource.data.expira_em
+          && request.resource.data.expira_em_ms == resource.data.expira_em_ms
+          && canAccessEmpresa(resource.data.empresa_id)
+        ) || (
+          isSignedIn()
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.empresa_id == resource.data.empresa_id
+          && request.resource.data.perfil == resource.data.perfil
+          && request.resource.data.criado_em == resource.data.criado_em
+          && request.resource.data.expira_em == resource.data.expira_em
+          && request.resource.data.expira_em_ms == resource.data.expira_em_ms
+          && resource.data.status == "Pendente"
+          && resource.data.expira_em_ms > request.time.toMillis()
+          && request.resource.data.status == "Usado"
+          && request.resource.data.usado_por_uid == request.auth.uid
+          && isTextoNaoVazio(request.resource.data.usado_em)
+          && (
+            request.resource.data.usado_por_nome == null
+            || isTextoNaoVazio(request.resource.data.usado_por_nome)
+          )
+        );
+
+      allow delete: if hasAdminManagementAccess()
+        && canAccessEmpresa(resource.data.empresa_id);
+    }
+  }
+}

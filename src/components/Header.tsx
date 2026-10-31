@@ -1,6 +1,8 @@
 import type { AppNotification } from "../types/notification";
 import type { PerfilAcesso } from "../types/usuario";
 import NotificationCenter from "./NotificationCenter";
+import type { Supermercado } from "../types/supermercado";
+import AssignedUnitSelector from "./AssignedUnitSelector";
 
 interface HeaderProps {
   onNovoChamado: () => void;
@@ -32,6 +34,10 @@ interface HeaderProps {
   showSupermercadosAction?: boolean;
   showEmpilhadeirasAction?: boolean;
   showManutencoesAction?: boolean;
+  authorizedUnits?: Supermercado[];
+  selectedUnitId?: string | null;
+  allowConsolidatedUnitView?: boolean;
+  onAuthorizedUnitChange?: (unitId: string | null) => void;
 }
 
 export default function Header({
@@ -64,6 +70,10 @@ export default function Header({
   showSupermercadosAction = false,
   showEmpilhadeirasAction = false,
   showManutencoesAction = false,
+  authorizedUnits = [],
+  selectedUnitId = null,
+  allowConsolidatedUnitView = false,
+  onAuthorizedUnitChange,
 }: HeaderProps) {
   const unidadesActionVisible = showUnidadesAction || showSupermercadosAction;
   const openUnidadesAdmin = onOpenUnidadesAdmin ?? onOpenSupermercadosAdmin;
@@ -84,6 +94,8 @@ export default function Header({
       ? "Fluxo ativo: central operacional da unidade"
       : perfilAcesso === "Supervisor" || perfilAcesso === "Separador de Televendas"
       ? "Fluxo ativo: gestão e separação da fila de chamados"
+      : perfilAcesso === "Gerente da Empresa"
+      ? "Fluxo ativo: acesso às unidades atribuídas"
       : perfilAcesso === "Administrador da Empresa"
       ? "Fluxo ativo: gestão consolidada da empresa"
       : perfilAcesso === "Administrador Geral"
@@ -99,12 +111,15 @@ export default function Header({
   const canShowCreateAction =
     showCreateAction &&
     perfilAcesso !== "Administrador da Empresa" &&
+    perfilAcesso !== "Gerente da Empresa" &&
     perfilAcesso !== "Administrador Geral";
   const operatorActionLabel =
     perfilAcesso === "Operador" ? "Minha operação" : "Painel Operador";
   const dashboardActionLabel =
     perfilAcesso === "Administrador Geral"
       ? "Gestão Plataforma"
+      : perfilAcesso === "Gerente da Empresa"
+      ? "Unidades atribuídas"
       : perfilAcesso === "Administrador da Empresa"
       ? "Gestão Empresa"
       : "Dashboard";
@@ -121,6 +136,8 @@ export default function Header({
       ? "Painel de Televendas"
       : perfilAcesso === "Separador de Televendas"
       ? "Painel do Separador de Televendas"
+      : perfilAcesso === "Gerente da Empresa"
+      ? "Painel do Gerente da Empresa"
       : perfilAcesso === "Administrador da Empresa"
       ? "Painel do Administrador da Empresa"
       : perfilAcesso === "Administrador Geral"
@@ -451,6 +468,16 @@ export default function Header({
             </div>
           </div>
         </div>
+        {authorizedUnits.length > 1 && onAuthorizedUnitChange && (
+          <div className="mt-3 rounded-2xl bg-white/95 p-2 text-slate-900 sm:ml-auto sm:max-w-md">
+            <AssignedUnitSelector
+              unidades={authorizedUnits}
+              valor={selectedUnitId}
+              permitirConsolidado={allowConsolidatedUnitView}
+              onChange={onAuthorizedUnitChange}
+            />
+          </div>
+        )}
       </div>
     </header>
   );

@@ -3,9 +3,7 @@ import {
   collection,
   doc,
   onSnapshot,
-  query,
   setDoc,
-  where,
   type FirestoreError,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -19,12 +17,15 @@ import {
   getChecklistEmpilhadeiraOcorrencia,
 } from "../utils/checklistEmpilhadeira";
 import { resolveEmpresaId } from "../utils/tenant";
+import { matchesFirestoreUnitScope, queryByUnitScope } from "../utils/firestoreUnitScope";
 
 const CHECKLISTS_COLLECTION = "checklists_empilhadeira";
 
 interface ChecklistScope {
+  userId?: string | null;
   empresaId: string | null;
   supermercadoId: string | null;
+  supermercadoIds?: string[];
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
 }
@@ -79,33 +80,25 @@ function createLocalId() {
 
 export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
   const [checklists, setChecklists] = useState<ChecklistEmpilhadeira[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!db) {
       setChecklists([]);
+      setSyncError(null);
       return;
     }
-
-    if (
-      !scope.canViewAllCompanies &&
-      !scope.empresaId &&
-      !(scope.supermercadoId && !scope.canViewAllUnits)
-    ) {
+    setChecklists([]);
+    setSyncError(null);
+    const checklistsQuery = queryByUnitScope(
+      collection(db, CHECKLISTS_COLLECTION),
+      "supermercado_id",
+      scope
+    );
+    if (!checklistsQuery) {
       setChecklists([]);
       return;
     }
-
-    const checklistsQuery = scope.canViewAllCompanies
-      ? query(collection(db, CHECKLISTS_COLLECTION))
-      : !scope.canViewAllUnits && scope.supermercadoId
-        ? query(
-            collection(db, CHECKLISTS_COLLECTION),
-            where("supermercado_id", "==", scope.supermercadoId)
-          )
-        : query(
-            collection(db, CHECKLISTS_COLLECTION),
-            where("empresa_id", "==", scope.empresaId)
-          );
 
     return onSnapshot(
       checklistsQuery,
@@ -117,8 +110,7 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
               snapshotDoc.id
             )
           )
-          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
-          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => matchesFirestoreUnitScope(scope, item.empresa_id, item.supermercado_id))
           .sort(
             (a, b) =>
               new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime()
@@ -126,11 +118,17 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
 
         setChecklists(remote);
       },
-      () => {
+      (error) => {
+        console.warn("[firestore] checklists.listen failed", {
+          operation: "checklists_empilhadeira.listen",
+          collection: CHECKLISTS_COLLECTION,
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar checklists (${error.code || "unknown"}).`);
         setChecklists([]);
       }
     );
-  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
+  }, [scope.userId, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId, scope.supermercadoIds?.join("|")]);
 
   const createChecklist = useCallback(
     async (
@@ -196,11 +194,12 @@ export function useChecklistsEmpilhadeira(scope: ChecklistScope) {
 
       setChecklists((prev) => [novo, ...prev]);
     },
-    [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]
+    [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId, scope.supermercadoIds?.join("|")]
   );
 
   return {
     checklists,
+    syncError,
     createChecklist,
   };
 }

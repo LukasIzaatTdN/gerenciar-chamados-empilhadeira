@@ -22,8 +22,8 @@ export default function AdminScopeSelector({
 }: AdminScopeSelectorProps) {
   const supermercadosVisiveis =
     empresaValue === "todas"
-      ? supermercados
-      : supermercados.filter((supermercado) => supermercado.empresa_id === empresaValue);
+      ? supermercados.filter((supermercado) => supermercado.status === "Ativo")
+      : supermercados.filter((supermercado) => supermercado.empresa_id === empresaValue && supermercado.status === "Ativo");
 
   return (
     <section className="mb-5 rounded-[28px] border border-slate-200 bg-white/85 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur-xl">

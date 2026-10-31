@@ -3,19 +3,20 @@ import {
   collection,
   doc,
   onSnapshot,
-  query,
-  where,
   writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { Empilhadeira, EmpilhadeiraStatus } from "../types/empilhadeira";
 import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
+import { matchesFirestoreUnitScope, queryByUnitScope } from "../utils/firestoreUnitScope";
 
 const EMPILHADEIRAS_COLLECTION = "empilhadeiras";
 
 interface EmpilhadeiraScope {
+  userId?: string | null;
   empresaId: string | null;
   supermercadoId: string | null;
+  supermercadoIds?: string[];
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
   perfil?: string | null;
@@ -51,31 +52,27 @@ function createLocalId() {
 
 export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
   const [empilhadeiras, setEmpilhadeiras] = useState<Empilhadeira[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     const firestore = db;
     if (!firestore) {
       setEmpilhadeiras([]);
+      setSyncError(null);
       return;
     }
-
-    if (!scope.canViewAllCompanies && !scope.empresaId) {
+    setEmpilhadeiras([]);
+    setSyncError(null);
+    const empilhadeirasQuery = queryByUnitScope(
+      collection(firestore, EMPILHADEIRAS_COLLECTION),
+      "supermercado_id",
+      scope
+    );
+    if (!empilhadeirasQuery) {
       setEmpilhadeiras([]);
       return;
     }
-
-    const empilhadeirasQuery = scope.canViewAllCompanies
-      ? query(collection(firestore, EMPILHADEIRAS_COLLECTION))
-      : !scope.canViewAllUnits && scope.supermercadoId
-        ? query(
-            collection(firestore, EMPILHADEIRAS_COLLECTION),
-            where("supermercado_id", "==", scope.supermercadoId)
-          )
-        : query(
-          collection(firestore, EMPILHADEIRAS_COLLECTION),
-          where("empresa_id", "==", scope.empresaId)
-        );
 
     return onSnapshot(
       empilhadeirasQuery,
@@ -87,8 +84,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
               snapshotDoc.id
             )
           )
-          .filter((item) => scope.canViewAllCompanies || item.empresa_id === scope.empresaId)
-          .filter((item) => scope.canViewAllUnits || item.supermercado_id === scope.supermercadoId)
+          .filter((item) => matchesFirestoreUnitScope(scope, item.empresa_id, item.supermercado_id))
           .sort(
             (a, b) =>
               new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime()
@@ -96,11 +92,17 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
         setEmpilhadeiras(remote);
       },
-      () => {
+      (error) => {
+        console.warn("[firestore] empilhadeiras.listen failed", {
+          operation: "empilhadeiras.listen",
+          collection: EMPILHADEIRAS_COLLECTION,
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar empilhadeiras (${error.code || "unknown"}).`);
         setEmpilhadeiras([]);
       }
     );
-  }, [scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId]);
+  }, [scope.userId, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId, scope.supermercadoIds?.join("|")]);
 
   const createEmpilhadeira = useCallback(
     async (input: {
@@ -317,6 +319,7 @@ export function useEmpilhadeiras(scope: EmpilhadeiraScope) {
 
   return {
     empilhadeiras,
+    syncError,
     isRemoteSyncEnabled,
     createEmpilhadeira,
     updateEmpilhadeira,

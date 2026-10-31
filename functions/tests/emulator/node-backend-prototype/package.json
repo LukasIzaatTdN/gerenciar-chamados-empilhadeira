@@ -1,0 +1,7 @@
+{
+  "name": "patio-node-backend-emulator-prototype",
+  "private": true,
+  "scripts": {
+    "test:emulator": "cd ../../../../ && firebase emulators:exec --config firebase.emulator.node-backend-prototype.json --only auth,firestore --project demo-patio-confirmation \"node --test functions/tests/emulator/node-backend-prototype/prototype.test.mjs\""
+  }
+}

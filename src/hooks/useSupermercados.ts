@@ -18,8 +18,10 @@ import { assertUserAccess } from "../utils/businessRules";
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
 interface UseSupermercadosOptions {
+  userId?: string | null;
   empresaId?: string | null;
   supermercadoId?: string | null;
+  supermercadoIds?: string[];
   canViewAllUnits?: boolean;
   canViewAllCompanies?: boolean;
   perfil?: string | null;
@@ -54,39 +56,62 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
   const {
     empresaId = null,
     supermercadoId = null,
+    supermercadoIds = [],
     canViewAllUnits = false,
     canViewAllCompanies = false,
     perfil = null,
+    userId = null,
   } = options;
-  const [supermercados, setSupermercados] = useState<Supermercado[]>(
-    SUPERMERCADOS_FALLBACK
+  const [supermercados, setSupermercados] = useState<Supermercado[]>(() =>
+    db ? [] : SUPERMERCADOS_FALLBACK
   );
+  const [syncError, setSyncError] = useState<string | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     const firestore = db;
     if (!firestore) {
-      setSupermercados(SUPERMERCADOS_FALLBACK);
+      setSyncError(null);
+      setSupermercados(SUPERMERCADOS_FALLBACK.filter((unit) =>
+        canViewAllCompanies || canViewAllUnits || (supermercadoIds.includes(unit.id) && unit.status === "Ativo")
+      ));
       return;
     }
 
-    if (!canViewAllCompanies && !empresaId && !supermercadoId) {
+    setSupermercados([]);
+    setSyncError(null);
+
+    const assignedIds = [...new Set(supermercadoIds)];
+    if (!canViewAllCompanies && !canViewAllUnits && assignedIds.length > 8) {
+      setSyncError("O escopo de unidades excede o limite permitido de 8.");
+      setSupermercados([]);
+      return;
+    }
+    if (!canViewAllCompanies && !canViewAllUnits && (!empresaId || assignedIds.length === 0)) {
       setSupermercados([]);
       return;
     }
 
-    const supermercadosQuery =
-      canViewAllCompanies || !empresaId
-        ? collection(firestore, SUPERMERCADOS_COLLECTION)
-        : !canViewAllUnits && supermercadoId
-          ? query(
-              collection(firestore, SUPERMERCADOS_COLLECTION),
-              where(documentId(), "==", supermercadoId)
-            )
-          : query(
-              collection(firestore, SUPERMERCADOS_COLLECTION),
-              where("empresa_id", "==", empresaId)
-            );
+    const ref = collection(firestore, SUPERMERCADOS_COLLECTION);
+    const supermercadosQuery = canViewAllCompanies || canViewAllUnits
+      ? supermercadoId
+        ? query(ref, where(documentId(), "==", supermercadoId))
+        : empresaId
+          ? query(ref, where("empresa_id", "==", empresaId))
+          : ref
+      : assignedIds.length === 1
+        ? query(
+            ref,
+            where(documentId(), "==", assignedIds[0]),
+            where("empresa_id", "==", empresaId),
+            where("status", "==", "Ativo")
+          )
+        : query(
+            ref,
+            where(documentId(), "in", assignedIds),
+            where("empresa_id", "==", empresaId),
+            where("status", "==", "Ativo")
+          );
 
     return onSnapshot(
       supermercadosQuery,
@@ -98,18 +123,27 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
               snapshotDoc.id
             )
           )
+          .filter((unit) => canViewAllCompanies || canViewAllUnits
+            ? (!supermercadoId || unit.id === supermercadoId)
+              && (!empresaId || unit.empresa_id === empresaId)
+            : assignedIds.includes(unit.id)
+              && unit.empresa_id === empresaId
+              && unit.status === "Ativo")
           .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
 
         setSupermercados(remote);
       },
-      () => {
-        // Mantém fallback para não quebrar o pré-cadastro quando houver erro de leitura remota.
-        setSupermercados((prev) =>
-          prev.length > 0 ? prev : SUPERMERCADOS_FALLBACK
-        );
+      (error) => {
+        console.warn("[firestore] supermarkets.listen failed", {
+          operation: "supermercados.listen",
+          collection: SUPERMERCADOS_COLLECTION,
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar unidades (${error.code || "unknown"}).`);
+        setSupermercados([]);
       }
     );
-  }, [canViewAllCompanies, canViewAllUnits, empresaId, supermercadoId]);
+  }, [userId, canViewAllCompanies, canViewAllUnits, empresaId, supermercadoId, supermercadoIds.join("|")]);
 
   const createSupermercado = useCallback(
     async (input: {
@@ -226,6 +260,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
 
   return {
     supermercados,
+    syncError,
     isRemoteSyncEnabled,
     createSupermercado,
     updateSupermercado,

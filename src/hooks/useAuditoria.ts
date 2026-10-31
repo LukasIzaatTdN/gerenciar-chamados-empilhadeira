@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { resolveAuditQueryScope } from "../utils/auditScope";
+import { resolveQueryUnitIds } from "../utils/firestoreUnitScope";
 
 export interface AuditoriaItem {
   id: string;
@@ -20,8 +20,10 @@ export interface AuditoriaItem {
 interface UseAuditoriaOptions {
   empresaId?: string | null;
   supermercadoId?: string | null;
+  supermercadoIds?: string[];
   canViewAllCompanies?: boolean;
   canViewAllUnits?: boolean;
+  ownerId?: string | null;
 }
 
 function isAuditMatch(item: AuditoriaItem, options: UseAuditoriaOptions) {
@@ -41,9 +43,17 @@ function isAuditMatch(item: AuditoriaItem, options: UseAuditoriaOptions) {
   }
 
   if (options.supermercadoId && typeof supermercadoId === "string") {
-    if (!options.canViewAllUnits && supermercadoId !== options.supermercadoId) {
+    if (supermercadoId !== options.supermercadoId) {
       return false;
     }
+  }
+  if (!options.canViewAllCompanies && !options.supermercadoId) {
+    const allowedUnits = resolveQueryUnitIds({
+      empresaId: options.empresaId ?? null,
+      supermercadoIds: options.supermercadoIds,
+      canViewAllCompanies: false,
+    });
+    if (!allowedUnits?.includes(typeof supermercadoId === "string" ? supermercadoId : "")) return false;
   }
 
   return true;
@@ -51,10 +61,11 @@ function isAuditMatch(item: AuditoriaItem, options: UseAuditoriaOptions) {
 
 export function useAuditoria(options: UseAuditoriaOptions) {
   const [items, setItems] = useState<AuditoriaItem[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!db) {
-      const saved = localStorage.getItem("operador_empilhadeira_auditoria");
+      const saved = localStorage.getItem(`operador_empilhadeira_auditoria:${options.ownerId ?? "guest"}`);
       if (!saved) {
         setItems([]);
         return;
@@ -70,21 +81,32 @@ export function useAuditoria(options: UseAuditoriaOptions) {
     }
 
     const auditsRef = collection(db, "auditoria");
-    const scope = resolveAuditQueryScope(options);
-
-    if (!scope) {
+    const scopedUnitIds = options.canViewAllCompanies
+      ? null
+      : resolveQueryUnitIds({
+          empresaId: options.empresaId ?? null,
+          supermercadoId: options.supermercadoId ?? null,
+          supermercadoIds: options.supermercadoIds,
+          canViewAllCompanies: false,
+        });
+    if (!options.canViewAllCompanies && !scopedUnitIds?.length) {
       setItems([]);
+      setSyncError(null);
       return;
     }
-
-    const scopeFilter =
-      scope.type === "supermercado"
-        ? where("supermercado_id", "==", scope.id)
-        : scope.type === "empresa"
-        ? where("empresa_id", "==", scope.id)
-        : null;
-    const q = scopeFilter
-      ? query(auditsRef, scopeFilter, orderBy("occurredAt", "desc"), limit(30))
+    setItems([]);
+    setSyncError(null);
+    const unitFilter = options.canViewAllCompanies && options.supermercadoId
+      ? where("supermercado_id", "==", options.supermercadoId)
+      : scopedUnitIds?.length
+        ? scopedUnitIds.length === 1
+          ? where("supermercado_id", "==", scopedUnitIds[0])
+          : where("supermercado_id", "in", scopedUnitIds)
+        : options.empresaId
+          ? where("empresa_id", "==", options.empresaId)
+          : null;
+    const q = unitFilter
+      ? query(auditsRef, unitFilter, orderBy("occurredAt", "desc"), limit(30))
       : query(auditsRef, orderBy("occurredAt", "desc"), limit(30));
 
     const unsubscribe = onSnapshot(
@@ -99,13 +121,21 @@ export function useAuditoria(options: UseAuditoriaOptions) {
           .slice(0, 8);
 
         setItems(nextItems);
-        localStorage.setItem("operador_empilhadeira_auditoria", JSON.stringify(nextItems));
+        localStorage.setItem(`operador_empilhadeira_auditoria:${options.ownerId ?? "guest"}`, JSON.stringify(nextItems));
       },
-      () => setItems([])
+      (error) => {
+        console.warn("[firestore] audit listen failed", {
+          operation: "auditoria.listen",
+          collection: "auditoria",
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar auditoria (${error.code || "unknown"}).`);
+        setItems([]);
+      }
     );
 
     return () => unsubscribe();
-  }, [options.empresaId, options.supermercadoId, options.canViewAllCompanies, options.canViewAllUnits]);
+  }, [options.empresaId, options.supermercadoId, options.supermercadoIds?.join("|"), options.canViewAllCompanies, options.canViewAllUnits, options.ownerId]);
 
-  return items;
+  return { items, syncError };
 }

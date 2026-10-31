@@ -1,0 +1,11 @@
+{
+  "firestore": {
+    "rules": "functions/tests/firestore/individual-order-items.rules"
+  },
+  "emulators": {
+    "firestore": { "host": "127.0.0.1", "port": 18631, "websocketPort": 18632 },
+    "hub": { "host": "127.0.0.1", "port": 18630 },
+    "logging": { "host": "127.0.0.1", "port": 18633 },
+    "ui": { "enabled": false }
+  }
+}

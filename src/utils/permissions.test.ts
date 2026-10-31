@@ -16,17 +16,18 @@ const operator = getPermissions("Operador");
 assert.equal(operator.canAccessOperatorPanel, true);
 assert.equal(operator.canViewUnitDashboard, false);
 
-const supervisor = getPermissions("Supervisor");
-assert.equal(supervisor.canAccessOperatorPanel, true);
-assert.equal(supervisor.canViewUnitDashboard, true);
-assert.equal(supervisor.canViewHistoryAndReports, true);
+const manager = getPermissions("Gerente da Empresa");
+assert.equal(manager.canViewUnitDashboard, true);
+assert.equal(manager.canViewAllUnits, false);
+assert.equal(manager.canManageUnits, false);
+assert.equal(manager.canManageCompanyAdmin, false);
 
-const companyAdmin = getPermissions("Administrador da Empresa");
-assert.equal(companyAdmin.canViewAllUnits, true);
-assert.equal(companyAdmin.canManageUnits, true);
+const legacyCompanyAdmin = getPermissions("Administrador da Empresa");
+assert.equal(legacyCompanyAdmin.canViewAllUnits, false);
+assert.equal(legacyCompanyAdmin.canManageUnits, false);
 
 const platformAdmin = getPermissions("Administrador Geral");
 assert.equal(platformAdmin.canViewAllUnits, true);
-assert.equal(platformAdmin.canManageUnits, false);
+assert.equal(platformAdmin.canManageUnits, true);
 
 console.log("permissions tests passed");

@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function actor() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data; }
+    function activeSeparator() {
+      return signedIn() && actor().status == 'Ativo'
+        && actor().perfil == 'Separador de Televendas';
+    }
+    function parentOrder(pedidoId) {
+      return get(/databases/$(database)/documents/chamados/$(pedidoId)).data;
+    }
+    function unit(pedidoId) {
+      return get(/databases/$(database)/documents/supermercados/$(parentOrder(pedidoId).supermercado_id)).data;
+    }
+    function company(pedidoId) {
+      return get(/databases/$(database)/documents/empresas/$(parentOrder(pedidoId).empresa_id)).data;
+    }
+    function inScope(pedidoId) {
+      return activeSeparator()
+        && actor().empresa_id == parentOrder(pedidoId).empresa_id
+        && actor().supermercado_id == parentOrder(pedidoId).supermercado_id
+        && unit(pedidoId).empresa_id == parentOrder(pedidoId).empresa_id
+        && unit(pedidoId).status == 'Ativo'
+        && company(pedidoId).status == 'Ativa';
+    }
+    function callData(callId) {
+      return get(/databases/$(database)/documents/chamados/$(callId)).data;
+    }
+    function receiptAfter(pedidoId, confirmationId) {
+      return getAfter(/databases/$(database)/documents/chamados/$(pedidoId)/separacao_confirmacoes/$(confirmationId)).data;
+    }
+    function auditAfter(auditId) {
+      return getAfter(/databases/$(database)/documents/auditoria/$(auditId)).data;
+    }
+    function itemAfter(pedidoId, itemId) {
+      return getAfter(/databases/$(database)/documents/chamados/$(pedidoId)/itens/$(itemId)).data;
+    }
+    function validItemUpdate(pedidoId, itemId) {
+      let old = resource.data;
+      let next = request.resource.data;
+      let confirmationId = next.get('ultima_confirmacao_id', '');
+      let auditId = next.get('ultima_auditoria_id', '');
+      let receipt = receiptAfter(pedidoId, confirmationId);
+      let audit = auditAfter(auditId);
+      return old.keys().hasOnly([
+          'id', 'pedido_id', 'empresa_id', 'supermercado_id', 'produto', 'unidade_medida',
+          'quantidade_solicitada', 'quantidade_encontrada', 'quantidade_faltante',
+          'recebimento_empilhadeira_confirmado', 'ultima_confirmacao_id', 'ultima_auditoria_id'
+        ])
+        && next.keys().hasOnly([
+          'id', 'pedido_id', 'empresa_id', 'supermercado_id', 'produto', 'unidade_medida',
+          'quantidade_solicitada', 'quantidade_encontrada', 'quantidade_faltante',
+          'recebimento_empilhadeira_confirmado', 'ultima_confirmacao_id', 'ultima_auditoria_id'
+        ])
+        && next.id == itemId && next.pedido_id == pedidoId
+        && old.id == itemId && old.pedido_id == pedidoId
+        && next.empresa_id == old.empresa_id && next.supermercado_id == old.supermercado_id
+        && next.produto == old.produto && next.unidade_medida == old.unidade_medida
+        && next.quantidade_solicitada == old.quantidade_solicitada
+        && old.ultima_confirmacao_id != confirmationId
+        && old.ultima_auditoria_id != auditId
+        && next.diff(old).affectedKeys().hasOnly([
+          'quantidade_encontrada', 'quantidade_faltante', 'recebimento_empilhadeira_confirmado',
+          'ultima_confirmacao_id', 'ultima_auditoria_id'
+        ])
+        && receipt.item_id == itemId
+        && next.quantidade_encontrada == old.quantidade_encontrada + receipt.quantidade
+        && next.quantidade_encontrada >= old.quantidade_encontrada
+        && next.quantidade_encontrada <= old.quantidade_solicitada
+        && next.quantidade_faltante == next.quantidade_solicitada - next.quantidade_encontrada
+        && next.recebimento_empilhadeira_confirmado == true
+        && next.ultima_confirmacao_id == receipt.id
+        && next.ultima_auditoria_id == receipt.audit_id
+        && audit.action == 'separacao_item_confirmada'
+        && audit.actorUid == request.auth.uid
+        && audit.entityType == 'pedido_item'
+        && audit.entityId == itemId
+        && audit.pedido_id == pedidoId
+        && audit.confirmacao_id == receipt.id
+        && audit.empresa_id == old.empresa_id
+        && audit.supermercado_id == old.supermercado_id;
+    }
+    match /chamados/{pedidoId} {
+      allow get, list: if inScope(pedidoId);
+      allow create, update, delete: if false;
+      match /itens/{itemId} {
+        allow get, list: if inScope(pedidoId);
+        allow create, delete: if false;
+        allow update: if inScope(pedidoId)
+          && parentOrder(pedidoId).status == 'Em separação'
+          && validItemUpdate(pedidoId, itemId);
+      }
+      match /separacao_confirmacoes/{confirmationId} {
+        allow get: if inScope(pedidoId);
+        allow list: if false;
+        allow create: if inScope(pedidoId)
+          && request.resource.data.keys().hasOnly([
+            'id', 'pedido_id', 'item_id', 'chamado_id', 'empresa_id', 'supermercado_id',
+            'actor_uid', 'quantidade', 'unidade_medida', 'justificativa', 'audit_id', 'confirmado_em'
+          ])
+          && request.resource.data.id == confirmationId
+          && request.resource.data.keys().hasAll([
+            'id', 'pedido_id', 'item_id', 'chamado_id', 'empresa_id', 'supermercado_id',
+            'actor_uid', 'quantidade', 'unidade_medida', 'audit_id', 'confirmado_em'
+          ])
+          && request.resource.data.pedido_id == pedidoId
+          && request.resource.data.chamado_id == confirmationId
+          && request.resource.data.actor_uid == request.auth.uid
+          && request.resource.data.confirmado_em == request.time
+          && request.resource.data.empresa_id == parentOrder(pedidoId).empresa_id
+          && request.resource.data.supermercado_id == parentOrder(pedidoId).supermercado_id
+          && request.resource.data.quantidade is int && request.resource.data.quantidade >= 0
+          && (request.resource.data.quantidade > 0
+            || (request.resource.data.justificativa is string && request.resource.data.justificativa.size() > 0))
+          && callData(confirmationId).status == 'Finalizado'
+          && callData(confirmationId).categoria == 'operacional'
+          && callData(confirmationId).pedido_origem_id == pedidoId
+          && callData(confirmationId).pedido_origem_item_id == request.resource.data.item_id
+          && callData(confirmationId).empresa_id == request.resource.data.empresa_id
+          && callData(confirmationId).supermercado_id == request.resource.data.supermercado_id
+          && itemAfter(pedidoId, request.resource.data.item_id).ultima_confirmacao_id == confirmationId
+          && itemAfter(pedidoId, request.resource.data.item_id).ultima_auditoria_id == request.resource.data.audit_id;
+        allow update, delete: if false;
+      }
+    }
+    match /auditoria/{auditId} {
+      allow create: if inScope(request.resource.data.pedido_id)
+        && request.resource.data.keys().hasOnly([
+          'action', 'actorUid', 'entityType', 'entityId', 'pedido_id', 'confirmacao_id',
+          'empresa_id', 'supermercado_id', 'occurredAt'
+        ])
+        && request.resource.data.action == 'separacao_item_confirmada'
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.occurredAt == request.time
+        && request.resource.data.entityType == 'pedido_item'
+        && request.resource.data.empresa_id == parentOrder(request.resource.data.pedido_id).empresa_id
+        && request.resource.data.supermercado_id == parentOrder(request.resource.data.pedido_id).supermercado_id
+        && itemAfter(request.resource.data.pedido_id, request.resource.data.entityId).ultima_auditoria_id == auditId
+        && itemAfter(request.resource.data.pedido_id, request.resource.data.entityId).ultima_confirmacao_id == request.resource.data.confirmacao_id
+        && receiptAfter(request.resource.data.pedido_id, request.resource.data.confirmacao_id).audit_id == auditId;
+      allow update, delete: if false;
+    }
+  }
+}

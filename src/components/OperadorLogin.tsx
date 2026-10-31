@@ -32,21 +32,15 @@ interface OperadorLoginProps {
 }
 
 const PERFIS_LOGIN: PerfilAcesso[] = [
-  "Promotor",
-  "Funcionário",
+  "Administrador Geral",
+  "Gerente da Empresa",
   "Operador",
-  "Supervisor",
   "Televendas",
   "Separador de Televendas",
-  "Administrador da Empresa",
-  "Administrador Geral",
 ];
 
 const PERFIS_AUTO_CADASTRO: PerfilAcesso[] = [
-  "Promotor",
-  "Funcionário",
   "Operador",
-  "Supervisor",
   "Televendas",
   "Separador de Televendas",
 ];
@@ -95,13 +89,13 @@ export default function OperadorLogin({
       ? PERFIS_AUTO_CADASTRO
       : PERFIS_LOGIN;
   const perfilEfetivo = usingAdminInvite
-    ? ("Administrador da Empresa" as PerfilAcesso)
+    ? ("Gerente da Empresa" as PerfilAcesso)
     : perfilSelecionado;
   const precisaEmpresa = Boolean(perfilEfetivo) && perfilEfetivo !== "Administrador Geral";
   const precisaUnidade =
     Boolean(perfilEfetivo) &&
     perfilEfetivo !== "Administrador Geral" &&
-    perfilEfetivo !== "Administrador da Empresa";
+    perfilEfetivo !== "Gerente da Empresa";
   const shouldDisableSubmit =
     authMode === "firebase" && authTab === "register" && precisaEmpresa && empresasAtivas.length === 0;
   const canUseGoogleRegister =
@@ -236,7 +230,7 @@ export default function OperadorLogin({
         {authMode === "firebase" && authTab === "register" && (
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Token de convite (Admin da Empresa)
+              Token de convite (Gerente da Empresa)
             </label>
             <input
               type="text"
@@ -249,7 +243,7 @@ export default function OperadorLogin({
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900"
             />
             <p className="mt-1 text-xs text-slate-500">
-              Com token válido, o cadastro será criado como Administrador da Empresa automaticamente.
+              Com token válido, o cadastro será criado como Gerente da Empresa. O Administrador Geral atribui as unidades depois.
             </p>
           </div>
         )}
@@ -260,7 +254,7 @@ export default function OperadorLogin({
           </div>
         ) : usingAdminInvite ? (
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-            Convite detectado: este cadastro será vinculado à empresa do token com acesso de Administrador da Empresa.
+            Convite detectado: este cadastro será vinculado à empresa do token sem unidades até ser atribuído pelo Administrador Geral.
           </div>
         ) : (
           <div>
@@ -305,9 +299,9 @@ export default function OperadorLogin({
           </div>
         )}
 
-        {perfilEfetivo === "Administrador da Empresa" && (
+        {perfilEfetivo === "Gerente da Empresa" && (
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-            Administrador da Empresa terá visão de todas as unidades do cliente selecionado.
+            O Gerente da Empresa acessa somente as unidades atribuídas pelo Administrador Geral.
           </div>
         )}
       </>

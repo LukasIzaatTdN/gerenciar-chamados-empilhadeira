@@ -12,33 +12,31 @@ service cloud.firestore {
     }
 
     function isCurrentUserActive() {
-      return hasCurrentUserDoc()
-        && (
-          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
-          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-        );
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn() && userData.get("status", "Ativo") == "Ativo";
     }
 
     function isAdminGeral() {
-      return isCurrentUserActive()
-        && currentUserPerfil() == "Administrador Geral";
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      return isSignedIn()
+        && userData.get("status", "Ativo") == "Ativo"
+        && userData.get("perfil", null) == "Administrador Geral";
     }
 
     // SaaS privilege is intentionally stricter than the shared operational helper:
     // a missing user status must never grant platform subscription management.
     function isActiveSaasPlatformAdmin() {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
       return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador Geral"
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo";
+        && userData.get("perfil", null) == "Administrador Geral"
+        && userData.get("status", null) == "Ativo";
     }
 
     function isActiveSaasCompanyAdmin(empresaId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador da Empresa"
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id == empresaId;
+      return false;
     }
 
     function isSaasPlanValid(planId, data) {
@@ -163,8 +161,7 @@ service cloud.firestore {
     }
 
     function isAdminEmpresa() {
-      return isCurrentUserActive()
-        && currentUserPerfil() == "Administrador da Empresa";
+      return false;
     }
 
     function hasAdminManagementAccess() {
@@ -172,116 +169,160 @@ service cloud.firestore {
     }
 
     function currentUserEmpresaId() {
-      return hasCurrentUserDoc()
-        && "empresa_id" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id is string
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id.size() > 0
-        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id
-        : null;
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let empresaId = userData.get("empresa_id", null);
+      return empresaId is string && empresaId.size() > 0 ? empresaId : null;
     }
 
     function currentUserSupermercadoId() {
-      return hasCurrentUserDoc()
-        && "supermercado_id" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id is string
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id.size() > 0
-        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id
-        : null;
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let supermercadoId = userData.get("supermercado_id", null);
+      return supermercadoId is string && supermercadoId.size() > 0 ? supermercadoId : null;
+    }
+
+    function currentUserSupermercadoIds() {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      return userData.get("supermercado_ids", []) is list
+        && userData.get("supermercado_ids", []).size() > 0
+        ? userData.get("supermercado_ids", [])
+        : (currentUserSupermercadoId() is string ? [currentUserSupermercadoId()] : []);
     }
 
     function currentUserPerfil() {
-      return hasCurrentUserDoc()
-        && "perfil" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil is string
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil.size() > 0
-        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
-        : null;
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
+      let perfil = userData.get("perfil", null);
+      return perfil is string && perfil.size() > 0 ? perfil : null;
     }
 
     function isSupervisorDaUnidade(supermercadoId) {
+      let userPath = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+      let userData = isSignedIn() ? get(userPath).data : {};
       return isSignedIn()
-        && (
-          currentUserPerfil() == "Supervisor"
-          || currentUserPerfil() == "Separador de Televendas"
-        )
-        && currentUserSupermercadoId() != null
-        && currentUserSupermercadoId() == supermercadoId;
+        && userData.get("status", "Ativo") == "Ativo"
+        && userData.get("perfil", null) == "Separador de Televendas"
+        && effectiveUnitIds(userData).hasAny([supermercadoId])
+        && isSupermercadoDaEmpresaAtivo(userData.get("empresa_id", null), supermercadoId);
     }
 
     function isAdminEmpresaDaEmpresa(empresaId) {
-      return isSignedIn()
-        && currentUserPerfil() == "Administrador da Empresa"
-        && currentUserEmpresaId() != null
-        && currentUserEmpresaId() == empresaId;
+      return isAdminGeral();
     }
 
     function isPerfilValido(perfilInput) {
-      return perfilInput == "Promotor"
-        || perfilInput == "Funcionário"
+      return perfilInput == "Gerente da Empresa"
         || perfilInput == "Operador"
-        || perfilInput == "Supervisor"
         || perfilInput == "Televendas"
         || perfilInput == "Separador de Televendas"
-        || perfilInput == "Administrador da Empresa"
         || perfilInput == "Administrador Geral";
     }
 
     function isPerfilAutoCadastroPermitido(perfilInput) {
-      return perfilInput == "Promotor"
-        || perfilInput == "Funcionário"
-        || perfilInput == "Operador"
-        || perfilInput == "Supervisor"
+      return perfilInput == "Operador"
         || perfilInput == "Televendas"
         || perfilInput == "Separador de Televendas";
     }
 
-    function isConviteAdminEmpresaValido(token) {
+    function isConviteGerenteValido(token) {
       return token is string
         && token.size() > 0
         && exists(/databases/$(database)/documents/convites_admin_empresa/$(token))
         && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.status == "Pendente"
-        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.perfil == "Administrador da Empresa"
+        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.perfil == "Gerente da Empresa"
         && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.empresa_id
           == request.resource.data.empresa_id
         && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.expira_em_ms
           > request.time.toMillis();
     }
 
-    function isCadastroAdminEmpresaPorConviteValido() {
-      return request.resource.data.perfil == "Administrador da Empresa"
+    function isCadastroGerentePorConviteValido() {
+      return request.resource.data.perfil == "Gerente da Empresa"
         && request.resource.data.supermercado_id == null
+        && request.resource.data.get("supermercado_ids", []) == []
         && request.resource.data.convite_token is string
-        && isConviteAdminEmpresaValido(request.resource.data.convite_token);
+        && isConviteGerenteValido(request.resource.data.convite_token);
     }
 
     function isEmpresaAtiva(empresaId) {
+      let path = /databases/$(database)/documents/empresas/$(empresaId);
+      let company = empresaId is string && empresaId.size() > 0
+        ? get(path).data
+        : {};
       return empresaId is string
         && empresaId.size() > 0
-        && exists(/databases/$(database)/documents/empresas/$(empresaId))
-        && (
-          !(
-            "status" in get(/databases/$(database)/documents/empresas/$(empresaId)).data
-          )
-          || get(/databases/$(database)/documents/empresas/$(empresaId)).data.status == "Ativa"
-        );
+        && company.get("status", "Ativa") == "Ativa";
     }
 
     function isSupermercadoAtivo(supermercadoId) {
+      let path = /databases/$(database)/documents/supermercados/$(supermercadoId);
+      let unit = supermercadoId is string && supermercadoId.size() > 0
+        ? get(path).data
+        : {};
       return supermercadoId is string
         && supermercadoId.size() > 0
-        && exists(/databases/$(database)/documents/supermercados/$(supermercadoId))
-        && (
-          !(
-            "status" in get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data
-          )
-          || get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.status == "Ativo"
-        );
+        && unit.get("status", "Ativo") == "Ativo";
     }
 
     function isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId) {
-      return isEmpresaAtiva(empresaId)
-        && isSupermercadoAtivo(supermercadoId)
-        && get(/databases/$(database)/documents/supermercados/$(supermercadoId)).data.empresa_id == empresaId;
+      let companyPath = /databases/$(database)/documents/empresas/$(empresaId);
+      let unitPath = /databases/$(database)/documents/supermercados/$(supermercadoId);
+      let company = empresaId is string && empresaId.size() > 0
+        ? get(companyPath).data
+        : {};
+      let unit = supermercadoId is string && supermercadoId.size() > 0
+        ? get(unitPath).data
+        : {};
+      return empresaId is string
+        && empresaId.size() > 0
+        && company.get("status", "Ativa") == "Ativa"
+        && supermercadoId is string
+        && supermercadoId.size() > 0
+        && unit.get("status", "Ativo") == "Ativo"
+        && unit.get("empresa_id", null) == empresaId;
+    }
+
+    function effectiveUnitIds(data) {
+      let listed = data.get("supermercado_ids", []);
+      return listed is list && listed.size() > 0
+        ? listed
+        : (data.get("supermercado_id", null) is string
+          ? [data.get("supermercado_id", null)]
+          : []);
+    }
+
+    function isUnitAssignmentsValid(data) {
+      let units = effectiveUnitIds(data);
+      return (!("supermercado_ids" in data) || data.supermercado_ids is list)
+        && units is list
+        // Eight assigned units leave room for the user document and both old/new link
+        // documents under Firestore's 20 access-call ceiling for one atomic batch.
+        && units.size() <= 8
+        && units.toSet().size() == units.size()
+        && (units.size() == 0 || data.get("supermercado_id", units[0]) == units[0]);
+    }
+
+    function userUnitAssignmentPath(userId, unitId) {
+      return /databases/$(database)/documents/usuarios/$(userId)/unidades/$(unitId);
+    }
+
+    function hasActiveManagerUnitAssignment(userData, unitId) {
+      let path = userUnitAssignmentPath(request.auth.uid, unitId);
+      let assignment = get(path).data;
+      return assignment.get("status", null) == "Ativo"
+        && assignment.get("empresa_id", null) == userData.get("empresa_id", null);
+    }
+
+    function canAccessAssignedUnit(userData, supermercadoId, empresaId) {
+      return userData.get("status", "Ativo") == "Ativo"
+        && userData.perfil in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+        && userData.get("empresa_id", null) is string
+        && userData.get("empresa_id", null) == empresaId
+        && effectiveUnitIds(userData).hasAny([supermercadoId])
+        && ((userData.perfil != "Gerente da Empresa"
+            && !userData.get("vinculos_unidades_v2", false))
+          || hasActiveManagerUnitAssignment(userData, supermercadoId));
     }
 
     function isEmpresaVinculoValido(perfilInput, empresaId) {
@@ -293,26 +334,15 @@ service cloud.firestore {
     }
 
     function isSupermercadoVinculoValido(perfilInput, empresaId, supermercadoId) {
-      return (
-        perfilInput == "Administrador Geral"
-        && (
-          supermercadoId == null
-          || isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId)
-        )
-      ) || (
-        perfilInput == "Administrador da Empresa"
-        && supermercadoId == null
-        && isEmpresaAtiva(empresaId)
-      ) || (
-        perfilInput != "Administrador Geral"
-        && perfilInput != "Administrador da Empresa"
-        && isSupermercadoDaEmpresaAtivo(empresaId, supermercadoId)
-      );
+      return (perfilInput == "Administrador Geral" && supermercadoId == null)
+        || (perfilInput in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+          && (supermercadoId == null || supermercadoId is string));
     }
 
     function isUsuarioVinculoValido(data) {
       return isPerfilValido(data.perfil)
         && (!("status" in data) || isStatusUsuarioValido(data.status))
+        && (!("vinculos_unidades_v2" in data) || data.vinculos_unidades_v2 is bool)
         && isEmpresaVinculoValido(data.perfil, data.empresa_id)
         && isSupermercadoVinculoValido(
           data.perfil,
@@ -322,12 +352,7 @@ service cloud.firestore {
     }
 
     function canAdminEmpresaManageUser(existingData, newData) {
-      return isAdminEmpresa()
-        && existingData.perfil != "Administrador Geral"
-        && newData.perfil != "Administrador Geral"
-        && existingData.empresa_id == currentUserEmpresaId()
-        && newData.empresa_id == currentUserEmpresaId()
-        && isUsuarioVinculoValido(newData);
+      return false;
     }
 
     function hasOnlyUserManagementChanges(existingData, newData) {
@@ -336,40 +361,110 @@ service cloud.firestore {
         "empresa_id",
         "supermercado_id",
         "supermercado_ids",
+        "vinculos_unidades_v2",
         "status",
         "atualizado_em"
       ]);
     }
 
+    function unitChangesUseV2Links(existingData, newData) {
+      return !newData.diff(existingData).affectedKeys().hasAny([
+          "supermercado_id", "supermercado_ids"
+        ])
+        || newData.get("vinculos_unidades_v2", false) == true;
+    }
+
     function canAccessEmpresa(empresaId) {
-      return isAdminGeral()
-        || isAdminEmpresaDaEmpresa(empresaId);
+      return isAdminGeral();
     }
 
     function belongsToEmpresa(empresaId) {
-      return isCurrentUserActive()
-        && currentUserEmpresaId() != null
-        && currentUserEmpresaId() == empresaId;
+      return false;
     }
 
     function canAccessCurrentSupermercado(supermercadoId) {
-      return isCurrentUserActive()
-        && currentUserSupermercadoId() is string
-        && currentUserSupermercadoId().size() > 0
-        && currentUserSupermercadoId() == supermercadoId;
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      return isSignedIn()
+        && userData.empresa_id is string
+        && canAccessAssignedUnit(userData, supermercadoId, userData.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(userData.empresa_id, supermercadoId);
     }
 
     function canCreateChamado() {
       return isCurrentUserActive()
-        && isPerfilValido(currentUserPerfil());
+        && currentUserPerfil() in ["Operador", "Televendas", "Separador de Televendas"];
+    }
+
+    function isCurrentUserSeparator() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil
+        == "Separador de Televendas";
     }
 
     function canManageChamado() {
       return currentUserPerfil() == "Operador"
-        || currentUserPerfil() == "Supervisor"
-        || currentUserPerfil() == "Separador de Televendas"
-        || isAdminEmpresa()
         || isAdminGeral();
+    }
+
+    function isChamadoTelevendas(data) {
+      return ("categoria" in data && data.categoria == "televendas")
+        || ("tipo_servico" in data && data.tipo_servico == "Atendimento Televendas");
+    }
+
+    function canSeparatorReadChamado(data) {
+      return isCurrentUserActive()
+        && currentUserPerfil() == "Separador de Televendas"
+        && data.get("supermercado_id", null) is string
+        && data.get("supermercado_id", "").size() > 0
+        && data.get("empresa_id", null) == currentUserEmpresaId()
+        && canAccessCurrentSupermercado(data.get("supermercado_id", null))
+        && isChamadoTelevendas(data);
+    }
+
+    function separatorChangedFieldsAllowed(oldData, newData) {
+      return newData.diff(oldData).affectedKeys().hasOnly([
+        "itens", "produto", "quantidade", "total_solicitado", "total_encontrado",
+        "percentual_atendido", "status", "motivo_incompleto", "observacao_operador",
+        "atualizado_em", "atualizado_por", "operador_nome", "assumido_em", "cancelado_em"
+      ]);
+    }
+
+    function canSeparatorUpdateTelevendas(oldData, newData) {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      let starting = oldData.status == "Aberto"
+        && newData.status == "Em separação"
+        && isCampoVazio(oldData.operador_nome)
+        && newData.operador_nome is string
+        && newData.operador_nome.size() > 0
+        && newData.assumido_em is string
+        && newData.assumido_em.size() > 0;
+      let completing = oldData.status == "Em separação"
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.operador_nome == newData.operador_nome;
+      let retrying = oldData.status == "Incompleto"
+        && newData.status in ["Pronto", "Incompleto", "Cancelado"]
+        && oldData.operador_nome == newData.operador_nome;
+      return (!("status" in userData) || userData.status == "Ativo")
+        && userData.perfil == "Separador de Televendas"
+        && userData.get("empresa_id", null) == oldData.empresa_id
+        && canAccessAssignedUnit(userData, oldData.supermercado_id, oldData.empresa_id)
+        && isSupermercadoDaEmpresaAtivo(oldData.empresa_id, oldData.supermercado_id)
+        && oldData.empresa_id == newData.empresa_id
+        && oldData.supermercado_id == newData.supermercado_id
+        && isChamadoTelevendas(oldData)
+        && isChamadoTelevendas(newData)
+        && (("id" in oldData && newData.id == oldData.id)
+          || (!("id" in oldData) && !("id" in newData)))
+        && (starting || completing || retrying)
+        && separatorChangedFieldsAllowed(oldData, newData)
+        && (newData.itens is list
+          || (starting && !("itens" in oldData) && !("itens" in newData)))
+        && (newData.status != "Incompleto" || isTextoNaoVazio(newData.motivo_incompleto))
+        && (newData.status == "Cancelado"
+          ? newData.cancelado_em is string && newData.cancelado_em.size() > 0
+          : newData.cancelado_em == null)
+        && (newData.status == "Em separação"
+          ? newData.assumido_em is string && newData.assumido_em.size() > 0
+          : newData.assumido_em == oldData.assumido_em);
     }
 
     function isStatusUsuarioValido(status) {
@@ -471,11 +566,9 @@ service cloud.firestore {
           isCurrentUserActive()
           && (
             currentUserPerfil() == "Operador"
-            || currentUserPerfil() == "Supervisor"
             || currentUserPerfil() == "Separador de Televendas"
           )
-          && currentUserSupermercadoId() != null
-          && currentUserSupermercadoId() == data.supermercado_id
+          && canAccessCurrentSupermercado(data.supermercado_id)
         );
     }
 
@@ -633,8 +726,14 @@ service cloud.firestore {
     match /chamados/{id} {
       allow read: if isSignedIn()
         && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
+          canSeparatorReadChamado(resource.data)
+          || (
+            currentUserPerfil() != "Separador de Televendas"
+            && (
+              canAccessCurrentSupermercado(resource.data.supermercado_id)
+              || canAccessEmpresa(resource.data.empresa_id)
+            )
+          )
         );
 
       allow create: if isSignedIn()
@@ -647,12 +746,19 @@ service cloud.firestore {
         );
 
       allow update: if isSignedIn()
-        && canManageChamado()
-        && isAtualizacaoChamadoValida()
-        && (
-          canAccessCurrentSupermercado(resource.data.supermercado_id)
-          || canAccessEmpresa(resource.data.empresa_id)
-        );
+        && (currentUserPerfil() == "Separador de Televendas"
+          ? isChamadoTelevendas(resource.data)
+            && canSeparatorUpdateTelevendas(resource.data, request.resource.data)
+          : canManageChamado()
+            && isAtualizacaoChamadoValida()
+            && (
+              canAccessAssignedUnit(
+                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data,
+                resource.data.supermercado_id,
+                resource.data.empresa_id
+              )
+              || canAccessEmpresa(resource.data.empresa_id)
+            ));
 
       allow delete: if isAdminGeral();
     }
@@ -882,9 +988,14 @@ service cloud.firestore {
     }
 
     match /operational_escalations/{id} {
-      allow read: if isSignedIn() && isCurrentUserActive();
+      allow read: if isAdminGeral() || canAccessCurrentSupermercado(resource.data.unitId);
       allow create: if isSignedIn()
-        && isCurrentUserActive()
+        && currentUserPerfil() == "Gerente da Empresa"
+        && canAccessCurrentSupermercado(request.resource.data.unitId)
+        && request.resource.data.keys().hasOnly([
+          "unitId", "unitName", "status", "severity", "openCalls", "urgentCalls",
+          "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
+        ])
         && request.resource.data.unitId is string
         && request.resource.data.unitId.size() > 0
         && request.resource.data.unitName is string
@@ -897,7 +1008,16 @@ service cloud.firestore {
           request.resource.data.resolvedAt == null
           || request.resource.data.resolvedAt is string
         );
-      allow update: if isSignedIn() && isCurrentUserActive();
+      allow update: if (currentUserPerfil() == "Gerente da Empresa"
+          && request.resource.data.keys().hasOnly([
+            "unitId", "unitName", "status", "severity", "openCalls", "urgentCalls",
+            "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
+          ])
+          && resource.data.unitId == request.resource.data.unitId
+          && resource.data.unitName == request.resource.data.unitName
+          && resource.data.createdAt == request.resource.data.createdAt
+          && canAccessCurrentSupermercado(resource.data.unitId))
+        || isAdminGeral();
       allow delete: if isAdminGeral();
     }
 
@@ -906,79 +1026,60 @@ service cloud.firestore {
         && (
           request.auth.uid == id
           || isAdminEmpresaDaEmpresa(resource.data.empresa_id)
-          || (
-            isAdminGeral()
-            && resource.data.perfil == "Administrador da Empresa"
-            && resource.data.convite_token is string
-            && resource.data.convite_token.size() > 0
-          )
+          || isAdminGeral()
         );
 
       allow create: if isSignedIn()
         && request.auth.uid == id
         && request.resource.data.id == request.auth.uid
         && request.resource.data.status == "Ativo"
+        && request.resource.data.get("vinculos_unidades_v2", false) == false
         && isPerfilValido(request.resource.data.perfil)
         && (
-          isPerfilAutoCadastroPermitido(request.resource.data.perfil)
-          || isCadastroAdminEmpresaPorConviteValido()
-        )
-        && isEmpresaVinculoValido(
-          request.resource.data.perfil,
-          request.resource.data.empresa_id
-        )
-        && isSupermercadoVinculoValido(
-          request.resource.data.perfil,
-          request.resource.data.empresa_id,
-          request.resource.data.supermercado_id
-        );
-
-      allow update: if (
-          isAdminGeral()
-          && resource.data.perfil == "Administrador da Empresa"
-          && resource.data.convite_token is string
-          && resource.data.convite_token.size() > 0
-          && request.resource.data.perfil == resource.data.perfil
-          && request.resource.data.empresa_id == resource.data.empresa_id
-          && request.resource.data.convite_token == resource.data.convite_token
-          && isUsuarioVinculoValido(request.resource.data)
-          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
-        )
-        || (
-          canAdminEmpresaManageUser(resource.data, request.resource.data)
-          && hasOnlyUserManagementChanges(resource.data, request.resource.data)
-        )
-        || (
-          isSignedIn()
-          && request.auth.uid == id
-          && isCurrentUserActive()
-          && request.resource.data.id == resource.data.id
-          && request.resource.data.nome == resource.data.nome
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.perfil == resource.data.perfil
-          && request.resource.data.empresa_id == resource.data.empresa_id
-          && request.resource.data.status == resource.data.status
-          && request.resource.data.criado_em == resource.data.criado_em
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "supermercado_id",
-            "supermercado_ids",
-            "atualizado_em"
-          ])
-          && (
-            request.resource.data.supermercado_id == resource.data.supermercado_id
-            || isSupermercadoDaEmpresaAtivo(resource.data.empresa_id, request.resource.data.supermercado_id)
-            || (resource.data.perfil == "Administrador Geral" && request.resource.data.supermercado_id == null)
-            || (resource.data.perfil == "Administrador da Empresa" && request.resource.data.supermercado_id == null)
+          (isPerfilAutoCadastroPermitido(request.resource.data.perfil)
+            && request.resource.data.empresa_id == null
+            && request.resource.data.supermercado_id == null
+            && request.resource.data.get("supermercado_ids", []) == [])
+          || (
+            isCadastroGerentePorConviteValido()
+            && isEmpresaVinculoValido(request.resource.data.perfil, request.resource.data.empresa_id)
+            && isUnitAssignmentsValid(request.resource.data)
+            && isSupermercadoVinculoValido(
+              request.resource.data.perfil,
+              request.resource.data.empresa_id,
+              request.resource.data.supermercado_id
+            )
           )
         );
 
-      allow delete: if isAdminGeral()
-        || (
-          isAdminEmpresa()
-          && request.auth.uid != id
-          && resource.data.perfil != "Administrador Geral"
-          && resource.data.empresa_id == currentUserEmpresaId()
-        );
+      allow update: if isAdminGeral()
+        && hasOnlyUserManagementChanges(resource.data, request.resource.data)
+        && unitChangesUseV2Links(resource.data, request.resource.data)
+        && isUsuarioVinculoValido(request.resource.data)
+        && (!request.resource.data.get("vinculos_unidades_v2", false)
+          || isUnitAssignmentsValid(request.resource.data));
+
+      allow delete: if false;
+
+      match /unidades/{supermercadoId} {
+        function assignmentMatchesUserAfter(data) {
+          let userAfter = getAfter(/databases/$(database)/documents/usuarios/$(id)).data;
+          return isAdminGeral()
+            && (userAfter.perfil in ["Gerente da Empresa", "Operador", "Televendas", "Separador de Televendas"]
+              || (userAfter.perfil == "Administrador Geral" && data.status == "Inativo"))
+            && data.keys().hasOnly(["empresa_id", "supermercado_id", "status", "atualizado_em"])
+            && (data.empresa_id == userAfter.empresa_id || data.status == "Inativo")
+            && data.supermercado_id == supermercadoId
+            && data.status in ["Ativo", "Inativo"]
+            && (data.status == "Inativo"
+              || userAfter.get("supermercado_ids", []).hasAny([supermercadoId]))
+            && isSupermercadoDaEmpresaAtivo(data.empresa_id, supermercadoId);
+        }
+
+        allow read: if request.auth.uid == id || isAdminGeral();
+        allow create, update: if assignmentMatchesUserAfter(request.resource.data);
+        allow delete: if false;
+      }
 
       match /push_tokens/{deviceId} {
         allow read: if false;
@@ -1020,7 +1121,7 @@ service cloud.firestore {
 
       allow create: if hasAdminManagementAccess()
         && request.resource.data.id == id
-        && request.resource.data.perfil == "Administrador da Empresa"
+        && request.resource.data.perfil == "Gerente da Empresa"
         && isEmpresaAtiva(request.resource.data.empresa_id)
         && request.resource.data.status == "Pendente"
         && request.resource.data.expira_em_ms is int

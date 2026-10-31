@@ -24,6 +24,8 @@ import {
   doc,
   type FirestoreError,
   onSnapshot,
+  and,
+  or,
   query,
   updateDoc,
   where,
@@ -35,6 +37,7 @@ import {
   type EmpilhadeiraStatus,
 } from "../types/empilhadeira";
 import { LEGACY_EMPRESA_ID, resolveEmpresaId } from "../utils/tenant";
+import { queryByUnitScope, resolveQueryUnitIds } from "../utils/firestoreUnitScope";
 import { assertBusinessScope, assertUserAccess, createAuditEntry } from "../utils/businessRules";
 import { runCallbackSafely } from "../utils/runCallbackSafely";
 
@@ -225,9 +228,13 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
   };
 }
 
-function loadChamados(): Chamado[] {
+function chamadosStorageKey(userId?: string | null) {
+  return `${STORAGE_KEY}:${userId ?? "guest"}`;
+}
+
+function loadChamados(userId?: string | null): Chamado[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(chamadosStorageKey(userId));
     if (!data) return [];
     const parsed = JSON.parse(data) as Partial<Chamado>[];
     return parsed.map((c, index) => normalizeChamado(c, `local-${index}`));
@@ -236,8 +243,8 @@ function loadChamados(): Chamado[] {
   }
 }
 
-function saveChamados(chamados: Chamado[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chamados));
+function saveChamados(chamados: Chamado[], userId?: string | null) {
+  localStorage.setItem(chamadosStorageKey(userId), JSON.stringify(chamados));
 }
 
 function sortChamados(chamados: Chamado[]): Chamado[] {
@@ -308,29 +315,35 @@ interface EquipamentoChamadoInput {
 }
 
 interface ChamadoScope {
+  userId?: string | null;
   empresaId: string | null;
   supermercadoId: string | null;
+  supermercadoIds?: string[];
   canViewAllUnits: boolean;
   canViewAllCompanies: boolean;
   perfil?: string | null;
 }
 
 function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
-  if (scope.canViewAllCompanies) return true;
+  if (scope.canViewAllCompanies) {
+    if (scope.supermercadoId) return chamado.supermercado_id === scope.supermercadoId;
+    return !scope.empresaId || chamado.empresa_id === scope.empresaId;
+  }
   if (!scope.empresaId) return false;
   if (chamado.empresa_id !== scope.empresaId) return false;
-  if (scope.canViewAllUnits) return true;
-  if (!scope.supermercadoId) return false;
-  return chamado.supermercado_id === scope.supermercadoId;
+  return Boolean(resolveQueryUnitIds(scope)?.includes(chamado.supermercado_id));
 }
 
 function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
-  if (scope.canViewAllCompanies) return chamados;
+  if (scope.canViewAllCompanies) {
+    if (scope.supermercadoId) return chamados.filter((item) => item.supermercado_id === scope.supermercadoId);
+    if (scope.empresaId) return chamados.filter((item) => item.empresa_id === scope.empresaId);
+    return chamados;
+  }
   if (!scope.empresaId) return [];
   const chamadosEmpresa = chamados.filter((c) => c.empresa_id === scope.empresaId);
-  if (scope.canViewAllUnits) return chamadosEmpresa;
-  if (!scope.supermercadoId) return [];
-  return chamadosEmpresa.filter((c) => c.supermercado_id === scope.supermercadoId);
+  const unitIds = resolveQueryUnitIds(scope) ?? [];
+  return chamadosEmpresa.filter((c) => unitIds.includes(c.supermercado_id));
 }
 
 async function ensureFirebaseSessionForChamado() {
@@ -378,33 +391,96 @@ function getEquipamentoPayload(
 }
 
 export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
-  const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados());
+  const [chamadosOwnerId, setChamadosOwnerId] = useState(scope.userId ?? null);
+  const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados(scope.userId));
+  if (chamadosOwnerId !== (scope.userId ?? null)) {
+    setChamadosOwnerId(scope.userId ?? null);
+    setChamados(db ? [] : loadChamados(scope.userId));
+  }
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("Todos");
   const [syncError, setSyncError] = useState<string | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     if (!isRemoteSyncEnabled) {
-      saveChamados(chamados);
+      saveChamados(chamados, scope.userId);
     }
-  }, [chamados, isRemoteSyncEnabled]);
+  }, [chamados, isRemoteSyncEnabled, scope.userId]);
 
   useEffect(() => {
     if (isRemoteSyncEnabled && db) {
+      const firestore = db;
+      setChamados([]);
       setSyncError(null);
       if (!scope.canViewAllCompanies && !scope.empresaId) {
         setChamados([]);
         return;
       }
 
-      const chamadosQuery = scope.canViewAllCompanies
-        ? query(collection(db, CHAMADOS_COLLECTION))
-        : !scope.canViewAllUnits && scope.supermercadoId
-          ? query(
-              collection(db, CHAMADOS_COLLECTION),
-              where("supermercado_id", "==", scope.supermercadoId)
+      const isSeparator = scope.perfil === "Separador de Televendas";
+      if (isSeparator) {
+        const unitIds = resolveQueryUnitIds(scope) ?? [];
+        if (!scope.empresaId || unitIds.length === 0) {
+          setChamados([]);
+          return;
+        }
+
+        const byUnit = new Map<string, Chamado[]>();
+        const unitErrors = new Map<string, string>();
+        const publish = () => {
+          const unique = new Map<string, Chamado>();
+          for (const rows of byUnit.values()) {
+            for (const chamado of rows) unique.set(chamado.id, chamado);
+          }
+          setChamados(sortChamados([...unique.values()]));
+          setSyncError(unitErrors.size
+            ? `Falha ao sincronizar pedidos do Separador em ${unitErrors.size} unidade(s) (${[...new Set(unitErrors.values())].join(", ")}).`
+            : null);
+        };
+        const unsubscribes = unitIds.map((unitId) => onSnapshot(
+          query(
+            collection(firestore, CHAMADOS_COLLECTION),
+            and(
+              where("empresa_id", "==", scope.empresaId),
+              where("supermercado_id", "==", unitId),
+              or(
+                where("categoria", "==", "televendas"),
+                where("tipo_servico", "==", "Atendimento Televendas")
+              )
             )
-          : query(collection(db, CHAMADOS_COLLECTION), where("empresa_id", "==", scope.empresaId));
+          ),
+          (snapshot) => {
+            unitErrors.delete(unitId);
+            byUnit.set(unitId, snapshot.docs.map((snapshotDoc) =>
+              normalizeChamado(snapshotDoc.data() as Partial<Chamado>, snapshotDoc.id)
+            ));
+            publish();
+          },
+          (error: FirestoreError) => {
+            console.warn("[firestore] separator unit calls listen failed", {
+              operation: "chamados.separator.listen",
+              collection: CHAMADOS_COLLECTION,
+              code: error.code || "unknown",
+            });
+            byUnit.delete(unitId);
+            unitErrors.set(unitId, error.code || "unknown");
+            publish();
+          }
+        ));
+        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+      }
+
+      const unitQuery = queryByUnitScope(
+        collection(db, CHAMADOS_COLLECTION),
+        "supermercado_id",
+        scope
+      );
+      if (!unitQuery) {
+        setChamados([]);
+        return;
+      }
+
+      const chamadosQuery = unitQuery;
 
       return onSnapshot(
         chamadosQuery,
@@ -418,16 +494,22 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
         },
         (error: FirestoreError) => {
           const code = error.code ? ` (${error.code})` : "";
+          console.warn("[firestore] chamados.listen failed", {
+            operation: "chamados.listen",
+            collection: CHAMADOS_COLLECTION,
+            code: error.code || "unknown",
+          });
           setSyncError(
             `Falha ao sincronizar chamados com o Firebase${code}. Verifique login, perfil e regras do Firestore.`
           );
+          setChamados([]);
         }
       );
     }
 
     setSyncError(null);
     function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY && e.newValue) {
+      if (e.key === chamadosStorageKey(scope.userId) && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue) as Partial<Chamado>[];
           setChamados(parsed.map((item, index) => normalizeChamado(item, `local-${index}`)));
@@ -439,13 +521,13 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [isRemoteSyncEnabled, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId]);
+  }, [isRemoteSyncEnabled, scope.userId, scope.canViewAllCompanies, scope.empresaId, scope.perfil, scope.supermercadoId, scope.supermercadoIds?.join("|")]);
 
   useEffect(() => {
     if (isRemoteSyncEnabled) return;
 
     const interval = setInterval(() => {
-      const current = loadChamados();
+      const current = loadChamados(scope.userId);
       setChamados((prev) => {
         const prevJson = JSON.stringify(prev);
         const newJson = JSON.stringify(current);
@@ -455,7 +537,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isRemoteSyncEnabled]);
+  }, [isRemoteSyncEnabled, scope.userId]);
 
   const criarChamado = useCallback(
     async (input: NovoChamadoInput) => {
@@ -643,7 +725,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
             operador_nome: operadorNome,
             assumido_em: chamadoAtual.assumido_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
-            ...equipamentoPayload,
+            ...(isTelevendasChamado(chamadoAtual) ? {} : equipamentoPayload),
           });
           batch.set(
             auditRef,
@@ -1081,6 +1163,12 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
           await ensureFirebaseSessionForChamado();
           await updateDoc(doc(db, CHAMADOS_COLLECTION, id), payload);
         } catch (error) {
+          const firestoreError = error as Partial<FirestoreError>;
+          console.warn("[firestore] chamados.updateTelevendas failed", {
+            operation: "chamados.updateTelevendas",
+            collection: CHAMADOS_COLLECTION,
+            code: firestoreError.code || "unknown",
+          });
           throw mapFirestoreWriteError(
             error,
             "Não foi possível atualizar o pedido de Televendas."

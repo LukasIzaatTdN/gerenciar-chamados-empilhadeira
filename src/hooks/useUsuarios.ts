@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { collection, doc, documentId, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { collection, doc, documentId, getDoc, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
-import { normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
+import { MAX_UNIDADES_POR_USUARIO, normalizeScopedUnitIds, resolveAuthorizedUnitIds, resolveEmpresaId } from "../utils/tenant";
 import { assertUserAccess } from "../utils/businessRules";
 
 const USUARIOS_COLLECTION = "usuarios";
@@ -43,6 +43,7 @@ function normalizeUsuario(
     data.perfil === "Supervisor" ||
     data.perfil === "Televendas" ||
     data.perfil === "Separador de Televendas" ||
+    data.perfil === "Gerente da Empresa" ||
     data.perfil === "Administrador da Empresa" ||
     data.perfil === "Administrador Geral"
       ? data.perfil
@@ -59,10 +60,11 @@ function normalizeUsuario(
       typeof data.supermercado_id === "string" && data.supermercado_id.trim()
         ? data.supermercado_id.trim()
         : null,
-    supermercado_ids: normalizeScopedUnitIds(
+    supermercado_ids: resolveAuthorizedUnitIds(
       typeof data.supermercado_id === "string" ? data.supermercado_id : null,
       data.supermercado_ids
     ),
+    vinculos_unidades_v2: data.vinculos_unidades_v2 === true || Array.isArray(data.supermercado_ids),
     status,
     email: typeof data.email === "string" ? data.email : undefined,
     telefone:
@@ -106,11 +108,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
     }
 
     const usuariosQuery = canViewAllCompanies
-      ? query(
-          collection(db, USUARIOS_COLLECTION),
-          where("perfil", "==", "Administrador da Empresa"),
-          where("convite_token", "!=", null)
-        )
+      ? collection(db, USUARIOS_COLLECTION)
       : canManageCompanyUsers && empresaId
         ? query(collection(db, USUARIOS_COLLECTION), where("empresa_id", "==", empresaId))
         : query(collection(db, USUARIOS_COLLECTION), where(documentId(), "==", currentUserId));
@@ -180,15 +178,49 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
         input.supermercado_id,
         input.supermercado_ids
       );
+      if (supermercado_ids.length > MAX_UNIDADES_POR_USUARIO) {
+        throw new Error(`Cada usuário pode ter até ${MAX_UNIDADES_POR_USUARIO} unidades atribuídas.`);
+      }
 
       if (db) {
-        await updateDoc(doc(db, USUARIOS_COLLECTION, id), {
+        const userRef = doc(db, USUARIOS_COLLECTION, id);
+        const usuarioAtual = usuarios.find((item) => item.id === id);
+        const unidadesAnteriores = normalizeScopedUnitIds(
+          usuarioAtual?.supermercado_id,
+          usuarioAtual?.supermercado_ids
+        );
+        const unidadesAfetadas = new Set([...unidadesAnteriores, ...supermercado_ids]);
+        const linksAnteriores = new Map(
+          await Promise.all(
+            [...unidadesAfetadas].map(async (supermercadoId) => {
+              const snapshot = await getDoc(doc(userRef, "unidades", supermercadoId));
+              return [supermercadoId, snapshot.exists() ? snapshot.data() : null] as const;
+            })
+          )
+        );
+        const batch = writeBatch(db);
+        batch.update(userRef, {
           perfil: input.perfil,
           empresa_id: resolveEmpresaId(input.empresa_id, null),
           supermercado_id: input.supermercado_id,
           supermercado_ids,
+          vinculos_unidades_v2: true,
           atualizado_em: new Date().toISOString(),
         });
+        for (const supermercadoId of unidadesAfetadas) {
+          const unidadeRef = doc(userRef, "unidades", supermercadoId);
+          const ativa = supermercado_ids.includes(supermercadoId);
+          const linkAnterior = linksAnteriores.get(supermercadoId);
+          batch.set(unidadeRef, {
+            empresa_id: ativa
+              ? resolveEmpresaId(input.empresa_id, null)
+              : linkAnterior?.empresa_id ?? usuarioAtual?.empresa_id ?? null,
+            supermercado_id: supermercadoId,
+            status: ativa ? "Ativo" : "Inativo",
+            atualizado_em: new Date().toISOString(),
+          });
+        }
+        await batch.commit();
         return;
       }
 
@@ -201,6 +233,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
                 empresa_id: resolveEmpresaId(input.empresa_id, null),
                 supermercado_id: input.supermercado_id,
                 supermercado_ids,
+                vinculos_unidades_v2: true,
                 atualizado_em: new Date().toISOString(),
               }
             : item
