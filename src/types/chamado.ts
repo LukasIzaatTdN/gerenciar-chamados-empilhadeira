@@ -62,6 +62,7 @@ export interface Chamado {
   empilhadeira_identificacao: string | null;
   status: Status;
   operador_nome: string | null;
+  separador_uid?: string | null;
   criado_em: string;
   assumido_em: string | null;
   a_caminho_em: string | null;
