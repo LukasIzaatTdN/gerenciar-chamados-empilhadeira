@@ -55,6 +55,10 @@ before(async () => {
     }));
     await setDoc(doc(firestore, "chamados/pedido-cancelacao"), baseCall("pedido-cancelacao"));
     await setDoc(doc(firestore, "chamados/pedido-uid-ownership"), baseCall("pedido-uid-ownership"));
+    await setDoc(doc(firestore, "chamados/pedido-legado-sem-uid-em-andamento"), baseCall(
+      "pedido-legado-sem-uid-em-andamento",
+      { status: "Em separação", operador_nome: "Separador teste", assumido_em: "2026-10-28T23:00:00.000Z" }
+    ));
     await setDoc(doc(firestore, "chamados/outra-unidade"), baseCall("outra-unidade", { supermercado_id: "loja-b" }));
   });
 });
@@ -139,6 +143,22 @@ test("separator ownership is tied to auth UID even when another separator has th
     total_solicitado: 2, total_encontrado: 2, percentual_atendido: 100,
     atualizado_em: "2026-10-29T02:47:00.000Z", operador_nome: "Separador teste",
     separador_uid: "separador-a", cancelado_em: null,
+  }));
+});
+
+test("legacy in-progress calls without separator UID cannot be claimed by matching display name", async () => {
+  const ownerDb = environment.authenticatedContext("separador-a").firestore();
+  await assertFails(updateDoc(doc(ownerDb, "chamados/pedido-legado-sem-uid-em-andamento"), {
+    itens: [{ ...item, quantidadeEncontrada: 2, quantidadeFaltante: 0 }],
+    status: "Pronto", operador_nome: "Separador teste", separador_uid: "separador-a",
+    atualizado_em: "2026-10-29T02:50:00.000Z", cancelado_em: null,
+  }));
+
+  const sameNameDb = environment.authenticatedContext("separador-b").firestore();
+  await assertFails(updateDoc(doc(sameNameDb, "chamados/pedido-legado-sem-uid-em-andamento"), {
+    itens: [{ ...item, quantidadeEncontrada: 2, quantidadeFaltante: 0 }],
+    status: "Pronto", operador_nome: "Separador teste", separador_uid: "separador-b",
+    atualizado_em: "2026-10-29T02:51:00.000Z", cancelado_em: null,
   }));
 });
 
