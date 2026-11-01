@@ -228,8 +228,8 @@ export default function App() {
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
     userId: usuarioAtual?.id ?? null,
-    empresaId: isAuthenticated ? usuarioAtual?.empresa_id ?? null : null,
-    supermercadoId: isAuthenticated ? usuarioAtual?.supermercado_id ?? null : null,
+    empresaId: isAuthenticated && !canViewAllCompanies ? usuarioAtual?.empresa_id ?? null : null,
+    supermercadoId: isAuthenticated && !canViewAllCompanies ? usuarioAtual?.supermercado_id ?? null : null,
     supermercadoIds: assignedUnitIds,
     canViewAllUnits: permissions.canViewAllUnits,
     canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
@@ -260,10 +260,9 @@ export default function App() {
   const empresaNome = getEmpresaById(empresaId, empresas)?.nome ?? null;
   const supermercadoNome = getUnidadeById(supermercadoId, supermercados)?.nome ?? null;
   const canViewAllUnits = permissions.canViewAllUnits;
-  const empresaSelecionadaId =
-    canViewAllCompanies && adminEmpresaFiltro !== "todas"
-      ? adminEmpresaFiltro
-      : empresaId;
+  const empresaSelecionadaId = canViewAllCompanies
+    ? adminEmpresaFiltro === "todas" ? null : adminEmpresaFiltro
+    : empresaId;
   const { invites: adminInvites, createAdminInvite, validateInviteToken, consumeInvite } = useAdminInvites({
     empresaId: empresaSelecionadaId,
     canViewAllCompanies,
