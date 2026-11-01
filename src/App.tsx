@@ -210,6 +210,7 @@ export default function App() {
   );
   const {
     empresas,
+    syncError: empresasSyncError,
     createEmpresa,
     updateEmpresa,
     toggleEmpresaStatus,
@@ -941,6 +942,7 @@ export default function App() {
   function renderGlobalOverlays() {
     const syncErrors = [
       assignmentSyncError,
+      empresasSyncError,
       unidadesSyncError,
       syncError,
       empilhadeirasSyncError,

@@ -181,7 +181,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
 
       setSupermercados((prev) => [novo, ...prev]);
     },
-    []
+    [perfil]
   );
 
   const updateSupermercado = useCallback(
@@ -224,7 +224,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
         )
       );
     },
-    []
+    [perfil]
   );
 
   const toggleSupermercadoStatus = useCallback(async (id: string) => {

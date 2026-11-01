@@ -88,12 +88,15 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
       return EMPRESAS;
     }
   });
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const lastSyncErrorCodeRef = useRef<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const retryTimeoutRef = useRef<number | null>(null);
   const isRemoteSyncEnabled = db !== null;
 
   useEffect(() => {
     if (!db) {
+      setSyncError(null);
       setEmpresas(EMPRESAS);
       return;
     }
@@ -104,6 +107,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
     }
 
     if (isAuthenticated && !canViewAllCompanies && !empresaId) {
+      setSyncError(null);
       setEmpresas([]);
       return;
     }
@@ -116,6 +120,8 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
     return onSnapshot(
       empresasQuery,
       (snapshot) => {
+        setSyncError(null);
+        lastSyncErrorCodeRef.current = null;
         const remote = snapshot.docs
           .map((item) => normalizeEmpresa(item.data() as Partial<Empresa>, item.id))
           .sort(
@@ -132,7 +138,23 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
           }
         }
       },
-      () => {
+      (error) => {
+        if (isAuthenticated) {
+          const code = error.code || "unknown";
+          setSyncError(code === "permission-denied"
+            ? "Não foi possível carregar as empresas. Verifique a permissão de acesso da sua conta."
+            : "Não foi possível atualizar as empresas. Verifique a conexão e tente novamente.");
+          if (lastSyncErrorCodeRef.current !== code) {
+            console.warn("[firestore] companies.listen failed", {
+              operation: "empresas.listen",
+              collection: EMPRESAS_COLLECTION,
+              code,
+            });
+            lastSyncErrorCodeRef.current = code;
+          }
+        } else {
+          setSyncError(null);
+        }
         // Keep current cache and retry listener soon to avoid "empty until reload" behavior.
         if (retryTimeoutRef.current !== null) return;
         retryTimeoutRef.current = window.setTimeout(() => {
@@ -175,7 +197,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
       setEmpresas((prev) => [normalizeEmpresa(empresa, empresa.id), ...prev]);
       return empresa.id;
     },
-    []
+    [perfil]
   );
 
   const updateEmpresa = useCallback(
@@ -223,7 +245,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
 
       setEmpresas((prev) => prev.map((item) => (item.id === id ? { ...item, ...payload } : item)));
     },
-    []
+    [perfil]
   );
 
   const toggleEmpresaStatus = useCallback(
@@ -251,6 +273,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
 
   return {
     empresas,
+    syncError,
     isRemoteSyncEnabled,
     createEmpresa,
     updateEmpresa,
