@@ -1,0 +1,108 @@
+{
+  "readOnly": true,
+  "project": "painel-772bf",
+  "firestoreUserDocuments": 21,
+  "authRecords": 19,
+  "authUidMatchesDocumentPath": 18,
+  "unmatchedDocumentPaths": 3,
+  "storedIdMismatches": 0,
+  "profiles": {
+    "Promotor": {
+      "count": 7,
+      "active": 7,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 7
+    },
+    "Operador": {
+      "count": 3,
+      "active": 3,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 3
+    },
+    "Televendas": {
+      "count": 5,
+      "active": 3,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 5
+    },
+    "Separador de Televendas": {
+      "count": 2,
+      "active": 2,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 2
+    },
+    "Administrador da Empresa": {
+      "count": 1,
+      "active": 1,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 1
+    },
+    "Funcionário": {
+      "count": 1,
+      "active": 1,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 1
+    },
+    "Administrador Geral": {
+      "count": 1,
+      "active": 1,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 1
+    },
+    "Supervisor": {
+      "count": 1,
+      "active": 1,
+      "explicitV2": 0,
+      "arrayWithoutExplicitV2": 1
+    }
+  },
+  "authCorrespondenceByProfile": {
+    "Promotor": {
+      "documents": 7,
+      "authMatches": 7,
+      "authMissing": 0
+    },
+    "Operador": {
+      "documents": 3,
+      "authMatches": 3,
+      "authMissing": 0
+    },
+    "Televendas": {
+      "documents": 5,
+      "authMatches": 2,
+      "authMissing": 3
+    },
+    "Separador de Televendas": {
+      "documents": 2,
+      "authMatches": 2,
+      "authMissing": 0
+    },
+    "Administrador da Empresa": {
+      "documents": 1,
+      "authMatches": 1,
+      "authMissing": 0
+    },
+    "Funcionário": {
+      "documents": 1,
+      "authMatches": 1,
+      "authMissing": 0
+    },
+    "Administrador Geral": {
+      "documents": 1,
+      "authMatches": 1,
+      "authMissing": 0
+    },
+    "Supervisor": {
+      "documents": 1,
+      "authMatches": 1,
+      "authMissing": 0
+    }
+  },
+  "authAccountsWithoutUserDocument": 1,
+  "assignmentAudit": {
+    "usersChecked": 21,
+    "explicitV2Users": 0,
+    "candidateLinksChecked": 22,
+    "existingCandidateLinkDocuments": 0
+  }
+}

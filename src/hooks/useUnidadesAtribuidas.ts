@@ -15,7 +15,7 @@ export function useUnidadesAtribuidas(usuario: UsuarioSistema | null) {
   const empresaId = usuario?.empresa_id ?? null;
   const perfil = usuario?.perfil ?? null;
   const candidates = resolveAuthorizedUnitIds(usuario?.supermercado_id, usuario?.supermercado_ids);
-  const requiresAssignmentDocs = usuario?.vinculos_unidades_v2 === true;
+  const requiresAssignmentDocs = perfil === "Gerente da Empresa" || usuario?.vinculos_unidades_v2 === true;
   const [state, setState] = useState<UnitAssignmentState>({ ownerId: null, unitIds: [], error: null });
 
   useEffect(() => {

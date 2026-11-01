@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { collection, doc, documentId, getDoc, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 import type { PerfilAcesso, UsuarioSistema, UsuarioStatus } from "../types/usuario";
-import { MAX_UNIDADES_POR_USUARIO, normalizeScopedUnitIds, resolveAuthorizedUnitIds, resolveEmpresaId } from "../utils/tenant";
+import { MAX_UNIDADES_POR_USUARIO, normalizeScopedUnitIds, resolveEmpresaId } from "../utils/tenant";
+import { normalizeUserUnitAssignments } from "../utils/userUnitAssignments";
 import { assertUserAccess } from "../utils/businessRules";
 
 const USUARIOS_COLLECTION = "usuarios";
@@ -52,7 +53,7 @@ function normalizeUsuario(
   const status: UsuarioStatus = data.status === "Inativo" ? "Inativo" : "Ativo";
 
   return {
-    id: data.id ?? fallbackId,
+    id: fallbackId,
     nome: typeof data.nome === "string" && data.nome.trim() ? data.nome.trim() : "Usuário",
     perfil,
     empresa_id: resolveEmpresaId(data.empresa_id, null),
@@ -60,11 +61,7 @@ function normalizeUsuario(
       typeof data.supermercado_id === "string" && data.supermercado_id.trim()
         ? data.supermercado_id.trim()
         : null,
-    supermercado_ids: resolveAuthorizedUnitIds(
-      typeof data.supermercado_id === "string" ? data.supermercado_id : null,
-      data.supermercado_ids
-    ),
-    vinculos_unidades_v2: data.vinculos_unidades_v2 === true || Array.isArray(data.supermercado_ids),
+    ...normalizeUserUnitAssignments(data),
     status,
     email: typeof data.email === "string" ? data.email : undefined,
     telefone:
@@ -95,14 +92,17 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
     perfil = null,
   } = options;
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!db) {
+      setSyncError(null);
       setUsuarios([]);
       return;
     }
 
     if (!currentUserId) {
+      setSyncError(null);
       setUsuarios([]);
       return;
     }
@@ -116,6 +116,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
     return onSnapshot(
       usuariosQuery,
       (snapshot) => {
+        setSyncError(null);
         const remote = snapshot.docs
           .map((snapshotDoc) =>
             normalizeUsuario(snapshotDoc.data() as Partial<UsuarioSistema>, snapshotDoc.id)
@@ -128,7 +129,13 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
 
         setUsuarios(remote);
       },
-      () => {
+      (error) => {
+        console.warn("[firestore] users.listen failed", {
+          operation: "usuarios.listen",
+          collection: USUARIOS_COLLECTION,
+          code: error.code || "unknown",
+        });
+        setSyncError(`Falha ao sincronizar usuários (${error.code || "unknown"}).`);
         setUsuarios([]);
       }
     );
@@ -240,7 +247,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
         )
       );
     },
-    []
+    [perfil, usuarios]
   );
 
   const toggleUsuarioStatus = useCallback(async (id: string) => {
@@ -278,6 +285,7 @@ export function useUsuarios(options: UseUsuariosOptions = {}) {
 
   return {
     usuarios,
+    syncError,
     upsertUsuarioFromLogin,
     updateUsuarioAdmin,
     toggleUsuarioStatus,

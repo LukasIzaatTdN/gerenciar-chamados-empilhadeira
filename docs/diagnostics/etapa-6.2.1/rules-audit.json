@@ -1,0 +1,37 @@
+{
+  "scope": "Auditoria focada na sincronização de perfis e vínculos; não é auditoria integral do sistema",
+  "score": 2,
+  "summary": "Cliente inferia migração v2 em cadastros legados; release publicada não contém o contrato de subcoleções. Correção cliente local mantém validação obrigatória de v2 e de Gerente.",
+  "findings": [
+    {
+      "check": "Business Logic vs. Rules",
+      "severity": "major",
+      "issue": "App.tsx e useUsuarios.ts promoviam arrays legados a vinculos_unidades_v2=true. Dois Separadores ativos têm array, flag não habilitada e vínculos inexistentes. A release publicada não possui match para esses documentos.",
+      "recommendation": "Normalizar apenas a flag explícita e manter negação para v2. Planejar separadamente uma migração restritiva, com autorização para regras/dados."
+    },
+    {
+      "check": "Authority Source / Field-Level vs. Identity-Level",
+      "severity": "major",
+      "issue": "A release antiga decide leitura operacional pela unidade principal e não impõe revogação dos documentos v2. A reprodução no Emulator confirma leitura da unidade principal mesmo com vínculo v2 ausente ou inativo.",
+      "recommendation": "Não fazer fallback de usuários v2 após permission-denied. Reconciliar o contrato de autorização antes de qualquer publicação de regras."
+    },
+    {
+      "check": "Update Bypass",
+      "severity": "moderate",
+      "issue": "As regras locais reservam alterações de vínculos ao Administrador Geral e a suíte confirma negação de autoatribuição e autopromoção. A release publicada mantém o fluxo antigo de atualização de unidades no próprio perfil, distinto do modelo v2.",
+      "recommendation": "Revisar esse fluxo antigo na proposta de migração. Esta etapa não altera as regras publicadas nem vínculos reais."
+    },
+    {
+      "check": "Type Safety / Storage Abuse",
+      "severity": "minor",
+      "issue": "A normalização mantém limite de oito IDs, rejeita duplicados e listas inválidas e não promove valores string a flag booleana verdadeira. A release antiga não compartilha integralmente essas invariantes v2.",
+      "recommendation": "Manter testes negativos e não publicar o arquivo local inteiro como correção pontual."
+    },
+    {
+      "check": "Error Reporting",
+      "severity": "moderate",
+      "issue": "useUsuarios.ts apagava a lista ao falhar sem expor o erro; a resolução do perfil também ocultava falha de leitura ao tentar o fallback existente por claims.",
+      "recommendation": "Expor o erro no alerta existente e registrar somente operação, coleção e código, preservando o desenho e o controle de acesso."
+    }
+  ]
+}

@@ -74,6 +74,7 @@ import type { UsuarioSistema } from "./types/usuario";
 import { getPermissions } from "./utils/permissions";
 import { isInvitedCompanyManager } from "./utils/invitedCompanyAdmin";
 import { resolveAuthorizedUnitIds } from "./utils/tenant";
+import { normalizeUserUnitAssignments } from "./utils/userUnitAssignments";
 import { normalizeGovernanceMessage } from "./utils/governanceMessages";
 import { getOperationalAlerts } from "./utils/operationalAlerts";
 import { getOperationalActionPlan } from "./utils/operationalActionPlan";
@@ -154,6 +155,7 @@ function canAccessViewByPerfil(view: View, perfil: UsuarioSistema["perfil"]) {
 
 export default function App() {
   const [authHydrated, setAuthHydrated] = useState(!hasFirebaseConfig);
+  const [profileSyncError, setProfileSyncError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<View>("geral");
   const [previousView, setPreviousView] = useState<View>("geral");
@@ -204,7 +206,9 @@ export default function App() {
   const perfilAcesso = usuarioAtual?.perfil ?? null;
   const permissions = getPermissions(perfilAcesso);
   const canViewAllCompanies = permissions.canViewAllCompanies;
-  const isAuthenticated = authHydrated && Boolean(usuarioAtual?.nome && perfilAcesso);
+  const authIdentityMatches = !hasFirebaseConfig || usuarioAtual?.id === auth?.currentUser?.uid;
+  const isAuthenticated = authHydrated && authIdentityMatches && Boolean(usuarioAtual?.nome && perfilAcesso);
+  const authReady = !hasFirebaseConfig || (authHydrated && (!auth?.currentUser || isAuthenticated));
   const { unitIds: assignedUnitIds, syncError: assignmentSyncError } = useUnidadesAtribuidas(
     isAuthenticated ? usuarioAtual : null
   );
@@ -215,6 +219,7 @@ export default function App() {
     updateEmpresa,
     toggleEmpresaStatus,
   } = useEmpresas({
+    authReady,
     empresaId: usuarioAtual?.empresa_id ?? null,
     canViewAllCompanies,
     isAuthenticated,
@@ -227,21 +232,23 @@ export default function App() {
     updateUnidade: updateSupermercado,
     toggleUnidadeStatus: toggleSupermercadoStatus,
   } = useUnidades({
-    userId: usuarioAtual?.id ?? null,
+    authReady,
+    userId: isAuthenticated ? usuarioAtual?.id ?? null : null,
     empresaId: isAuthenticated && !canViewAllCompanies ? usuarioAtual?.empresa_id ?? null : null,
     supermercadoId: isAuthenticated && !canViewAllCompanies ? usuarioAtual?.supermercado_id ?? null : null,
     supermercadoIds: assignedUnitIds,
     canViewAllUnits: permissions.canViewAllUnits,
-    canViewAllCompanies: canViewAllCompanies || !isAuthenticated,
+    canViewAllCompanies: canViewAllCompanies || (authHydrated && !auth?.currentUser),
     perfil: perfilAcesso,
   });
   const {
     usuarios,
+    syncError: usuariosSyncError,
     upsertUsuarioFromLogin,
     updateUsuarioAdmin,
     toggleUsuarioStatus,
   } = useUsuarios({
-    currentUserId: usuarioAtual?.id ?? null,
+    currentUserId: isAuthenticated ? usuarioAtual?.id ?? null : null,
     empresaId: usuarioAtual?.empresa_id ?? null,
     canViewAllCompanies,
     canManageCompanyUsers: permissions.canManageCompanyAdmin,
@@ -697,6 +704,8 @@ export default function App() {
     let unsubscribeUserDoc: (() => void) | undefined;
 
     return onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+      setAuthHydrated(false);
+      setProfileSyncError(null);
       try {
         if (unsubscribeUserDoc) {
           unsubscribeUserDoc();
@@ -780,6 +789,7 @@ export default function App() {
           unsubscribeUserDoc = onSnapshot(
             doc(db, "usuarios", firebaseUser.uid),
             async (userDoc) => {
+              setProfileSyncError(null);
               if (userDoc.exists()) {
                 const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
                 if (userData.status === "Inativo") {
@@ -804,12 +814,7 @@ export default function App() {
                       typeof userData.supermercado_id === "string"
                         ? userData.supermercado_id
                         : null,
-                    supermercado_ids: resolveAuthorizedUnitIds(
-                      userData.supermercado_id,
-                      userData.supermercado_ids
-                    ),
-                    vinculos_unidades_v2:
-                      userData.vinculos_unidades_v2 === true || Array.isArray(userData.supermercado_ids),
+                    ...normalizeUserUnitAssignments(userData),
                   };
                   await applyUsuarioResolved(usuarioResolved);
                   setAuthHydrated(true);
@@ -817,10 +822,17 @@ export default function App() {
                 }
               }
 
+              setProfileSyncError("Perfil de acesso não disponível. Solicite a revisão do cadastro.");
               await applyUsuarioResolved(buildFallbackUsuario());
               setAuthHydrated(true);
             },
-            async () => {
+            async (error) => {
+              console.warn("[firestore] profile.listen failed", {
+                operation: "usuarios.profile.listen",
+                collection: "usuarios",
+                code: error.code || "unknown",
+              });
+              setProfileSyncError(`Falha ao carregar o perfil de acesso (${error.code || "unknown"}).`);
               await applyUsuarioResolved(buildFallbackUsuario());
               setAuthHydrated(true);
             }
@@ -940,6 +952,8 @@ export default function App() {
 
   function renderGlobalOverlays() {
     const syncErrors = [
+      profileSyncError,
+      usuariosSyncError,
       assignmentSyncError,
       empresasSyncError,
       unidadesSyncError,

@@ -1,6 +1,7 @@
 import { useSupermercados } from "./useSupermercados";
 
 interface UseUnidadesOptions {
+  authReady?: boolean;
   userId?: string | null;
   empresaId?: string | null;
   supermercadoId?: string | null;

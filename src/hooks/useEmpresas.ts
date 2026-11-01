@@ -58,6 +58,7 @@ function buildEmpresaId(codigo: string) {
 }
 
 interface UseEmpresasOptions {
+  authReady?: boolean;
   empresaId?: string | null;
   canViewAllCompanies?: boolean;
   isAuthenticated?: boolean;
@@ -66,6 +67,7 @@ interface UseEmpresasOptions {
 
 export function useEmpresas(options: UseEmpresasOptions = {}) {
   const {
+    authReady = true,
     empresaId = null,
     canViewAllCompanies = false,
     isAuthenticated = false,
@@ -98,6 +100,12 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
     if (!db) {
       setSyncError(null);
       setEmpresas(EMPRESAS);
+      return;
+    }
+
+    if (!authReady) {
+      setEmpresas([]);
+      setSyncError(null);
       return;
     }
 
@@ -163,7 +171,7 @@ export function useEmpresas(options: UseEmpresasOptions = {}) {
         }, 1500);
       }
     );
-  }, [canViewAllCompanies, empresaId, isAuthenticated, retryTick]);
+  }, [authReady, canViewAllCompanies, empresaId, isAuthenticated, retryTick]);
 
   useEffect(() => {
     return () => {

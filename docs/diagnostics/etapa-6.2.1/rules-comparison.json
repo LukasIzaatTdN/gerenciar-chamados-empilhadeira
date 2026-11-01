@@ -1,0 +1,15 @@
+{
+  "project": "painel-772bf",
+  "release": "projects/painel-772bf/releases/cloud.firestore",
+  "ruleset": "projects/painel-772bf/rulesets/1589914b-62c5-4650-b42a-5c4d5a4a368c",
+  "releaseUpdatedAt": "2026-10-31T05:02:45.741202Z",
+  "comparisonRecordedAt": "2026-11-01T22:10:15.100808+00:00",
+  "hashNormalization": "CRLF -> LF, trim",
+  "localSha256Normalized": "3d083159a94de08f56d3410b15723bd04784bba37f34faeb67efd809abb68a14",
+  "publishedSha256Normalized": "f52b5c5878773452ec10a4d915174e243855d3fe8db160933f56d7faf3494a11",
+  "localSha256Raw": "f5bc243ced293651b9a8ba53645950360f56a330944ac676294782fd20dd8f36",
+  "publishedSha256Raw": "d30d9af68c763ce2dbf575592b227c72573ab2232cb3ebc48b68aa8eb7443311",
+  "equal": false,
+  "publishedHasAssignmentPath": false,
+  "localHasAssignmentPath": true
+}

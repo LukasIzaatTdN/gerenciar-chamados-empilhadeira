@@ -18,6 +18,7 @@ import { assertUserAccess } from "../utils/businessRules";
 const SUPERMERCADOS_COLLECTION = "supermercados";
 
 interface UseSupermercadosOptions {
+  authReady?: boolean;
   userId?: string | null;
   empresaId?: string | null;
   supermercadoId?: string | null;
@@ -54,6 +55,7 @@ function normalizeSupermercado(
 
 export function useSupermercados(options: UseSupermercadosOptions = {}) {
   const {
+    authReady = true,
     empresaId = null,
     supermercadoId = null,
     supermercadoIds = [],
@@ -75,6 +77,12 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
       setSupermercados(SUPERMERCADOS_FALLBACK.filter((unit) =>
         canViewAllCompanies || canViewAllUnits || (supermercadoIds.includes(unit.id) && unit.status === "Ativo")
       ));
+      return;
+    }
+
+    if (!authReady) {
+      setSupermercados([]);
+      setSyncError(null);
       return;
     }
 
@@ -143,7 +151,7 @@ export function useSupermercados(options: UseSupermercadosOptions = {}) {
         setSupermercados([]);
       }
     );
-  }, [userId, canViewAllCompanies, canViewAllUnits, empresaId, supermercadoId, supermercadoIds.join("|")]);
+  }, [authReady, userId, canViewAllCompanies, canViewAllUnits, empresaId, supermercadoId, supermercadoIds.join("|")]);
 
   const createSupermercado = useCallback(
     async (input: {
