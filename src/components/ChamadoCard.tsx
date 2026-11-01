@@ -216,7 +216,7 @@ export default function ChamadoCard({
 
   return (
     <div
-      className={`group fade-up relative overflow-hidden rounded-[28px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_36px_rgba(15,23,42,0.09)] ${
+      className={`workspace-call-card group fade-up relative overflow-hidden rounded-[28px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_36px_rgba(15,23,42,0.09)] ${
         isFinalizado
           ? "border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(255,255,255,0.96))] opacity-90"
           : isTelevendas

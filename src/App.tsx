@@ -3,6 +3,9 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
+import PageHeading from "./components/PageHeading";
+import WorkspaceMetrics from "./components/WorkspaceMetrics";
+import AdminIcon from "./components/AdminIcon";
 import PlatformOverview from "./components/PlatformOverview";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminTopbar from "./components/AdminTopbar";
@@ -881,6 +884,17 @@ export default function App() {
   useEffect(() => {
     setSelectedAssignedUnitId("");
   }, [operadorId]);
+
+  const resumoChamadosDoUsuario = useMemo(() => {
+    const proprios = permissions.canTrackOwnChamados && operadorNome
+      ? allChamados.filter((chamado) => chamado.solicitante_nome === operadorNome)
+      : [];
+    return {
+      total: proprios.length,
+      emAndamento: proprios.filter((chamado) => isEmAtendimentoStatus(chamado.status)).length,
+      finalizados: proprios.filter((chamado) => chamado.status === "Finalizado").length,
+    };
+  }, [allChamados, operadorNome, permissions.canTrackOwnChamados]);
 
   const chamadosVisiveis = useMemo(() => {
     if (permissions.canTrackOwnChamados && operadorNome) {
@@ -1781,7 +1795,7 @@ export default function App() {
 
   if (hasFirebaseConfig && !authHydrated) {
     return (
-      <div className="app-page min-h-screen bg-transparent">
+      <div className="app-page role-page min-h-screen bg-transparent">
         <main className="app-main px-4 py-10 sm:px-0">
           <div className="mx-auto max-w-xl rounded-[28px] border border-slate-200 bg-white p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -1907,7 +1921,7 @@ export default function App() {
   if (view === "dashboard" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)) {
     return (
       <>
-        <div className="app-page min-h-screen bg-transparent">
+        <div className="app-page role-page min-h-screen bg-transparent">
           <div className={isPlatformAdmin ? "admin-shell min-h-screen" : ""}>
           {isPlatformAdmin && <div className="p-2 sm:p-3 md:p-5"><AdminSidebar activeView={view} dark={tema === "dark"} userName={operadorNome ?? "Administrador"} onNavigate={navigateTo} onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")} /></div>}
           <div className="min-w-0">
@@ -1954,6 +1968,37 @@ export default function App() {
         />
 
           <main className={`app-main px-2 py-4 sm:px-0 sm:py-6 ${isPlatformAdmin ? "admin-dashboard" : ""}`}>
+          <PageHeading variant="workspace"
+            eyebrow="Gestão da operação"
+            title={isPlatformAdmin ? "Administração geral da plataforma" : "Visão geral da operação"}
+            description="Acompanhe o desempenho, os chamados e os pontos de atenção das unidades atribuídas."
+            context={<span className="workspace-context"><AdminIcon name="units" width={15} height={15} />{nomeEscopoAtual}</span>}
+            actions={canViewAllUnits ? <div className="workspace-period" aria-label="Período do dashboard">
+              {([{ value: "hoje", label: "Hoje" }, { value: "7d", label: "7 dias" }, { value: "30d", label: "30 dias" }] as const).map((option) => (
+                <button key={option.value} type="button" aria-pressed={dashboardPeriod === option.value}
+                  onClick={() => setDashboardPeriod(option.value)}>{option.label}</button>
+              ))}
+            </div> : undefined}
+          />
+          {!isPlatformAdmin && (<>
+              <div className="mb-5 fade-up">
+                <Stats
+                  stats={{
+                    aguardando: canViewAllUnits ? dashboardStats.aguardando : stats.aguardando,
+                    emAtendimento: canViewAllUnits ? dashboardStats.emAtendimento : stats.emAtendimento,
+                    finalizadosHoje: canViewAllUnits ? dashboardStats.finalizadosHoje : dashboardFinalizadosHoje,
+                    urgentes: canViewAllUnits ? dashboardStats.urgentes : stats.urgentes,
+                    setorMaisAcionado: canViewAllUnits ? dashboardStats.setorMaisAcionado : dashboardSetorMaisAcionado,
+                  }}
+                  mediaMin={canViewAllUnits ? dashboardTimeEstimates.mediaMin : timeEstimates.mediaMin}
+                  totalFinalizadosComTempo={
+                    canViewAllUnits ? dashboardTimeEstimates.totalFinalizados : timeEstimates.totalFinalizados
+                  }
+                  finalizadosLabel={canViewAllUnits ? dashboardPeriodLabel : "Finalizados Hoje"}
+                />
+              </div>
+
+          </>)}
           {canViewAllUnits && (
             <AdminScopeSelector
               empresaValue={adminEmpresaFiltro}
@@ -1975,6 +2020,8 @@ export default function App() {
             />
           )}
 
+          {canViewAllUnits && <p className="workspace-period-hint">{dashboardPeriodHint}</p>}
+          <div className="workspace-analysis-grid">
           <OperationalAlerts alerts={operationalAlerts} recentActivity={auditoriaRecente} />
           <OperationalHealthPanel healthSummary={operationalHealth} />
           <OperationalActionPlanPanel actions={operationalActionPlan} />
@@ -1982,65 +2029,8 @@ export default function App() {
           <OperationalEscalationHistoryPanel escalations={operationalEscalationHistory} />
           <OperationalForecastPanel forecastSummary={operationalForecast} />
           <OperationalReportPanel slaSummary={slaSummary} auditRows={auditoriaRecente} />
-
-          <div className="professional-panel mb-5 p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {isPlatformAdmin
-                    ? "Gestão da plataforma"
-                    : canViewAllUnits
-                    ? "Dashboard executivo"
-                    : "Dashboard da operação"}
-                </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                  {isPlatformAdmin ? "Administração geral da plataforma" : nomeEscopoAtual}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                  {isPlatformAdmin
-                    ? "Use este espaço para gerenciar a estrutura SaaS, cadastrar empresas clientes e organizar as unidades de cada operação."
-                    : canViewAllCompanies && adminEmpresaFiltro === "todas"
-                    ? "Painel consolidado da plataforma para acompanhar empresas clientes, comparar unidades e priorizar operação."
-                    : canViewAllUnits && adminSupermercadoFiltro === "todos"
-                    ? "Painel consolidado da empresa com foco em desempenho entre unidades e priorização operacional."
-                    : "Painel gerencial com foco em desempenho, fila e ritmo de atendimento."}
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:items-end">
-                {canViewAllUnits && (
-                  <div className="flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-slate-50/90 p-2">
-                    {([
-                      { value: "hoje", label: "Hoje" },
-                      { value: "7d", label: "7 dias" },
-                      { value: "30d", label: "30 dias" },
-                    ] as const).map((option) => {
-                      const isActive = dashboardPeriod === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setDashboardPeriod(option.value)}
-                          className={`touch-target rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
-                            isActive
-                              ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]"
-                              : "bg-white text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className="text-right">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Recorte ativo
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">{dashboardPeriodHint}</p>
-                </div>
-              </div>
-            </div>
           </div>
+
           {isPlatformAdmin ? (
             <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
               <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
@@ -2131,23 +2121,6 @@ export default function App() {
             </div>
           ) : (
             <>
-              <div className="mb-5 fade-up">
-                <Stats
-                  stats={{
-                    aguardando: canViewAllUnits ? dashboardStats.aguardando : stats.aguardando,
-                    emAtendimento: canViewAllUnits ? dashboardStats.emAtendimento : stats.emAtendimento,
-                    finalizadosHoje: canViewAllUnits ? dashboardStats.finalizadosHoje : dashboardFinalizadosHoje,
-                    urgentes: canViewAllUnits ? dashboardStats.urgentes : stats.urgentes,
-                    setorMaisAcionado: canViewAllUnits ? dashboardStats.setorMaisAcionado : dashboardSetorMaisAcionado,
-                  }}
-                  mediaMin={canViewAllUnits ? dashboardTimeEstimates.mediaMin : timeEstimates.mediaMin}
-                  totalFinalizadosComTempo={
-                    canViewAllUnits ? dashboardTimeEstimates.totalFinalizados : timeEstimates.totalFinalizados
-                  }
-                  finalizadosLabel={canViewAllUnits ? dashboardPeriodLabel : "Finalizados Hoje"}
-                />
-              </div>
-
               <div className="mb-5 fade-up">
                 <ChamadoTimeMetricsPanel
                   chamados={canViewAllUnits ? dashboardChamados : allChamados}
@@ -2517,7 +2490,7 @@ export default function App() {
 
   // General panel view (promoter)
   return (
-    <div className="app-page min-h-screen bg-transparent">
+    <div className="app-page role-page min-h-screen bg-transparent">
       <Header
         onNovoChamado={handleNovoChamadoAccess}
         onOperadorPanel={handleOperadorAccess}
@@ -2734,8 +2707,20 @@ export default function App() {
           </div>
         )}
 
+        {isAuthenticated && permissions.canTrackOwnChamados && <>
+          <PageHeading variant="workspace" eyebrow="Televendas" title="Meus chamados"
+            description="Abra solicitações e acompanhe a separação e o atendimento dos seus pedidos."
+            context={<span className="workspace-context"><AdminIcon name="units" width={15} height={15} />{unidadeAtualNome}</span>}
+          />
+          <WorkspaceMetrics label="Resumo dos meus chamados" items={[
+            { label: "Minhas solicitações", value: resumoChamadosDoUsuario.total, icon: "box", tone: "primary" },
+            { label: "Em andamento", value: resumoChamadosDoUsuario.emAndamento, icon: "clock", tone: "waiting" },
+            { label: "Finalizados", value: resumoChamadosDoUsuario.finalizados, icon: "check", tone: "success" },
+          ]} />
+        </>}
+
         {permissions.canTrackOwnChamados && (
-          <div className="mb-4 rounded-[28px] border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+          <div className="workspace-scope-note">
             Seu acesso permite abrir chamados e acompanhar apenas as suas solicitações dentro da unidade vinculada.
           </div>
         )}
@@ -2752,27 +2737,9 @@ export default function App() {
             Você está em modo local. Para sincronizar entre dispositivos, configure Firebase neste dispositivo.
           </div>
         )}
-        <div className="mb-4 flex flex-col gap-3 rounded-[28px] border border-white/70 bg-white/60 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
-              {permissions.canTrackOwnChamados ? "Meus Chamados" : "Fila de Atendimento"}
-              <span className="ml-2 rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
-                {chamadosVisiveis.length}
-              </span>
-            </h2>
-            <div className="mt-2 flex flex-col gap-2">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-300" />
-                Unidade atual: {unidadeAtualNome}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-xs font-medium text-slate-500">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.5)]" />
-            {permissions.canTrackOwnChamados
-              ? "Acompanhamento restrito ao seu usuário"
-              : "Fila isolada por unidade"}
-          </div>
+        <div className="workspace-queue-heading">
+          <h2>{permissions.canTrackOwnChamados ? "Solicitações" : "Fila de atendimento"}<span className="workspace-count">{chamadosVisiveis.length.toLocaleString("pt-BR")}</span></h2>
+          <span className="workspace-context">{permissions.canTrackOwnChamados ? "Acompanhamento dos seus chamados" : "Fila da unidade"}</span>
         </div>
 
         <ChamadoList
@@ -2810,11 +2777,11 @@ export default function App() {
 
       {/* Footer */}
       <footer className="mt-8 border-t border-white/50 py-4 text-center text-xs text-slate-400">
-        Painel Empilhadeira · Sistema de Gerenciamento de Chamados
+        Pátio Pro Log · Gestão de chamados e operações
       </footer>
 
       {!isPlatformAdmin && (
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/92 px-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:hidden">
+      <div className="workspace-bottom-bar fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/92 px-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:hidden">
         <div className="app-main overflow-x-auto pb-0.5">
           <div className="flex min-w-max items-center gap-2">
           {(permissions.canViewUnitDashboard || permissions.canViewAllUnits) &&
@@ -2823,7 +2790,7 @@ export default function App() {
               onClick={handleDashboardAccess}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
             >
-              <span>📈</span>
+              <AdminIcon name="chart" width={18} height={18} />
               Dashboard
             </button>
           )}
@@ -2832,7 +2799,7 @@ export default function App() {
               onClick={handleOperadorAccess}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700"
             >
-              <span>👷</span>
+              <AdminIcon name="forklift" width={18} height={18} />
               Operador
             </button>
           )}
@@ -2841,7 +2808,7 @@ export default function App() {
               onClick={isAuthenticated ? handleAccessProfile : openLoginModal}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
             >
-              <span>{isAuthenticated ? "⚙️" : "🔐"}</span>
+              <AdminIcon name="user" width={18} height={18} />
               {isAuthenticated ? "Conta" : "Entrar"}
             </button>
           )}
@@ -2850,7 +2817,7 @@ export default function App() {
               onClick={handleNovoChamadoAccess}
               className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(249,115,22,0.32)]"
             >
-              <span className="text-base">＋</span>
+              <AdminIcon name="plus" width={18} height={18} />
               Novo Chamado
             </button>
           )}

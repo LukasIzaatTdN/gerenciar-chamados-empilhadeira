@@ -7,6 +7,7 @@ import type { FilterStatus } from "../hooks/useChamados";
 import type { TimeEstimatesResult } from "../hooks/useTimeEstimates";
 import type { Supermercado } from "../types/supermercado";
 import ChamadoCard from "./ChamadoCard";
+import AdminIcon from "./AdminIcon";
 
 interface ChamadoListProps {
   chamados: Chamado[];
@@ -19,10 +20,10 @@ interface ChamadoListProps {
 
 const FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Todos", value: "Todos" },
-  { label: "⏳ Aguardando", value: "Aguardando" },
-  { label: "🔧 Em atendimento", value: "Em atendimento" },
-  { label: "⚠️ Incompletos", value: "Incompleto" },
-  { label: "✅ Finalizados", value: "Finalizado" },
+  { label: "Aguardando", value: "Aguardando" },
+  { label: "Em atendimento", value: "Em atendimento" },
+  { label: "Incompletos", value: "Incompleto" },
+  { label: "Finalizados", value: "Finalizado" },
 ];
 
 export default function ChamadoList({
@@ -51,115 +52,37 @@ export default function ChamadoList({
   );
 
   return (
-    <div className="space-y-4">
-      {/* Filter tabs */}
-      <div className="sticky top-[86px] z-10 -mx-1 overflow-x-auto pb-1 sm:static sm:mx-0">
-        <div className="inline-flex min-w-full gap-2 rounded-[24px] border border-slate-200 bg-white p-1.5 shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:min-w-0">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => onFilterChange(f.value)}
-            className={`touch-target shrink-0 rounded-2xl px-4 py-3 text-xs font-semibold transition-all sm:text-sm ${
-              filterStatus === f.value
-                ? "bg-[linear-gradient(135deg,#0f3d75,#0f172a)] text-white shadow-[0_10px_24px_rgba(15,23,42,0.2)]"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        </div>
+    <section className="workspace-call-list" aria-label="Lista de chamados">
+      <div className="workspace-tabs" aria-label="Filtrar por status">
+        {FILTERS.map((filter) => <button key={filter.value} type="button" aria-pressed={filterStatus === filter.value} onClick={() => onFilterChange(filter.value)}>
+          {filter.label}
+        </button>)}
       </div>
-
-      <div className="overflow-x-auto pb-1">
-        <div className="mb-2 inline-flex min-w-full gap-2 rounded-[20px] border border-slate-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:min-w-0">
-          <button
-            onClick={() => setFilterCategoria("Todos")}
-            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-              filterCategoria === "Todos"
-                ? "bg-slate-900 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            onClick={() => setFilterCategoria("operacional")}
-            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-              filterCategoria === "operacional"
-                ? "bg-slate-900 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            Operacionais
-          </button>
-          <button
-            onClick={() => setFilterCategoria("televendas")}
-            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-              filterCategoria === "televendas"
-                ? "bg-indigo-600 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            Televendas
-          </button>
-        </div>
-        <div className="inline-flex min-w-full gap-2 rounded-[20px] border border-slate-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:min-w-0">
-          <button
-            onClick={() => setFilterTipo("Todos")}
-            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-              filterTipo === "Todos"
-                ? "bg-slate-900 text-white"
-                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            Todos os tipos
-          </button>
-          {TIPOS_SERVICO.map((tipo) => (
-            <button
-              key={tipo}
-              onClick={() => setFilterTipo(tipo)}
-              className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-                filterTipo === tipo
-                  ? tipo === "Atendimento Televendas"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-900 text-white"
-                  : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
-            >
-              {tipo}
-            </button>
-          ))}
-        </div>
+      <div className="workspace-call-filters">
+        <label><span>Categoria</span><select value={filterCategoria} onChange={(event) => setFilterCategoria(event.target.value as typeof filterCategoria)}>
+          <option value="Todos">Todas as categorias</option><option value="operacional">Operacionais</option><option value="televendas">Televendas</option>
+        </select></label>
+        <label><span>Tipo de serviço</span><select value={filterTipo} onChange={(event) => setFilterTipo(event.target.value as typeof filterTipo)}>
+          <option value="Todos">Todos os tipos</option>
+          {TIPOS_SERVICO.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+        </select></label>
+        <span className="workspace-call-results">{chamadosFiltradosPorTipo.length.toLocaleString("pt-BR")} {chamadosFiltradosPorTipo.length === 1 ? "chamado encontrado" : "chamados encontrados"}</span>
       </div>
-
-      {/* List */}
       {chamadosFiltradosPorTipo.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-[30px] border border-dashed border-slate-200 bg-white py-16 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-          <span className="text-5xl">🏗️</span>
-          <p className="mt-4 text-sm font-semibold text-slate-500">
-            Nenhum chamado encontrado
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            {filterStatus !== "Todos" || filterTipo !== "Todos"
-              ? "Tente mudar o filtro ou crie um novo chamado"
-              : 'Clique em "Solicitar Empilhadeira" para criar um chamado'}
-          </p>
+        <div className="workspace-empty">
+          <span className="workspace-empty-icon"><AdminIcon name="box" width={25} height={25} /></span>
+          <h3>Nenhum chamado encontrado</h3>
+          <p>{filterStatus !== "Todos" || filterTipo !== "Todos" || filterCategoria !== "Todos" ? "Ajuste os filtros para consultar outras solicitações." : "As solicitações disponíveis para o seu acesso aparecerão aqui."}</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {chamadosFiltradosPorTipo.map((chamado) => (
-            <ChamadoCard
-              key={chamado.id}
-              chamado={chamado}
-              estimate={timeEstimates.estimates[chamado.id]}
-              remainingMin={timeEstimates.tempoRestanteEmAtendimento[chamado.id]}
-              showSupermercado={showSupermercado}
-              supermercados={supermercados}
-            />
-          ))}
+        <div className="workspace-call-results-list">
+          {chamadosFiltradosPorTipo.map((chamado) => <ChamadoCard
+            key={chamado.id} chamado={chamado} estimate={timeEstimates.estimates[chamado.id]}
+            remainingMin={timeEstimates.tempoRestanteEmAtendimento[chamado.id]}
+            showSupermercado={showSupermercado} supermercados={supermercados}
+          />)}
         </div>
       )}
-    </div>
+    </section>
   );
 }

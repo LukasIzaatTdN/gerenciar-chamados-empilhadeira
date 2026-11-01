@@ -18,6 +18,15 @@ const paths = {
   chevron: "m9 5 7 7-7 7",
   units: "M3 21V8l9-5 9 5v13 M3 9h18 M7 13h10v8 M10 13v8 M14 13v8 M1 21h22",
   support: "M12 17v4 M8 21h8 M3 3h18v14H3z M7 8h3 M7 12h7",
+  clock: "M12 8v4l3 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  check: "m8 12 3 3 5-6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  alert: "M12 9v4 M12 17h.01 M10.3 3.9 1.8 18.6A1.6 1.6 0 0 0 3.2 21h17.6a1.6 1.6 0 0 0 1.4-2.4L13.7 3.9a2 2 0 0 0-3.4 0",
+  forklift: "M3 17V9h5l3 4v4 M3 13h8 M8 9V4H4 M16 3v16h6 M19 3v13h3 M7 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M14 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0",
+  box: "m3 7 9-5 9 5v10l-9 5-9-5z M3 7l9 5 9-5 M12 12v10 M7.5 4.5l9 5",
+  logout: "M9 3H4v18h5 M10 12h12 M18 8l4 4-4 4",
+  settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z",
+  chart: "M4 3v18h17 M8 16v-4 M13 16V8 M18 16v-7",
+  location: "M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0 M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
 } as const;
 
 export type AdminIconName = keyof typeof paths;

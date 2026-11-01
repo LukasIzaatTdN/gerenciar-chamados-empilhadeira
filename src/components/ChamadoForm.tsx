@@ -225,8 +225,8 @@ export default function ChamadoForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-none bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="flex w-full max-w-xl animate-in flex-col overflow-hidden overscroll-contain rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
+    <div className="workspace-call-dialog fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-none bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="call-form-title" className="workspace-call-dialog-panel flex w-full max-w-xl animate-in flex-col overflow-hidden overscroll-contain rounded-t-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] shadow-[0_24px_60px_rgba(15,23,42,0.2)] max-h-[calc(100dvh-0.5rem)] sm:rounded-[30px] sm:max-h-[calc(100dvh-2rem)]">
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
           <div className="mb-3 block text-center sm:hidden">
             <span className="mx-auto block h-1.5 w-10 rounded-full bg-slate-200" />
@@ -237,9 +237,9 @@ export default function ChamadoForm({
                 🏗️
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Novo chamado</h2>
+                <h2 id="call-form-title" className="text-xl font-black tracking-tight text-slate-900">{isTelevendas ? "Novo pedido de Televendas" : "Novo chamado"}</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Preencha os dados abaixo para abrir rapidamente uma solicitação de empilhadeira.
+                  {isTelevendas ? "Informe o pedido e os produtos para iniciar o atendimento da sua unidade." : "Preencha os dados para solicitar o apoio da empilhadeira."}
                 </p>
                 {supermercadoNome && (
                   <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">

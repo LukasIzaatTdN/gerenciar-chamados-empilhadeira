@@ -6,6 +6,7 @@ type PageHeadingProps = {
   description: string;
   actions?: ReactNode;
   context?: ReactNode;
+  variant?: "panel" | "workspace";
 };
 
 export default function PageHeading({
@@ -14,9 +15,10 @@ export default function PageHeading({
   description,
   actions,
   context,
+  variant = "panel",
 }: PageHeadingProps) {
   return (
-    <section className="page-heading" aria-label={title}>
+    <section className={`page-heading${variant === "workspace" ? " workspace-heading" : ""}`} aria-label={title}>
       <div className="page-heading-copy">
         <p className="page-heading-eyebrow">
           <span aria-hidden="true" className="page-heading-indicator" />

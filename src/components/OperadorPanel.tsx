@@ -11,6 +11,9 @@ import { formatEstimateMinutes } from "../hooks/useTimeEstimates";
 import { cn } from "../utils/cn";
 import TimeEstimateBadge from "./TimeEstimateBadge";
 import NotificationCenter from "./NotificationCenter";
+import AdminIcon, { type AdminIconName } from "./AdminIcon";
+import PageHeading from "./PageHeading";
+import WorkspaceMetrics from "./WorkspaceMetrics";
 import SectionErrorBoundary from "./SectionErrorBoundary";
 import { recordAppActivity } from "../utils/appActivity";
 import { getCategoriaChamado, isTelevendasChamado } from "../utils/chamadoStatus";
@@ -368,10 +371,10 @@ export default function OperadorPanel({
     "Atendimento Televendas": "📞",
   };
 
-  const tabs: { key: FilterTab; label: string; count: number; icon: string }[] = [
-    { key: "pendentes", label: "Pendentes", count: pendentes.length, icon: "📋" },
-    { key: "meus", label: "Meus Chamados", count: meusChamados.length, icon: "👷" },
-    { key: "finalizados", label: "Finalizados", count: finalizados.length, icon: "✅" },
+  const tabs: { key: FilterTab; label: string; count: number; icon: AdminIconName }[] = [
+    { key: "pendentes", label: "Pendentes", count: pendentes.length, icon: "clock" },
+    { key: "meus", label: "Meus Chamados", count: meusChamados.length, icon: "user" },
+    { key: "finalizados", label: "Finalizados", count: finalizados.length, icon: "check" },
   ];
 
   const totalHojeFinalizados = finalizados.filter((c) => {
@@ -529,79 +532,22 @@ export default function OperadorPanel({
   }
 
   return (
-    <div className="min-h-screen bg-transparent">
-      <header className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(15,61,117,0.97),rgba(15,23,42,0.95))] shadow-[0_16px_34px_rgba(15,23,42,0.16)]">
-        <div className="app-main px-2 py-4 sm:px-0">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-                <span className="text-2xl">👷</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white sm:text-2xl">
-                  {isSeparadorTelevendas ? "Painel do Separador de Televendas" : "Painel do Operador"}
-                </h1>
-                <p className="text-xs text-slate-200 sm:text-sm">
-                  Olá, <span className="font-semibold text-white">{operadorNome}</span>
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-semibold text-white/85">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-300" />
-                    Unidade: {supermercadoNome ?? "Unidade não identificada"}
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-semibold text-white/85">
-                    <span
-                      className={cn(
-                        "inline-block h-2.5 w-2.5 rounded-full",
-                        isDisponivel ? "bg-emerald-400" : "bg-amber-300"
-                      )}
-                    />
-                    Status: {operadorStatus}
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-semibold text-white/85">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-300" />
-                    Pendentes da unidade: {pendentes.length}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto">
-              <div className="flex min-w-max items-center gap-2 lg:justify-end">
-              <NotificationCenter
-                notifications={notifications}
-                unreadCount={unreadCount}
-                onMarkAsRead={onMarkAsRead}
-                onMarkAllAsRead={onMarkAllAsRead}
-                onClearAll={onClearAll}
-                variant="light"
-              />
-
-              <button
-                onClick={onAccessProfile}
-                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 sm:text-sm"
-              >
-                <span>⚙️</span>
-                <span>Perfil</span>
-              </button>
-
-              <button
-                onClick={onTrocarUsuario}
-                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-4 py-3 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/14 hover:border-white/35 active:scale-95 sm:text-sm"
-              >
-                <span>🔐</span>
-                <span>Trocar usuário</span>
-              </button>
-
-              <button
-                onClick={onLogout}
-                className="touch-target inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-red-300/25 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-100 transition-all hover:bg-red-500/16 active:scale-95 sm:text-sm"
-              >
-                <span>⎋</span>
-                <span>Sair</span>
-              </button>
-              </div>
-            </div>
+    <div className="app-page role-page operator-page min-h-screen" data-workspace={isSeparadorTelevendas ? "separador" : "operador"}>
+      <header className="workspace-header">
+        <div className="app-main workspace-header-top">
+          <div className="workspace-brand">
+            <span className="workspace-brand-mark"><AdminIcon name={isSeparadorTelevendas ? "box" : "forklift"} width={23} height={23} /></span>
+            <div><strong>Pátio Pro Log</strong><span>{isSeparadorTelevendas ? "Separação de Televendas" : "Central do Operador"}</span></div>
+          </div>
+          <div className="workspace-header-tools">
+            <div className="workspace-user"><strong>{operadorNome}</strong><span>{supermercadoNome ?? "Unidade não identificada"}</span></div>
+            <div className="workspace-notifications"><NotificationCenter
+              notifications={notifications} unreadCount={unreadCount} onMarkAsRead={onMarkAsRead}
+              onMarkAllAsRead={onMarkAllAsRead} onClearAll={onClearAll} variant="light"
+            /></div>
+            <button type="button" onClick={onAccessProfile} className="workspace-button workspace-button-secondary"><AdminIcon name="user" width={17} height={17} />Perfil</button>
+            <button type="button" onClick={onTrocarUsuario} className="workspace-button workspace-button-secondary"><AdminIcon name="users" width={17} height={17} />Trocar usuário</button>
+            <button type="button" onClick={onLogout} className="workspace-button workspace-button-danger"><AdminIcon name="logout" width={17} height={17} />Sair</button>
           </div>
         </div>
       </header>
@@ -613,42 +559,19 @@ export default function OperadorPanel({
           </div>
         )}
 
-        <div className="mb-4 rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                Central da unidade
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
-                {supermercadoNome ?? "Unidade não identificada"}
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Este painel mostra apenas chamados da loja vinculada ao seu usuário.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">
-                  Pendentes
-                </p>
-                <p className="mt-2 text-2xl font-black text-amber-700">{pendentes.length}</p>
-              </div>
-              <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-                  Em andamento
-                </p>
-                <p className="mt-2 text-2xl font-black text-emerald-700">{emAtendimentoAtual}</p>
-              </div>
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                  Status atual
-                </p>
-                <p className="mt-2 text-lg font-black text-slate-900">{operadorStatus}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PageHeading variant="workspace"
+          eyebrow={isSeparadorTelevendas ? "Separação de pedidos" : "Operação da unidade"}
+          title={isSeparadorTelevendas ? "Central de separação" : "Minha operação"}
+          description={isSeparadorTelevendas ? "Organize os pedidos, confira os itens e acompanhe suas separações." : "Acompanhe a fila, prepare seu equipamento e conduza os atendimentos da unidade."}
+          context={<><span className="workspace-context"><AdminIcon name="units" width={15} height={15} />{supermercadoNome ?? "Unidade não identificada"}</span>
+            <span className={`workspace-availability-badge ${isDisponivel ? "is-available" : ""}`}><span aria-hidden="true" />{operadorStatus}</span></>}
+        />
+        <WorkspaceMetrics items={[
+          { label: "Pendentes", value: pendentes.length, icon: "clock", tone: "waiting" },
+          { label: isSeparadorTelevendas ? "Em separação" : "Atendendo", value: emAtendimentoAtual, icon: isSeparadorTelevendas ? "box" : "forklift", tone: "primary" },
+          { label: "Finalizados hoje", value: totalHojeFinalizados, icon: "check", tone: "success" },
+          { label: "Tempo médio", value: timeEstimates.mediaMin !== null ? formatEstimateMinutes(timeEstimates.mediaMin) : "—", icon: "clock", hint: timeEstimates.totalFinalizados > 0 ? `${timeEstimates.totalFinalizados} atendimento${timeEstimates.totalFinalizados !== 1 ? "s" : ""}` : "Sem dados ainda" },
+        ]} />
 
         {actionError && (
           <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -656,7 +579,7 @@ export default function OperadorPanel({
           </div>
         )}
 
-        <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
+        <div className="workspace-panel operator-recommendation">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -702,7 +625,7 @@ export default function OperadorPanel({
           </div>
         </div>
 
-        <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
+        <div className="workspace-panel operator-availability">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -722,6 +645,7 @@ export default function OperadorPanel({
                     key={status}
                     type="button"
                     onClick={() => onStatusChange(status)}
+                    aria-pressed={active}
                     className={cn(
                       "touch-target rounded-2xl px-4 py-3 text-sm font-semibold transition-all",
                       active
@@ -744,44 +668,9 @@ export default function OperadorPanel({
           )}
         </div>
 
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {[
-            { label: "Pendentes", value: pendentes.length, icon: "📋", border: "border-amber-200", text: "text-amber-700", valueText: "text-amber-600" },
-            { label: "Atendendo", value: emAtendimentoAtual, icon: "🔧", border: "border-emerald-200", text: "text-emerald-700", valueText: "text-emerald-600" },
-            { label: "Hoje", value: totalHojeFinalizados, icon: "✅", border: "border-blue-200", text: "text-blue-800", valueText: "text-blue-700" },
-            {
-              label: "Tempo Médio",
-              value: timeEstimates.mediaMin !== null ? formatEstimateMinutes(timeEstimates.mediaMin) : "—",
-              icon: "⏱️",
-              border: "border-blue-200",
-              text: "text-blue-800",
-              valueText: "text-blue-700",
-              subtitle:
-                timeEstimates.totalFinalizados > 0
-                  ? `${timeEstimates.totalFinalizados} atendimento${timeEstimates.totalFinalizados !== 1 ? "s" : ""}`
-                  : "sem dados",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className={cn(
-                "rounded-[24px] border bg-white p-4 shadow-[0_12px_26px_rgba(15,23,42,0.06)]",
-                item.border
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{item.icon}</span>
-                <span className={cn("text-xs font-semibold sm:text-sm", item.text)}>{item.label}</span>
-              </div>
-              <p className={cn("mt-1 text-2xl font-bold sm:text-3xl", item.valueText)}>{item.value}</p>
-              {"subtitle" in item && item.subtitle && (
-                <p className="mt-0.5 text-[10px] text-slate-400">{item.subtitle}</p>
-              )}
-            </div>
-          ))}
-        </div>
-
         {!isSeparadorTelevendas && (
+        <details className="workspace-technical">
+          <summary><AdminIcon name="settings" width={19} height={19} /><span><strong>Rotina técnica da unidade</strong><span>Checklist diário e registro de problemas do equipamento</span></span><AdminIcon name="chevron" className="workspace-details-chevron" width={18} height={18} /></summary>
         <div className="mb-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1045,9 +934,10 @@ export default function OperadorPanel({
             </div>
           )}
         </div>
+        </details>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)]">
+        <div className="workspace-queue-legend">
           <span className="text-xs font-medium text-slate-500">Indicadores:</span>
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-full bg-red-500" />
@@ -1063,11 +953,13 @@ export default function OperadorPanel({
           </div>
         </div>
 
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        <div className="workspace-queue-title"><h2>{isSeparadorTelevendas ? "Pedidos para separação" : "Fila de atendimento"}</h2><p>{isSeparadorTelevendas ? "Acompanhe a fila de Televendas da sua unidade." : "Escolha os chamados e acompanhe os seus atendimentos."}</p></div>
+        <div className="workspace-tabs" aria-label="Filtrar chamados">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
               className={cn(
                 "touch-target flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-semibold transition-all sm:text-sm",
                 activeTab === tab.key
@@ -1075,7 +967,7 @@ export default function OperadorPanel({
                   : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
-              <span>{tab.icon}</span>
+              <AdminIcon name={tab.icon} width={17} height={17} />
               {tab.label}
               <span
                 className={cn(
@@ -1160,24 +1052,10 @@ export default function OperadorPanel({
 
         <SectionErrorBoundary title="A lista de chamados encontrou um erro, mas o painel continua ativo.">
           {currentList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-slate-200 bg-white py-16 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-              <span className="text-5xl">
-                {activeTab === "pendentes" ? "✨" : activeTab === "meus" ? "👷" : "📊"}
-              </span>
-              <p className="mt-4 text-sm font-semibold text-slate-600">
-                {activeTab === "pendentes"
-                  ? "Nenhum chamado pendente"
-                  : activeTab === "meus"
-                  ? "Nenhum chamado assumido"
-                  : "Nenhum chamado finalizado"}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                {activeTab === "pendentes"
-                  ? "Todos os chamados foram atendidos!"
-                  : activeTab === "meus"
-                  ? "Assuma chamados na aba Pendentes"
-                  : "Seus chamados finalizados aparecerão aqui"}
-              </p>
+            <div className="workspace-empty">
+              <span className="workspace-empty-icon"><AdminIcon name={activeTab === "pendentes" ? "check" : activeTab === "meus" ? "user" : "chart"} width={25} height={25} /></span>
+              <h3>{activeTab === "pendentes" ? "Nenhum chamado pendente" : activeTab === "meus" ? "Nenhum chamado assumido" : "Nenhum chamado finalizado"}</h3>
+              <p>{activeTab === "pendentes" ? "Novas solicitações da unidade aparecerão aqui." : activeTab === "meus" ? "Assuma chamados na aba Pendentes para acompanhar seu atendimento." : "Os chamados que você finalizar aparecerão aqui."}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1249,7 +1127,7 @@ export default function OperadorPanel({
                 <div
                   key={chamado.id}
                   className={cn(
-                    "group relative overflow-hidden rounded-[26px] border shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.1)]",
+                    "operator-call-card group relative overflow-hidden rounded-[26px] border shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.1)]",
                     cardBorder,
                     cardBg
                   )}
@@ -1762,7 +1640,7 @@ export default function OperadorPanel({
       </main>
 
       <footer className="mt-8 border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-        Painel do Operador · Sistema de Gerenciamento de Chamados
+        Pátio Pro Log · {isSeparadorTelevendas ? "Separação de Televendas" : "Central do Operador"}
       </footer>
     </div>
   );
