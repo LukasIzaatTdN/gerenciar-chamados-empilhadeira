@@ -271,7 +271,7 @@ export default function Header({
               {showCompanyNavigationAction && onOpenEmpresasAdmin && (
                 <button
                   onClick={onOpenEmpresasAdmin}
-                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                  className={getActionClassName(false)}
                 >
                   <span>🏢</span>
                   <span>Empresas</span>
@@ -280,7 +280,7 @@ export default function Header({
               {showUnitNavigationAction && openUnidadesAdmin && (
                 <button
                   onClick={openUnidadesAdmin}
-                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                  className={getActionClassName(false)}
                 >
                   <span>🏬</span>
                   <span>Unidades</span>
@@ -289,7 +289,7 @@ export default function Header({
               {showUsersNavigationAction && onOpenUsuariosAdmin && (
                 <button
                   onClick={onOpenUsuariosAdmin}
-                  className={getActionClassName(perfilAcesso === "Administrador Geral")}
+                  className={getActionClassName(false)}
                 >
                   <span>👥</span>
                   <span>Usuários</span>
@@ -415,11 +415,7 @@ export default function Header({
                 {showCompanyNavigationAction && onOpenEmpresasAdmin && (
                   <button
                     onClick={onOpenEmpresasAdmin}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
-                      perfilAcesso === "Administrador Geral"
-                        ? "bg-amber-500 text-slate-950"
-                        : "border border-white/20 bg-white/10 text-white"
-                    }`}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold border border-white/20 bg-white/10 text-white"
                   >
                     <span>🏢</span>
                     <span>Empresas</span>
@@ -429,11 +425,7 @@ export default function Header({
                 {showUnitNavigationAction && openUnidadesAdmin && (
                   <button
                     onClick={openUnidadesAdmin}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
-                      perfilAcesso === "Administrador Geral"
-                        ? "bg-amber-500 text-slate-950"
-                        : "border border-white/20 bg-white/10 text-white"
-                    }`}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold border border-white/20 bg-white/10 text-white"
                   >
                     <span>🏬</span>
                     <span>Unidades</span>
@@ -442,11 +434,7 @@ export default function Header({
                 {showUsersNavigationAction && onOpenUsuariosAdmin && (
                   <button
                     onClick={onOpenUsuariosAdmin}
-                    className={`touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold ${
-                      perfilAcesso === "Administrador Geral"
-                        ? "bg-amber-500 text-slate-950"
-                        : "border border-white/20 bg-white/10 text-white"
-                    }`}
+                    className="touch-target inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2.5 text-[11px] font-semibold border border-white/20 bg-white/10 text-white"
                   >
                     <span>👥</span>
                     <span>Usuários</span>

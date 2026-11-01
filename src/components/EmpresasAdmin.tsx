@@ -27,6 +27,7 @@ interface EmpresasAdminProps {
   onToggleStatus: (id: string) => Promise<void>;
   onVoltar: () => void;
   onOpenSubscriptions?: () => void;
+  onOpenCompany?: (empresaId: string, area: "unidades" | "usuarios" | "suporte") => void;
 }
 
 type FormState = {
@@ -79,6 +80,7 @@ export default function EmpresasAdmin({
   onToggleStatus,
   onVoltar,
   onOpenSubscriptions,
+  onOpenCompany,
 }: EmpresasAdminProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -324,7 +326,12 @@ export default function EmpresasAdmin({
                     {assinatura ? <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${assinatura.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assinatura.status}</span> : <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Não foi possível consultar" : "Não vinculada"}</p>}
                     <p className="mt-2 text-xs text-slate-500">Empresa: {empresa.status}</p>
                   </div>
-                  <div className="flex items-center gap-2 md:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    {onOpenCompany && <>
+                      <button type="button" onClick={() => onOpenCompany(empresa.id, "suporte")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Consultar operação</button>
+                      <button type="button" onClick={() => onOpenCompany(empresa.id, "unidades")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Unidades</button>
+                      <button type="button" onClick={() => onOpenCompany(empresa.id, "usuarios")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Acessos</button>
+                    </>}
                     <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
                       Editar
                     </button>

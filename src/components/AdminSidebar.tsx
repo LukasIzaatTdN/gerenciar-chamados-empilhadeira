@@ -4,29 +4,30 @@ type AdminSidebarProps = {
   activeView: string;
   dark: boolean;
   userName: string;
-  onNavigate: (view: "dashboard" | "empresas" | "unidades" | "usuarios" | "assinaturas" | "perfil") => void;
+  onNavigate: (view: "dashboard" | "empresas" | "unidades" | "usuarios" | "assinaturas" | "perfil" | "suporte" | "auditoria") => void;
   onThemeToggle: () => void;
 };
 
 const links = [
   ["dashboard", "Visão geral", "▦"],
   ["empresas", "Empresas", "▤"],
-  ["unidades", "Unidades", "⌖"],
-  ["usuarios", "Usuários", "♙"],
-  ["assinaturas", "Assinaturas", "◇"],
+  ["usuarios", "Acessos", "♙"],
+  ["assinaturas", "Planos e assinaturas", "◇"],
+  ["auditoria", "Auditoria", "≡"],
   ["perfil", "Meu perfil", "⚙"],
 ] as const;
 
 export default function AdminSidebar({ activeView, dark, userName, onNavigate, onThemeToggle }: AdminSidebarProps) {
   const surface = dark ? "border-slate-700 bg-slate-900 text-slate-100" : "border-slate-200 bg-white text-slate-800";
   const muted = dark ? "text-slate-400" : "text-slate-500";
+  const selectedView = activeView === "unidades" || activeView === "suporte" ? "empresas" : activeView;
   const nav = (items: typeof links, compact = false): ReactNode => items.map(([view, label, icon]) => (
     <button
       key={view}
       type="button"
       onClick={() => onNavigate(view)}
-      aria-current={activeView === view ? "page" : undefined}
-      className={`flex min-h-11 ${compact ? "w-auto shrink-0" : "w-full"} items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === view ? "bg-blue-600 text-white shadow-md shadow-blue-900/15" : `${muted} hover:bg-slate-500/10 hover:text-current`}`}
+      aria-current={selectedView === view ? "page" : undefined}
+      className={`flex min-h-11 ${compact ? "w-auto shrink-0" : "w-full"} items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedView === view ? "bg-blue-600 text-white shadow-md shadow-blue-900/15" : `${muted} hover:bg-slate-500/10 hover:text-current`}`}
     >
       <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-slate-500/10 text-base">{icon}</span>
       {label}

@@ -20,14 +20,12 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
   const isSeparator = perfil === "Separador de Televendas";
   const canAccessOperatorPanel =
     perfil === "Operador" ||
-    isSeparator ||
-    isPlatformAdmin;
+    isSeparator;
 
   return {
     canCreateChamado:
       perfil === "Televendas" ||
-      perfil === "Separador de Televendas" ||
-      isPlatformAdmin,
+      perfil === "Separador de Televendas",
     canTrackOwnChamados:
       perfil === "Televendas",
     canAccessOperatorPanel,
@@ -35,7 +33,7 @@ export function getPermissions(perfil: PerfilAcesso | null): AccessPermissions {
     canViewUnitDashboard:
       isCompanyManager || isPlatformAdmin,
     canViewUnitQueue:
-      isSeparator || isPlatformAdmin,
+      isSeparator,
     canViewHistoryAndReports:
       isCompanyManager || isPlatformAdmin,
     canViewAllUnits: isPlatformAdmin,

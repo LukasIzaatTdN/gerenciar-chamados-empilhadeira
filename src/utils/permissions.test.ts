@@ -31,3 +31,20 @@ assert.equal(platformAdmin.canViewAllUnits, true);
 assert.equal(platformAdmin.canManageUnits, true);
 
 console.log("permissions tests passed");
+
+assert.equal(platformAdmin.canCreateChamado, false);
+assert.equal(platformAdmin.canAccessOperatorPanel, false);
+assert.equal(platformAdmin.canManageOperatorQueue, false);
+assert.equal(platformAdmin.canViewUnitQueue, false);
+
+// Preserve the complete operational access contract for both mobile/web roles.
+assert.deepEqual(operator, {
+  canCreateChamado: false, canTrackOwnChamados: false,
+  canAccessOperatorPanel: true, canManageOperatorQueue: true,
+  canViewUnitDashboard: false, canViewUnitQueue: false,
+  canViewHistoryAndReports: false, canViewAllUnits: false,
+  canManageUnits: false, canViewAllCompanies: false, canManageCompanyAdmin: false,
+});
+assert.deepEqual(separator, {
+  ...operator, canCreateChamado: true, canViewUnitQueue: true,
+});

@@ -3,6 +3,7 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { getEmpresaById } from "./data/empresas";
 import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
+import PlatformOverview from "./components/PlatformOverview";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminScopeSelector from "./components/AdminScopeSelector";
 import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
@@ -84,6 +85,8 @@ import type { AdminInvite } from "./types/adminInvite";
 
 type View =
   | "geral"
+  | "suporte"
+  | "auditoria"
   | "operador"
   | "perfil"
   | "dashboard"
@@ -131,7 +134,9 @@ function getViewByPerfil(perfil: UsuarioSistema["perfil"]): View {
 
 function canAccessViewByPerfil(view: View, perfil: UsuarioSistema["perfil"]) {
   const nextPermissions = getPermissions(perfil);
+  if (perfil === "Administrador Geral" && ["geral", "operador", "empilhadeiras", "manutencoes"].includes(view)) return false;
 
+  if (view === "suporte" || view === "auditoria") return perfil === "Administrador Geral";
   if (view === "empresas") return nextPermissions.canViewAllCompanies;
   if (view === "assinaturas") return nextPermissions.canViewAllCompanies;
   if (view === "unidades") return nextPermissions.canManageUnits;
@@ -1861,6 +1866,38 @@ export default function App() {
     );
   }
 
+  if ((view === "suporte" || view === "auditoria") && isPlatformAdmin) {
+    const auditRows = auditoriaRecente.filter((item) => (!empresaSelecionadaId || (item.empresa_id ?? item.details?.empresa_id) === empresaSelecionadaId) && (!supermercadoSelecionadoId || (item.supermercado_id ?? item.details?.supermercado_id) === supermercadoSelecionadoId));
+    const supportRows = allChamados.filter((item) => item.empresa_id === empresaSelecionadaId && (!supermercadoSelecionadoId || item.supermercado_id === supermercadoSelecionadoId));
+    return <>{renderAdminScreen(<main className="app-main space-y-5 px-4 py-6">
+      <h1 className="text-2xl font-black">{view === "suporte" ? "Consulta da operação" : "Auditoria"}</h1>
+      <p className="text-sm text-slate-500">Consulta somente para leitura dos registros disponíveis. {view === "auditoria" && "O histórico apresenta os eventos já registrados pelo sistema."}</p>
+      <AdminScopeSelector empresaValue={adminEmpresaFiltro} supermercadoValue={adminSupermercadoFiltro}
+        onEmpresaChange={(id) => { setAdminEmpresaFiltro(id); setAdminSupermercadoFiltro("todos"); }}
+        onSupermercadoChange={setAdminSupermercadoFiltro} empresas={empresas} supermercados={supermercados} allowEmpresaSelection />
+      {view === "suporte" ? <>
+        <p className="font-semibold">Empresa: {empresas.find((item) => item.id === empresaSelecionadaId)?.nome ?? "Selecione uma empresa"} · Unidade: {unidadeAtualNome}</p>
+        {!empresaSelecionadaId ? <p>Selecione uma empresa para consultar sua operação.</p> : supportRows.length === 0 ? <p>Nenhum chamado disponível neste recorte.</p> : supportRows.map((item) => <article key={item.id} className="professional-panel p-4">
+          <h2 className="font-bold">{item.tipo_servico} · {item.status}</h2>
+          <p className="mt-2 text-sm">{supermercados.find((unit) => unit.id === item.supermercado_id)?.nome ?? item.supermercado_id} · {item.solicitante_nome} · {item.setor}</p>
+          <p className="mt-1 text-xs text-slate-500">Chamado {item.id}</p>
+        </article>)}
+      </> : <>
+        {auditoriaSyncError && <p role="alert">Não foi possível atualizar o histórico: {auditoriaSyncError}</p>}
+        {auditRows.length === 0 && <p>Nenhum evento disponível neste recorte.</p>}
+        {auditRows.map((item) => <article key={item.id} className="professional-panel p-4"><h2 className="font-bold">{item.action}</h2><p className="mt-2 text-sm">{item.actorName} · {item.occurredAt}</p><p className="mt-1 text-xs text-slate-500">{item.entityType} · {item.entityId}</p></article>)}
+      </>}
+    </main>, view)}{renderGlobalOverlays()}</>;
+  }
+
+  if (view === "dashboard" && isPlatformAdmin) {
+    return <>{renderAdminScreen(
+      <PlatformOverview empresas={empresas} unidades={supermercados} usuarios={usuarios}
+        onNavigate={(nextView) => { setAdminEmpresaFiltro("todas"); setAdminSupermercadoFiltro("todos"); navigateTo(nextView); }}
+        onProfile={handleAccessProfile} />,
+      view)}{renderGlobalOverlays()}</>;
+  }
+
   if (view === "dashboard" && (permissions.canViewUnitDashboard || permissions.canViewAllUnits)) {
     return (
       <>
@@ -2242,6 +2279,11 @@ export default function App() {
           onToggleStatus={handleToggleEmpresaStatus}
           onVoltar={goBackToPreviousView}
           onOpenSubscriptions={() => navigateTo("assinaturas")}
+          onOpenCompany={(empresaId, area) => {
+            setAdminEmpresaFiltro(empresaId);
+            setAdminSupermercadoFiltro("todos");
+            navigateTo(area);
+          }}
         />
         </>, view)}
         {renderGlobalOverlays()}
@@ -2302,7 +2344,7 @@ export default function App() {
           empresas={empresas}
           usuarios={
             canViewAllCompanies
-              ? usuarios.filter(isInvitedCompanyManager)
+              ? usuarios.filter((usuario) => isInvitedCompanyManager(usuario) && (!empresaSelecionadaId || usuario.empresa_id === empresaSelecionadaId))
               : usuarios.filter((usuario) => usuario.empresa_id === empresaSelecionadaId)
           }
           supermercados={supermercadosDoEscopo}
