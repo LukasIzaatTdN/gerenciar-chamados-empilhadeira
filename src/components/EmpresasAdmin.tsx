@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../config/firebase";
 import type { AssinaturaEmpresa } from "../types/empresa";
 import type { Empresa, PlanoCiclo, PlanoStatus } from "../types/empresa";
-import PageHeading from "./PageHeading";
+import type { Supermercado } from "../types/supermercado";
+import AdminIcon from "./AdminIcon";
+import CompanyActions from "./CompanyActions";
 
 interface EmpresasAdminProps {
   empresas: Empresa[];
+  unidades: Supermercado[];
   onCreate: (input: { nome: string; codigo: string; cnpj?: string }) => Promise<string | void>;
   onUpdate: (
     id: string,
@@ -25,7 +28,6 @@ interface EmpresasAdminProps {
     }
   ) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
-  onVoltar: () => void;
   onOpenSubscriptions?: () => void;
   onOpenCompany?: (empresaId: string, area: "unidades" | "usuarios" | "suporte") => void;
 }
@@ -75,13 +77,18 @@ function parseNullableNumber(value: string) {
 
 export default function EmpresasAdmin({
   empresas,
+  unidades,
   onCreate,
   onUpdate,
   onToggleStatus,
-  onVoltar,
   onOpenSubscriptions,
   onOpenCompany,
 }: EmpresasAdminProps) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todas");
+  const drawerRef = useRef<HTMLDialogElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +103,38 @@ export default function EmpresasAdmin({
       ),
     [empresas]
   );
+
+  const searchTerm = search.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  const filteredCompanies = empresasOrdenadas.filter((empresa) => {
+    const searchable = `${empresa.nome} ${empresa.codigo} ${empresa.cnpj ?? ""} ${(empresa.cnpj ?? "").replace(/\D/g, "")}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+    return (statusFilter === "todas" || empresa.status === statusFilter) && searchable.includes(searchTerm);
+  });
+  const unitCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const unidade of unidades) counts.set(unidade.empresa_id, (counts.get(unidade.empresa_id) ?? 0) + 1);
+    return counts;
+  }, [unidades]);
+
+  useEffect(() => {
+    if (!drawerOpen || !drawerRef.current) return;
+    const drawer = drawerRef.current;
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    drawer.showModal();
+    nameRef.current?.focus();
+    document.body.style.overflow = "hidden";
+    return () => {
+      drawer.close();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+  }, [drawerOpen]);
+
+  function closeDrawer() {
+    if (isSubmitting) return;
+    setDrawerOpen(false);
+    setError(null);
+  }
 
   // Use canonical SaaS subscription documents, not legacy company plan defaults.
   const [saas, setSaas] = useState<Record<string, { loading: boolean; value: AssinaturaEmpresa | null; error: boolean }>>({});
@@ -161,6 +200,7 @@ export default function EmpresasAdmin({
           contrato_fim: form.contrato_fim.trim() || null,
         });
         resetForm();
+        setDrawerOpen(false);
       } else {
         const companyId = await onCreate({
           nome: form.nome.trim(),
@@ -170,6 +210,9 @@ export default function EmpresasAdmin({
         setCreatedCompany(companyId ?? form.codigo.trim().toUpperCase());
         setForm(EMPTY_FORM);
         setError(null);
+        setSearch("");
+        setStatusFilter("todas");
+        setDrawerOpen(false);
       }
     } catch (submitError) {
       setError(
@@ -198,6 +241,7 @@ export default function EmpresasAdmin({
       contrato_fim: empresa.contrato_fim ?? "",
     });
     setError(null);
+    setDrawerOpen(true);
   }
 
   async function handleToggleStatus(id: string) {
@@ -217,135 +261,101 @@ export default function EmpresasAdmin({
   }
 
   return (
-    <div className="min-h-screen bg-transparent">
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <PageHeading
-          eyebrow="Plataforma SaaS"
-          title="Empresas"
-          description="Cadastre os dados da empresa. A assinatura é configurada separadamente."
-          actions={(
-            <>
-              {onOpenSubscriptions && <button type="button" onClick={onOpenSubscriptions} className="touch-target rounded-xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white">Planos e assinaturas</button>}
-              <button type="button" onClick={onVoltar} className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"><span aria-hidden="true">←</span>Voltar ao painel</button>
-            </>
-          )}
-        />
-
-        <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
-          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-            {editingId ? "Editar empresa" : "Nova empresa"}
-          </h2>
-          {createdCompany && !editingId && <div role="status" className="mb-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Empresa criada. A assinatura continua pendente até ser configurada.<button type="button" onClick={onOpenSubscriptions} disabled={!onOpenSubscriptions} className="ml-2 font-bold underline">Abrir Planos e assinaturas</button><button type="button" onClick={() => setCreatedCompany(null)} className="ml-3">Fechar</button></div>}
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
-            <input type="text" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <input type="text" value={form.codigo} onChange={(e) => setForm((prev) => ({ ...prev, codigo: e.target.value }))} placeholder="Código da empresa" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <input type="text" value={form.cnpj} onChange={(e) => setForm((prev) => ({ ...prev, cnpj: e.target.value }))} placeholder="CNPJ" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            {editingId && <><select value={form.plano_codigo} onChange={(e) => {
-              const selected = PLANO_OPTIONS.find((option) => option.codigo === e.target.value);
-              setForm((prev) => ({
-                ...prev,
-                plano_codigo: e.target.value,
-                plano_nome: selected?.nome ?? prev.plano_nome,
-              }));
-            }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-              {PLANO_OPTIONS.map((option) => (
-                <option key={option.codigo} value={option.codigo}>
-                  {option.nome}
-                </option>
-              ))}
-            </select>
-            <input type="text" value={form.plano_nome} onChange={(e) => setForm((prev) => ({ ...prev, plano_nome: e.target.value }))} placeholder="Nome exibido do plano" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <select value={form.plano_status} onChange={(e) => setForm((prev) => ({ ...prev, plano_status: e.target.value as PlanoStatus }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-              {PLANO_STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <select value={form.plano_ciclo} onChange={(e) => setForm((prev) => ({ ...prev, plano_ciclo: e.target.value as PlanoCiclo }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-              {PLANO_CICLO_OPTIONS.map((ciclo) => (
-                <option key={ciclo} value={ciclo}>
-                  {ciclo}
-                </option>
-              ))}
-            </select>
-            <input type="number" min="1" value={form.max_usuarios} onChange={(e) => setForm((prev) => ({ ...prev, max_usuarios: e.target.value }))} placeholder="Limite de usuários" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <input type="number" min="1" value={form.max_unidades} onChange={(e) => setForm((prev) => ({ ...prev, max_unidades: e.target.value }))} placeholder="Limite de unidades" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <input type="date" value={form.contrato_inicio} onChange={(e) => setForm((prev) => ({ ...prev, contrato_inicio: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            <input type="date" value={form.contrato_fim} onChange={(e) => setForm((prev) => ({ ...prev, contrato_fim: e.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
-            </>}
-            <div className="flex flex-wrap gap-2 md:col-span-2">
-              <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-[linear-gradient(135deg,#0f3d75,#0f172a)] px-5 py-3 text-sm font-semibold text-white">
-                {isSubmitting ? "Salvando..." : editingId ? "Salvar empresa" : "Cadastrar empresa"}
-              </button>
-              {editingId && (
-                <button type="button" onClick={resetForm} className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700">
-                  Cancelar edição
-                </button>
-              )}
-            </div>
-            {error && <p className="text-sm font-medium text-red-600 md:col-span-2">{error}</p>}
-          </form>
+    <main className="admin-companies">
+      <header className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Gestão de clientes</p>
+          <h1>Empresas</h1>
+          <p>Organize as empresas, unidades e acessos da plataforma.</p>
         </div>
+        <div className="admin-heading-actions">
+          {onOpenSubscriptions && <button type="button" onClick={onOpenSubscriptions} className="admin-button admin-button-secondary"><AdminIcon name="subscription" width={18} height={18} />Planos e assinaturas</button>}
+          <button type="button" className="admin-button admin-button-primary" onClick={() => { resetForm(); setDrawerOpen(true); }}><AdminIcon name="plus" width={18} height={18} />Nova empresa</button>
+        </div>
+      </header>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-            Empresas cadastradas
-          </h2>
-          <div className="space-y-3">
-            {empresasOrdenadas.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                Nenhuma empresa cadastrada ou visível para este perfil.
-              </p>
-            ) : (
-              empresasOrdenadas.map((empresa) => {
-                const info = saas[empresa.id];
-                const assinatura = info?.value;
-                return (
-                <div key={empresa.id} className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 md:grid-cols-[1.1fr_0.55fr_0.95fr_0.9fr_0.9fr_auto]">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Empresa</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{empresa.nome}</p>
-                    <p className="mt-1 text-xs text-slate-500">{empresa.cnpj ?? "Sem CNPJ"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Código</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">{empresa.codigo}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Plano SaaS</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">{!info || info.loading ? "Consultando..." : info.error ? "Consulta indisponível" : assinatura ? assinatura.plano_nome : "Sem plano SaaS vinculado"}</p>
-                    {assinatura && <p className="mt-1 text-xs text-slate-500">{assinatura.ciclo} · {assinatura.status}</p>}
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Limites SaaS</p>
-                    <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Indisponível" : assinatura ? "Ver limites no painel SaaS" : "Sem plano vinculado"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Assinatura</p>
-                    {assinatura ? <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${assinatura.status === "Ativa" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assinatura.status}</span> : <p className="mt-1 text-sm text-slate-600">{!info || info.loading ? "Consultando..." : info.error ? "Não foi possível consultar" : "Não vinculada"}</p>}
-                    <p className="mt-2 text-xs text-slate-500">Empresa: {empresa.status}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    {onOpenCompany && <>
-                      <button type="button" onClick={() => onOpenCompany(empresa.id, "suporte")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Consultar operação</button>
-                      <button type="button" onClick={() => onOpenCompany(empresa.id, "unidades")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Unidades</button>
-                      <button type="button" onClick={() => onOpenCompany(empresa.id, "usuarios")} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Acessos</button>
-                    </>}
-                    <button type="button" onClick={() => startEdit(empresa)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                      Editar
-                    </button>
-                    <button type="button" onClick={() => { void handleToggleStatus(empresa.id); }} disabled={pendingStatusId === empresa.id} className={`rounded-xl px-3 py-2 text-xs font-semibold ${empresa.status === "Ativa" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                      {pendingStatusId === empresa.id ? "Atualizando..." : empresa.status === "Ativa" ? "Inativar" : "Ativar"}
-                    </button>
-                  </div>
-                </div>
-                );
-              })
-            )}
+      {createdCompany && <div role="status" className="admin-success-message">
+        <div><strong>Empresa cadastrada.</strong><p>Configure o plano e a assinatura para concluir o cadastro.</p>
+          {onOpenSubscriptions && <button type="button" onClick={onOpenSubscriptions}>Configurar assinatura<AdminIcon name="arrow" width={16} height={16} /></button>}
+        </div>
+        <button type="button" className="admin-icon-button" onClick={() => setCreatedCompany(null)} aria-label="Fechar confirmação"><AdminIcon name="close" width={18} height={18} /></button>
+      </div>}
+      {error && !drawerOpen && <p role="alert" className="admin-error-message">{error}</p>}
+
+      <section className="company-directory" aria-labelledby="company-directory-title">
+        <div className="company-directory-heading">
+          <h2 id="company-directory-title">Empresas cadastradas <span className="company-count">{empresas.length}</span></h2>
+          <span className="company-directory-summary">{empresas.filter((empresa) => empresa.status === "Ativa").length} ativas</span>
+        </div>
+        <div className="company-directory-filters">
+          <div className="company-search">
+            <AdminIcon name="search" width={18} height={18} />
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar empresas por nome, código ou CNPJ" placeholder="Buscar por nome, código ou CNPJ" />
           </div>
+          <label className="company-status-filter"><span>Situação</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="todas">Todas</option><option value="Ativa">Ativas</option><option value="Inativa">Inativas</option>
+            </select>
+          </label>
         </div>
-      </main>
-    </div>
+        {filteredCompanies.length === 0 ? <div className="company-empty-state">
+          <span className="company-empty-icon"><AdminIcon name={empresas.length === 0 ? "company" : "search"} width={27} height={27} /></span>
+          <h3>{empresas.length === 0 ? "Cadastre sua primeira empresa" : "Nenhuma empresa encontrada"}</h3>
+          <p>{empresas.length === 0 ? "Adicione uma empresa para organizar suas unidades e responsáveis." : "Tente outro nome, código, CNPJ ou situação."}</p>
+          <button type="button" className="admin-button admin-button-secondary" onClick={() => {
+            if (empresas.length === 0) { resetForm(); setDrawerOpen(true); }
+            else { setSearch(""); setStatusFilter("todas"); }
+          }}>{empresas.length === 0 ? "Nova empresa" : "Limpar filtros"}</button>
+        </div> : <table className="company-table" role="table" aria-label="Empresas cadastradas">
+          <thead role="rowgroup"><tr role="row"><th scope="col">Empresa</th><th scope="col">Unidades</th><th scope="col">Assinatura</th><th scope="col">Situação</th><th scope="col">Ações</th></tr></thead>
+          <tbody role="rowgroup">{filteredCompanies.map((empresa) => {
+            const info = saas[empresa.id];
+            const assinatura = info?.value;
+            return <tr key={empresa.id} role="row">
+              <td className="company-name-cell" role="cell"><div className="company-name"><span className="company-monogram" aria-hidden="true">{empresa.nome.trim().slice(0, 2).toLocaleUpperCase("pt-BR")}</span><div><strong>{empresa.nome}</strong><span>{empresa.codigo} · {empresa.cnpj || "CNPJ não informado"}</span></div></div></td>
+              <td data-label="Unidades" role="cell">{onOpenCompany ? <button type="button" className="company-unit-link" onClick={() => onOpenCompany(empresa.id, "unidades")} aria-label={`Ver ${unitCounts.get(empresa.id) ?? 0} unidades de ${empresa.nome}`}><AdminIcon name="units" width={16} height={16} />{unitCounts.get(empresa.id) ?? 0}</button> : unitCounts.get(empresa.id) ?? 0}</td>
+              <td data-label="Assinatura" role="cell"><div className="company-subscription">
+                {!info || info.loading ? <span className="company-muted">Consultando...</span> : info.error ? <span className="company-muted">Consulta indisponível</span> : assinatura ? <><strong>{assinatura.plano_nome}</strong><span className={`admin-status ${assinatura.status === "Ativa" ? "is-positive" : assinatura.status === "Cancelada" ? "is-neutral" : "is-warning"}`}>{assinatura.status}</span></> : <span className="admin-status is-warning">Sem assinatura</span>}
+              </div></td>
+              <td data-label="Situação" role="cell"><span className={`admin-status ${empresa.status === "Ativa" ? "is-positive" : "is-neutral"}`}><span className="company-status-dot" aria-hidden="true" />{empresa.status}</span></td>
+              <td className="company-actions-cell" role="cell"><CompanyActions companyName={empresa.nome} active={empresa.status === "Ativa"} pending={pendingStatusId === empresa.id}
+                onEdit={() => startEdit(empresa)} onToggleStatus={() => { void handleToggleStatus(empresa.id); }}
+                onOpenCompany={onOpenCompany ? (area) => onOpenCompany(empresa.id, area) : undefined} /></td>
+            </tr>;
+          })}</tbody>
+        </table>}
+        <p className="company-results" role="status">{filteredCompanies.length} de {empresas.length} empresa(s)</p>
+      </section>
+
+      <dialog ref={drawerRef} className="admin-company-drawer" aria-labelledby="company-drawer-title" aria-describedby="company-drawer-description"
+        onCancel={(event) => { event.preventDefault(); closeDrawer(); }} onClick={(event) => { if (event.target === event.currentTarget) closeDrawer(); }}>
+        <header className="company-drawer-heading">
+          <div><p className="admin-eyebrow">{editingId ? "Dados da empresa" : "Novo cliente"}</p><h2 id="company-drawer-title">{editingId ? "Editar empresa" : "Nova empresa"}</h2><p id="company-drawer-description">{editingId ? "Atualize os dados cadastrais da empresa." : "Informe os dados abaixo. A assinatura poderá ser configurada em seguida."}</p></div>
+          <button type="button" className="admin-icon-button" onClick={closeDrawer} disabled={isSubmitting} aria-label="Fechar cadastro de empresa"><AdminIcon name="close" /></button>
+        </header>
+        <form onSubmit={handleSubmit} className="company-drawer-form" aria-busy={isSubmitting}>
+          <div className="company-drawer-fields"><fieldset disabled={isSubmitting}>
+            <legend className="sr-only">Dados cadastrais</legend>
+            <label>Nome da empresa <span aria-hidden="true">*</span><input ref={nameRef} type="text" name="nome" value={form.nome} onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))} placeholder="Ex.: Logística Central" required autoComplete="organization" /></label>
+            <label>Código da empresa <span aria-hidden="true">*</span><input type="text" name="codigo" value={form.codigo} onChange={(event) => setForm((prev) => ({ ...prev, codigo: event.target.value }))} placeholder="Ex.: LOG-CENTRAL" required autoCapitalize="characters" spellCheck={false} aria-describedby="company-code-help" /><small id="company-code-help">Identificador usado para reconhecer a empresa no sistema.</small></label>
+            <label>CNPJ <span className="company-optional">Opcional</span><input type="text" name="cnpj" value={form.cnpj} onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))} placeholder="00.000.000/0000-00" inputMode="numeric" /></label>
+            {editingId && <details className="company-legacy-fields"><summary>Dados do contrato legado</summary>
+              <p>A assinatura atual é gerenciada em Planos e assinaturas. Estes campos mantêm os dados do cadastro anterior.</p>
+              <label>Plano legado<select value={form.plano_codigo} onChange={(event) => { const selected = PLANO_OPTIONS.find((option) => option.codigo === event.target.value); setForm((prev) => ({ ...prev, plano_codigo: event.target.value, plano_nome: selected?.nome ?? prev.plano_nome })); }}>{PLANO_OPTIONS.map((option) => <option key={option.codigo} value={option.codigo}>{option.nome}</option>)}</select></label>
+              <label>Nome exibido do plano<input type="text" value={form.plano_nome} onChange={(event) => setForm((prev) => ({ ...prev, plano_nome: event.target.value }))} /></label>
+              <label>Situação do plano<select value={form.plano_status} onChange={(event) => setForm((prev) => ({ ...prev, plano_status: event.target.value as PlanoStatus }))}>{PLANO_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select></label>
+              <label>Ciclo<select value={form.plano_ciclo} onChange={(event) => setForm((prev) => ({ ...prev, plano_ciclo: event.target.value as PlanoCiclo }))}>{PLANO_CICLO_OPTIONS.map((ciclo) => <option key={ciclo} value={ciclo}>{ciclo}</option>)}</select></label>
+              <label>Limite de usuários<input type="number" min="1" value={form.max_usuarios} onChange={(event) => setForm((prev) => ({ ...prev, max_usuarios: event.target.value }))} /></label>
+              <label>Limite de unidades<input type="number" min="1" value={form.max_unidades} onChange={(event) => setForm((prev) => ({ ...prev, max_unidades: event.target.value }))} /></label>
+              <label>Início do contrato<input type="date" value={form.contrato_inicio} onChange={(event) => setForm((prev) => ({ ...prev, contrato_inicio: event.target.value }))} /></label>
+              <label>Fim do contrato<input type="date" value={form.contrato_fim} onChange={(event) => setForm((prev) => ({ ...prev, contrato_fim: event.target.value }))} /></label>
+            </details>}
+          </fieldset>
+          {error && <p role="alert" className="admin-error-message">{error}</p>}
+          </div>
+          <footer className="company-drawer-footer"><button type="button" className="admin-button admin-button-secondary" onClick={closeDrawer} disabled={isSubmitting}>Cancelar</button><button type="submit" className="admin-button admin-button-primary" disabled={isSubmitting}>{isSubmitting ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar empresa"}</button></footer>
+        </form>
+      </dialog>
+    </main>
   );
 }

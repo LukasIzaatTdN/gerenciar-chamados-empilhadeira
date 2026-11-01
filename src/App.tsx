@@ -5,6 +5,7 @@ import { getUnidadeById } from "./data/unidades";
 import Header from "./components/Header";
 import PlatformOverview from "./components/PlatformOverview";
 import AdminSidebar from "./components/AdminSidebar";
+import AdminTopbar from "./components/AdminTopbar";
 import AdminScopeSelector from "./components/AdminScopeSelector";
 import AdminExecutiveSummary from "./components/AdminExecutiveSummary";
 import OperationalAlerts from "./components/OperationalAlerts";
@@ -1028,7 +1029,7 @@ export default function App() {
   function renderAdminScreen(content: ReactNode, activeView: View) {
     if (!isPlatformAdmin) return content;
     return (
-      <div className="app-page min-h-screen bg-transparent">
+      <div className="app-page admin-page min-h-screen">
         <div className="admin-shell min-h-screen">
           <div className="p-2 sm:p-3 md:p-5">
             <AdminSidebar
@@ -1039,7 +1040,12 @@ export default function App() {
               onThemeToggle={() => setTema((current) => current === "dark" ? "light" : "dark")}
             />
           </div>
-          <div className="min-w-0">{content}</div>
+          <div className="admin-workspace min-w-0">
+            <AdminTopbar activeView={activeView} userName={operadorNome ?? "Administrador"} dark={tema === "dark"}
+              syncMode={hasFirebaseConfig ? "firebase" : "local"} notifications={notifications} unreadCount={unreadCount}
+              onMarkAsRead={markAsRead} onMarkAllAsRead={markAllAsRead} onClearAll={clearAll} onProfile={handleAccessProfile} />
+            {content}
+          </div>
         </div>
       </div>
     );
@@ -2170,7 +2176,7 @@ export default function App() {
     return (
       <>
         {renderAdminScreen(<>
-        <Header
+        {!isPlatformAdmin && <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
@@ -2210,7 +2216,7 @@ export default function App() {
             permissions.canAccessOperatorPanel &&
             perfilAcesso !== "Separador de Televendas"
           }
-        />
+        />}
         <UnidadesAdmin
           empresas={empresas}
           unidades={supermercadosDoEscopo}
@@ -2231,7 +2237,7 @@ export default function App() {
     return (
       <>
         {renderAdminScreen(<>
-        <Header
+        {!isPlatformAdmin && <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
@@ -2271,13 +2277,13 @@ export default function App() {
             permissions.canAccessOperatorPanel &&
             perfilAcesso !== "Separador de Televendas"
           }
-        />
+        />}
         <EmpresasAdmin
           empresas={empresas}
+          unidades={supermercados}
           onCreate={handleCreateEmpresa}
           onUpdate={handleUpdateEmpresa}
           onToggleStatus={handleToggleEmpresaStatus}
-          onVoltar={goBackToPreviousView}
           onOpenSubscriptions={() => navigateTo("assinaturas")}
           onOpenCompany={(empresaId, area) => {
             setAdminEmpresaFiltro(empresaId);
@@ -2299,7 +2305,7 @@ export default function App() {
     return (
       <>
         {renderAdminScreen(<>
-        <Header
+        {!isPlatformAdmin && <Header
           onNovoChamado={handleNovoChamadoAccess}
           onOperadorPanel={handleOperadorAccess}
           onDashboard={handleDashboardAccess}
@@ -2339,7 +2345,7 @@ export default function App() {
             permissions.canAccessOperatorPanel &&
             perfilAcesso !== "Separador de Televendas"
           }
-        />
+        />}
         <UsuariosAdmin
           empresas={empresas}
           usuarios={
