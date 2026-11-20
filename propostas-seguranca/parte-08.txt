@@ -1,0 +1,63 @@
+candidate => candidate.id === item.unitId);
++        return unit && (isPlatformAdmin || (unit.empresa_id === empresaId && (isCompanyAdmin || unit.id === supermercadoId)));
++      });
++      const eligibleIds = new Set(supermercados.filter(unit => isPlatformAdmin || (unit.empresa_id === empresaId && (isCompanyAdmin || unit.id === supermercadoId))).map(unit => unit.id));
++      const scopedPrevious = new Set([...previousCriticalUnitIds].filter(id => eligibleIds.has(id)));
++      void syncOperationalEscalationState(scoped, scopedPrevious, supermercados).catch(error => console.error("Falha ao sincronizar escalonamentos", error));
+     }
+ 
+     newCritical.forEach((item) => {
+@@ -551,6 +559,7 @@
+     isAuthenticated,
+     notificacoesAtivas,
+     operationalEscalation,
++    supermercados, empresaId, supermercadoId, isPlatformAdmin, isCompanyAdmin,
+     permissions.canViewAllUnits,
+     permissions.canViewUnitDashboard,
+     notify,
+@@ -643,6 +652,7 @@
+         if (!firebaseUser) {
+           setUsuarioAtual(null);
+           setPushAtivo(false);
++          setAccountMessage("");
+           setAuthHydrated(true);
+           return;
+         }
+@@ -719,13 +729,17 @@
+             async (userDoc) => {
+               if (userDoc.exists()) {
+                 const userData = userDoc.data() as Partial<UsuarioSistema> & { status?: string };
+-                if (userData.status === "Inativo") {
+-                  await applyUsuarioResolved(null, true);
++                if (userData.status !== "Ativo") {
++                  setAccountMessage(userData.status === "Pendente"
++                    ? "Cadastro aguardando aprovação do administrador da empresa."
++                    : "Conta sem acesso ativo. Procure o administrador da empresa.");
++                  await applyUsuarioResolved(null);
+                   setAuthHydrated(true);
+                   return;
+                 }
+ 
+                 if (isPerfilAcesso(userData.perfil)) {
++                  setAccountMessage("");
+                   usuarioResolved = {
+                     id: firebaseUser.uid,
+                     nome:
+@@ -757,11 +771,13 @@
+                 }
+               }
+ 
+-              await applyUsuarioResolved(buildFallbackUsuario());
++              setAccountMessage("Perfil ainda não disponível. Se o cadastro falhou, entre em contato com o administrador.");
++              await applyUsuarioResolved(null);
+               setAuthHydrated(true);
+             },
+             async () => {
+-              await applyUsuarioResolved(buildFallbackUsuario());
++              setAccountMessage("Não foi possível verificar seu perfil. Tente novamente.");
++              await applyUsuarioResolved(null);
+               setAuthHydrated(true);
+             }
+           );
+@@ -866,6 +882,11 @@
+   function rende

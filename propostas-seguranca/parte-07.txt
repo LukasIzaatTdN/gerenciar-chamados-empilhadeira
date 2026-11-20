@@ -1,0 +1,62 @@
+ } from "./types/chamado";
+ import type { EmpilhadeiraStatus } from "./types/empilhadeira";
+ import type {
+@@ -63,7 +63,7 @@
+   ManutencaoTipo,
+   NovaManutencaoInput,
+ } from "./types/manutencao";
+-import { auth, db, hasFirebaseConfig } from "./config/firebase";
++import { auth, db, hasFirebaseConfig, useFirebaseEmulators } from "./config/firebase";
+ import type { UsuarioSistema } from "./types/usuario";
+ import { getPermissions } from "./utils/permissions";
+ import { isInvitedCompanyAdmin } from "./utils/invitedCompanyAdmin";
+@@ -78,7 +78,7 @@
+ import { getOperationalForecastSummary } from "./utils/operationalForecast";
+ import { getOperationalHealthSummary } from "./utils/operationalHealth";
+ import { getUnitSlaSummary } from "./utils/operationalReports";
+-import type { AdminInvite } from "./types/adminInvite";
++import { redeemAdminInvite } from "./services/redeemAdminInvite";
+ 
+ type View =
+   | "geral"
+@@ -145,6 +145,7 @@
+   const [view, setView] = useState<View>("geral");
+   const [previousView, setPreviousView] = useState<View>("geral");
+   const [usuarioAtual, setUsuarioAtual] = useState<UsuarioSistema | null>(() => {
++    if (hasFirebaseConfig) return null;
+     const saved = localStorage.getItem(USER_SESSION_KEY);
+     if (!saved) return null;
+ 
+@@ -182,6 +183,7 @@
+     return saved === "dark" ? "dark" : "light";
+   });
+   const [showLoginModal, setShowLoginModal] = useState(false);
++  const [accountMessage, setAccountMessage] = useState("");
+   const [adminEmpresaFiltro, setAdminEmpresaFiltro] = useState<string>("todas");
+   const [adminSupermercadoFiltro, setAdminSupermercadoFiltro] = useState<string>("todos");
+   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("7d");
+@@ -243,7 +245,7 @@
+     canViewAllCompanies && adminEmpresaFiltro !== "todas"
+       ? adminEmpresaFiltro
+       : empresaId;
+-  const { invites: adminInvites, createAdminInvite, validateInviteToken, consumeInvite } = useAdminInvites({
++  const { invites: adminInvites, createAdminInvite } = useAdminInvites({
+     empresaId: empresaSelecionadaId,
+     canViewAllCompanies,
+   });
+@@ -492,7 +494,7 @@
+     () => getOperationalEscalationSummary(allChamados, supermercados),
+     [allChamados, supermercados]
+   );
+-  const operationalEscalationHistory = useOperationalEscalations();
++  const operationalEscalationHistory = useOperationalEscalations(empresaId, supermercadoId, isPlatformAdmin, isCompanyAdmin, authHydrated && isAuthenticated);
+   useEffect(() => {
+     const canReceiveOperationalAlerts =
+       authHydrated &&
+@@ -517,7 +519,13 @@
+     );
+ 
+     if (db) {
+-      void syncOperationalEscalationState(operationalEscalation, previousCriticalUnitIds);
++      const scoped = operationalEscalation.filter(item => {
++        const unit = supermercados.find(
