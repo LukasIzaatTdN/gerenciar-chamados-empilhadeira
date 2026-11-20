@@ -1,0 +1,56 @@
+update: if isSignedIn() && isCurrentUserActive();
++      allow read: if canAccessEscalation(resource.data);
++      allow create: if canAccessEscalation(request.resource.data)
++        && validEscalation(request.resource.data)
++        && request.resource.data.status == "active";
++      allow update: if canAccessEscalation(resource.data)
++        && request.resource.data.empresaId == resource.data.empresaId
++        && request.resource.data.unitId == resource.data.unitId
++        && request.resource.data.createdAt == resource.data.createdAt
++        && validEscalation(request.resource.data);
+       allow delete: if isAdminGeral();
+     }
+ 
+@@ -914,24 +966,34 @@
+           )
+         );
+ 
++      // Non-invite self-registration records a request only. Its claimed scope is
++      // untrusted until an active company admin reviews and sets status to Ativo.
++      // The separate company-admin invite branch remains unchanged.
+       allow create: if isSignedIn()
+         && request.auth.uid == id
+         && request.resource.data.id == request.auth.uid
+-        && request.resource.data.status == "Ativo"
+         && isPerfilValido(request.resource.data.perfil)
+         && (
+-          isPerfilAutoCadastroPermitido(request.resource.data.perfil)
+-          || isCadastroAdminEmpresaPorConviteValido()
+-        )
+-        && isEmpresaVinculoValido(
+-          request.resource.data.perfil,
+-          request.resource.data.empresa_id
+-        )
+-        && isSupermercadoVinculoValido(
+-          request.resource.data.perfil,
+-          request.resource.data.empresa_id,
+-          request.resource.data.supermercado_id
+-        );
++          (isPerfilAutoCadastroPermitido(request.resource.data.perfil)
++            && request.resource.data.status == "Pendente"
++            && request.resource.data.keys().hasOnly([
++              "id", "nome", "email", "perfil", "empresa_id", "supermercado_id",
++              "supermercado_ids", "status", "criado_em", "convite_token"
++            ])
++            && request.resource.data.nome is string
++            && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 200
++            && request.resource.data.email is string
++            && request.auth.token.email is string
++            && request.resource.data.email == request.auth.token.email
++            && request.resource.data.criado_em is string
++            && request.resource.data.supermercado_ids == [request.resource.data.supermercado_id]
++            && (!("convite_token" in request.resource.data) || request.resource.data.convite_token == null)
++          )
++          || (request.resource.data.status == "Ativo" && isCadastroAdminEmpresaPorConviteValido())
++        )
++        && isEmpresaVinculoValido(request.resource.data.perfil, request.resource.d

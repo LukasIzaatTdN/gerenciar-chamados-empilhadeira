@@ -1,0 +1,52 @@
+  let perfil = user.get("perfil", null);
++      let empresa = user.get("empresa_id", null);
++      let unidade = user.get("supermercado_id", null);
++      return isSignedIn() && user.get("status", null) == "Ativo" && (
++        perfil == "Administrador Geral"
++        || (perfil == "Administrador da Empresa" && empresa is string
++          && empresa.size() > 0 && empresa == data.empresaId)
++        || (empresa is string && empresa.size() > 0 && empresa == data.empresaId
++          && unidade is string && unidade.size() > 0 && unidade == data.unitId)
++      );
++    }
++
++    function validEscalation(data) {
++      return data.keys().hasAll([
++          "empresaId", "unitId", "unitName", "status", "severity", "openCalls",
++          "urgentCalls", "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
++        ])
++        && data.keys().hasOnly([
++          "empresaId", "unitId", "unitName", "status", "severity", "openCalls",
++          "urgentCalls", "delayedCalls", "action", "createdAt", "updatedAt", "resolvedAt"
++        ])
++        && isSupermercadoDaEmpresaAtivo(data.empresaId, data.unitId)
++        && data.unitName is string && data.unitName.size() > 0 && data.unitName.size() <= 200
++        && data.status in ["active", "resolved"]
++        && data.severity in ["critical", "medium", "low"]
++        && data.openCalls is int && data.openCalls >= 0
++        && data.urgentCalls is int && data.urgentCalls >= 0 && data.urgentCalls <= data.openCalls
++        && data.delayedCalls is int && data.delayedCalls >= 0 && data.delayedCalls <= data.openCalls
++        && data.action is string && data.action.size() <= 2000
++        && data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() <= 50
++        && data.updatedAt is string && data.updatedAt.size() > 0 && data.updatedAt.size() <= 50
++        && (data.status == "active" ? data.resolvedAt == null
++          : data.resolvedAt is string && data.resolvedAt.size() > 0 && data.resolvedAt.size() <= 50);
++    }
++
+     match /operational_escalations/{id} {
+-      allow read: if isSignedIn() && isCurrentUserActive();
+-      allow create: if isSignedIn()
+-        && isCurrentUserActive()
+-        && request.resource.data.unitId is string
+-        && request.resource.data.unitId.size() > 0
+-        && request.resource.data.unitName is string
+-        && request.resource.data.unitName.size() > 0
+-        && request.resource.data.status in ["active", "resolved"]
+-        && request.resource.data.severity in ["critical", "medium", "low"]
+-        && request.resource.data.createdAt is string
+-        && request.resource.data.updatedAt is string
+-        && (
+-          request.resource.data.resolvedAt == null
+-          || request.resource.data.resolvedAt is string
+-        );
+-      allow 
