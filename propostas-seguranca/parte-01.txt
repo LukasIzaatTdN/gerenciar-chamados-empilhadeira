@@ -1,0 +1,61 @@
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -13,10 +13,8 @@
+ 
+     function isCurrentUserActive() {
+       return hasCurrentUserDoc()
+-        && (
+-          !("status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data)
+-          || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
+-        );
++        && "status" in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data
++        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo";
+     }
+ 
+     function isAdminGeral() {
+@@ -199,7 +197,7 @@
+     }
+ 
+     function isSupervisorDaUnidade(supermercadoId) {
+-      return isSignedIn()
++      return isCurrentUserActive()
+         && (
+           currentUserPerfil() == "Supervisor"
+           || currentUserPerfil() == "Separador de Televendas"
+@@ -209,7 +207,7 @@
+     }
+ 
+     function isAdminEmpresaDaEmpresa(empresaId) {
+-      return isSignedIn()
++      return isCurrentUserActive()
+         && currentUserPerfil() == "Administrador da Empresa"
+         && currentUserEmpresaId() != null
+         && currentUserEmpresaId() == empresaId;
+@@ -235,21 +233,42 @@
+         || perfilInput == "Separador de Televendas";
+     }
+ 
++    // Both sides of the same atomic write must agree. get() is the before image,
++    // getAfter() is the after image; an already-used invite is never reusable.
+     function isConviteAdminEmpresaValido(token) {
+-      return token is string
+-        && token.size() > 0
+-        && exists(/databases/$(database)/documents/convites_admin_empresa/$(token))
+-        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.status == "Pendente"
+-        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.perfil == "Administrador da Empresa"
+-        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.empresa_id
+-          == request.resource.data.empresa_id
+-        && get(/databases/$(database)/documents/convites_admin_empresa/$(token)).data.expira_em_ms
+-          > request.time.toMillis();
++      let path = /databases/$(database)/documents/convites_admin_empresa/$(token);
++      return token is string && token.size() > 0
++        && exists(path)
++        && get(path).data.id == token
++        && get(path).data.status == "Pendente"
++        && get(path).data.perfil == "Administrador da Empresa"
++        && get(path).data.empresa_id == request.resource.data.empresa_id
++        && get(path).data.expira_em_ms is int
++        && get(path).data.expira_em_ms > request.time.toMillis()
++        && getAfter(path).data.status == "Usado"
++        && getAfter(path).data.usado_por_uid == request.auth.uid
++        && isTextoNaoVazio(getAfter(path).data.usado_em)

@@ -1,0 +1,61 @@
+
++        && getAfter(path).data.usado_por_nome == request.resource.data.nome
++        && getAfter(path).data.diff(get(path).data).affectedKeys().hasOnly([
++          "status", "usado_em", "usado_por_uid", "usado_por_nome"
++        ]);
+     }
+ 
+     function isCadastroAdminEmpresaPorConviteValido() {
+       return request.resource.data.perfil == "Administrador da Empresa"
+         && request.resource.data.supermercado_id == null
++        && request.resource.data.supermercado_ids == []
++        && request.resource.data.keys().hasOnly([
++          "id", "nome", "email", "perfil", "empresa_id", "supermercado_id",
++          "supermercado_ids", "status", "criado_em", "convite_token"
++        ])
++        && request.resource.data.nome is string
++        && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 200
++        && (("email" in request.auth.token && request.auth.token.email is string)
++          ? request.resource.data.email == request.auth.token.email
++          : request.resource.data.email == null)
++        && request.resource.data.criado_em is string
++        && request.resource.data.criado_em.size() > 0 && request.resource.data.criado_em.size() <= 50
+         && request.resource.data.convite_token is string
+         && isConviteAdminEmpresaValido(request.resource.data.convite_token);
+     }
+@@ -325,6 +344,7 @@
+       return isAdminEmpresa()
+         && existingData.perfil != "Administrador Geral"
+         && newData.perfil != "Administrador Geral"
++        && (newData.perfil != "Administrador da Empresa" || existingData.perfil == "Administrador da Empresa")
+         && existingData.empresa_id == currentUserEmpresaId()
+         && newData.empresa_id == currentUserEmpresaId()
+         && isUsuarioVinculoValido(newData);
+@@ -365,15 +385,15 @@
+     }
+ 
+     function canManageChamado() {
+-      return currentUserPerfil() == "Operador"
++      return isCurrentUserActive() && (currentUserPerfil() == "Operador"
+         || currentUserPerfil() == "Supervisor"
+         || currentUserPerfil() == "Separador de Televendas"
+         || isAdminEmpresa()
+-        || isAdminGeral();
++        || isAdminGeral());
+     }
+ 
+     function isStatusUsuarioValido(status) {
+-      return status == "Ativo" || status == "Inativo";
++      return status == "Ativo" || status == "Inativo" || status == "Pendente";
+     }
+ 
+     function isTextoNaoVazio(valor) {
+@@ -881,23 +901,55 @@
+         || isAdminEmpresaDaEmpresa(resource.data.empresa_id);
+     }
+ 
++    // The unit and company are trusted only after validating their relationship.
++    // Reads use document fields so clients must include matching where clauses.
++    function canAccessEscalation(data) {
++      let user = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
++    
