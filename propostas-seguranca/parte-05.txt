@@ -1,0 +1,58 @@
+ata.empresa_id)
++        && isSupermercadoVinculoValido(request.resource.data.perfil, request.resource.data.empresa_id,
++          request.resource.data.supermercado_id);
+ 
+       allow update: if (
+           isAdminGeral()
+@@ -959,6 +1021,7 @@
+           && request.resource.data.empresa_id == resource.data.empresa_id
+           && request.resource.data.status == resource.data.status
+           && request.resource.data.criado_em == resource.data.criado_em
++          && (isAdminGeral() || isAdminEmpresa())
+           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             "supermercado_id",
+             "supermercado_ids",
+@@ -1009,14 +1072,19 @@
+     }
+ 
+     match /convites_admin_empresa/{id} {
++      // A direct lookup of an active token is a bearer capability, including for
++      // a user not yet signed in. Lists must always be tenant-scoped.
+       allow get: if (
+-          isSignedIn() && hasAdminManagementAccess()
++          hasAdminManagementAccess()
++          && (!exists(/databases/$(database)/documents/convites_admin_empresa/$(id))
++              || canAccessEmpresa(resource.data.empresa_id))
+         ) || (
+           resource.data.id == id
+           && resource.data.status == "Pendente"
+           && resource.data.expira_em_ms > request.time.toMillis()
+         );
+-      allow list: if isSignedIn() && hasAdminManagementAccess();
++      allow list: if isAdminGeral()
++        || (isAdminEmpresa() && resource.data.empresa_id == currentUserEmpresaId());
+ 
+       allow create: if hasAdminManagementAccess()
+         && request.resource.data.id == id
+@@ -1042,34 +1110,37 @@
+ 
+       allow update: if (
+           hasAdminManagementAccess()
+-          && request.resource.data.id == resource.data.id
+-          && request.resource.data.empresa_id == resource.data.empresa_id
+-          && request.resource.data.perfil == resource.data.perfil
+-          && request.resource.data.criado_em == resource.data.criado_em
+-          && request.resource.data.expira_em == resource.data.expira_em
+-          && request.resource.data.expira_em_ms == resource.data.expira_em_ms
+           && canAccessEmpresa(resource.data.empresa_id)
++          && resource.data.status == "Pendente"
++          && request.resource.data.status in ["Cancelado", "Expirado"]
++          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
+         ) || (
+           isSignedIn()
+-          && request.resource.data.id == resource.data.id
+-          && request.resource.data.empresa_id == resource.data.empresa_id
+-          && request.resource.data.perfil == resource.data.perfil
+-          && request.resource.data.criado_em == resource.data.criado_em
+-          && request.resource.data.expira_em == resource.data.expira_em
+-          && 

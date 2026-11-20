@@ -1,0 +1,56 @@
+request.resource.data.expira_em_ms == resource.data.expira_em_ms
++          && resource.data.id == id
++          && resource.data.perfil == "Administrador da Empresa"
+           && resource.data.status == "Pendente"
++          && resource.data.expira_em_ms is int
+           && resource.data.expira_em_ms > request.time.toMillis()
++          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
++            "status", "usado_em", "usado_por_uid", "usado_por_nome"
++          ])
+           && request.resource.data.status == "Usado"
+           && request.resource.data.usado_por_uid == request.auth.uid
+           && isTextoNaoVazio(request.resource.data.usado_em)
+-          && (
+-            request.resource.data.usado_por_nome == null
+-            || isTextoNaoVazio(request.resource.data.usado_por_nome)
+-          )
+-        );
+-
+-      allow delete: if hasAdminManagementAccess()
+-        && canAccessEmpresa(resource.data.empresa_id);
++          && isTextoNaoVazio(request.resource.data.usado_por_nome)
++          && !exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
++          && existsAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid))
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.id == request.auth.uid
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == "Administrador da Empresa"
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.status == "Ativo"
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.empresa_id == resource.data.empresa_id
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.supermercado_id == null
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.convite_token == id
++          && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.nome == request.resource.data.usado_por_nome
++        );
++
++      // Retain tombstones so a previously used or revoked token cannot be recreated.
++      allow delete: if false;
+     }
+   }
+ }
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -45,8 +45,8 @@
+ import { useOperationalEscalations } from "./hooks/useOperationalEscalations";
+ import {
+   getAuth,
++  connectAuthEmulator,
+   createUserWithEmailAndPassword,
+-  deleteUser,
+   GoogleAuthProvider,
+   getIdTokenResult,
+   onAuthStateChanged,
+@@ -54,7 +54,7 @@
+   signInWithEmailAndPassword,
+   signOut,
+ } from "firebase/auth";
+-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
++import { doc, getDoc, onSnapshot, setDoc, updateDoc, getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+ import type { Chamado
