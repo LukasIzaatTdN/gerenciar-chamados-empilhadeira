@@ -1,0 +1,583 @@
+diff --git a/docs/pedidos-proprios-televendas-wip.md b/docs/pedidos-proprios-televendas-wip.md
+index 30ee437..5bce3dc 100644
+--- a/docs/pedidos-proprios-televendas-wip.md
++++ b/docs/pedidos-proprios-televendas-wip.md
+@@ -1,5 +1,8 @@
+-# Prévia de pedidos próprios de televendas
++# Pedidos próprios de televendas: trabalho em andamento
+ 
+-Esta branch contém somente um componente isolado e não conectado ao painel. Não está pronto para uso ou deploy.
++**Não fazer merge nem deploy.** A interface e a consulta estão integradas, mas a validação não terminou.
+ 
+-Pendências obrigatórias: integrar ao painel com os tipos e consultas existentes; garantir no Firestore/backend que o vendedor possa ler somente os próprios pedidos pelo solicitante_uid, empresa e supermercado, sem usar nome como identificação; decidir tratamento seguro dos pedidos antigos sem UID; preservar acessos de separadores e demais perfis; testar regras no emulador, interface e build. O filtro da interface não é uma autorização. Não alterar a branch de segurança nem publicar automaticamente.
++- A consulta e as regras propostas usam UID autenticado, empresa e unidade. Documentos antigos sem UID não são mostrados; não atribuir por nome.
++- O teste de regras no emulador confirmou leitura isolada e acesso de separadores e outros perfis, mas a criação de um chamado pelo televendas falhou com limite de 1000 expressões na regra. Investigar e corrigir antes de publicar, depois executar todos os testes, incluindo os casos de criação e alteração de UID que ficaram incompletos.
++- Os testes unitários do filtro e da representação de quantidades passaram; o build Vite passou antes da última revisão. TypeScript sinalizou erros preexistentes em EmpresasAdmin.tsx e Header.tsx. Reexecutar build e checagens completas.
++- Revisar a proteção dos perfis e as correções de segurança pré-existentes na branch de segurança separada, sem presumir que estejam integradas. Testar com dados reais, múltiplas contas e pedidos legados. Revisar o índice no ambiente de testes.
+diff --git a/firestore.indexes.json b/firestore.indexes.json
+index eb9bd3b..cc0215c 100644
+--- a/firestore.indexes.json
++++ b/firestore.indexes.json
+@@ -4,16 +4,46 @@
+       "collectionGroup": "auditoria",
+       "queryScope": "COLLECTION",
+       "fields": [
+-        { "fieldPath": "empresa_id", "order": "ASCENDING" },
+-        { "fieldPath": "occurredAt", "order": "DESCENDING" }
++        {
++          "fieldPath": "empresa_id",
++          "order": "ASCENDING"
++        },
++        {
++          "fieldPath": "occurredAt",
++          "order": "DESCENDING"
++        }
+       ]
+     },
+     {
+       "collectionGroup": "auditoria",
+       "queryScope": "COLLECTION",
+       "fields": [
+-        { "fieldPath": "supermercado_id", "order": "ASCENDING" },
+-        { "fieldPath": "occurredAt", "order": "DESCENDING" }
++        {
++          "fieldPath": "supermercado_id",
++          "order": "ASCENDING"
++        },
++        {
++          "fieldPath": "occurredAt",
++          "order": "DESCENDING"
++        }
++      ]
++    },
++    {
++      "collectionGroup": "chamados",
++      "queryScope": "COLLECTION",
++      "fields": [
++        {
++          "fieldPath": "empresa_id",
++          "order": "ASCENDING"
++        },
++        {
++          "fieldPath": "supermercado_id",
++          "order": "ASCENDING"
++        },
++        {
++          "fieldPath": "solicitante_uid",
++          "order": "ASCENDING"
++        }
+       ]
+     }
+   ],
+@@ -22,7 +52,10 @@
+       "collectionGroup": "push_tokens",
+       "fieldPath": "empresa_id",
+       "indexes": [
+-        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
++        {
++          "order": "ASCENDING",
++          "queryScope": "COLLECTION_GROUP"
++        }
+       ]
+     }
+   ]
+diff --git a/firestore.rules b/firestore.rules
+index a6b0d39..f05a6f5 100644
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -563,6 +563,7 @@ service cloud.firestore {
+           request.resource.data.supermercado_id
+         )
+         && isTextoNaoVazio(request.resource.data.solicitante_nome)
++        && (currentUserPerfil() != "Televendas" || "solicitante_uid" in request.resource.data)
+         && (!("solicitante_uid" in request.resource.data)
+           || request.resource.data.solicitante_uid == request.auth.uid)
+         && isTextoNaoVazio(request.resource.data.setor)
+@@ -633,7 +634,15 @@ service cloud.firestore {
+     match /chamados/{id} {
+       allow read: if isSignedIn()
+         && (
+-          canAccessCurrentSupermercado(resource.data.supermercado_id)
++          (currentUserPerfil() == "Televendas"
++            && isCurrentUserActive()
++            && currentUserEmpresaId() != null
++            && currentUserSupermercadoId() != null
++            && resource.data.empresa_id == currentUserEmpresaId()
++            && resource.data.supermercado_id == currentUserSupermercadoId()
++            && resource.data.solicitante_uid == request.auth.uid)
++          || (currentUserPerfil() != "Televendas"
++            && canAccessCurrentSupermercado(resource.data.supermercado_id))
+           || canAccessEmpresa(resource.data.empresa_id)
+         );
+ 
+@@ -641,6 +650,9 @@ service cloud.firestore {
+         && canCreateChamado()
+         && request.resource.data.id == id
+         && isCriacaoChamadoValida()
++        && (currentUserPerfil() != "Televendas"
++          || (request.resource.data.empresa_id == currentUserEmpresaId()
++            && request.resource.data.supermercado_id == currentUserSupermercadoId()))
+         && (
+           canAccessCurrentSupermercado(request.resource.data.supermercado_id)
+           || canAccessEmpresa(request.resource.data.empresa_id)
+diff --git a/functions/tests/firestore/chamados-own.rules.test.mjs b/functions/tests/firestore/chamados-own.rules.test.mjs
+new file mode 100644
+index 0000000..fc0d9bf
+--- /dev/null
++++ b/functions/tests/firestore/chamados-own.rules.test.mjs
+@@ -0,0 +1,78 @@
++import { readFile } from "node:fs/promises";
++import { before, after, test } from "node:test";
++import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
++import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
++
++const environment = await initializeTestEnvironment({
++  projectId: "demo-patio-pro-log",
++  firestore: {
++    host: "127.0.0.1", port: Number(process.env.PATIO_FIRESTORE_EMULATOR_PORT || "8080"),
++    rules: await readFile(new URL("../../../firestore.rules", import.meta.url), "utf8"),
++  },
++});
++const user = (uid) => environment.authenticatedContext(uid).firestore();
++const scopedQuery = (db, empresa, loja, uid) => query(collection(db, "chamados"),
++  where("empresa_id", "==", empresa), where("supermercado_id", "==", loja), where("solicitante_uid", "==", uid));
++const chamado = (id, uid, empresa = "a", loja = "loja-a") => ({
++  id, empresa_id: empresa, supermercado_id: loja, ...(uid === undefined ? {} : { solicitante_uid: uid }),
++  solicitante_nome: "Nome igual", setor: "Setor", categoria: "televendas", tipo_servico: "Atendimento Televendas",
++  prioridade: "Normal", criado_em: "2026-01-01", status: "Aberto", numero_pedido: "123", cliente: "Cliente",
++  itens: [{ nome: "item" }], local_separacao: "Loja", prazo_limite: "2026-01-02",
++  empilhadeira_id: null, empilhadeira_identificacao: null, operador_nome: null, assumido_em: null,
++  a_caminho_em: null, cheguei_em: null, iniciado_em: null, finalizado_em: null, cancelado_em: null,
++  atualizado_em: null, atualizado_por: null, motivo_incompleto: null, observacao_operador: null,
++});
++
++before(async () => environment.withSecurityRulesDisabled(async (context) => {
++  const db = context.firestore();
++  for (const empresa of ["a", "b"]) await setDoc(doc(db, "empresas", empresa), { status: "Ativa" });
++  for (const [loja, empresa] of [["loja-a", "a"], ["loja-a2", "a"], ["loja-b", "b"]])
++    await setDoc(doc(db, "supermercados", loja), { empresa_id: empresa, status: "Ativo" });
++  for (const [uid, perfil, empresa, loja, status] of [
++    ["seller", "Televendas", "a", "loja-a", "Ativo"], ["seller2", "Televendas", "a", "loja-a", "Ativo"],
++    ["inactive", "Televendas", "a", "loja-a", "Inativo"], ["separator", "Separador de Televendas", "a", "loja-a", "Ativo"],
++    ["supervisor", "Supervisor", "a", "loja-a", "Ativo"], ["operator", "Operador", "a", "loja-a", "Ativo"],
++    ["admin", "Administrador da Empresa", "a", null, "Ativo"], ["platform", "Administrador Geral", null, null, "Ativo"],
++  ]) await setDoc(doc(db, "usuarios", uid), { perfil, empresa_id: empresa, supermercado_id: loja, status });
++  for (const data of [chamado("own", "seller"), chamado("other", "seller2"), chamado("legacy", undefined),
++    chamado("other-unit", "seller", "a", "loja-a2"), chamado("other-company", "seller", "b", "loja-b"),
++    chamado("wrong-company", "seller", "b", "loja-a"), chamado("inactive-own", "inactive")])
++    await setDoc(doc(db, "chamados", data.id), data);
++}));
++after(async () => environment.cleanup());
++
++test("seller reads only own UID in both company and unit, including queries", async () => {
++  const db = user("seller");
++  await assertSucceeds(getDoc(doc(db, "chamados/own")));
++  for (const id of ["other", "legacy", "other-unit", "other-company", "wrong-company"])
++    await assertFails(getDoc(doc(db, "chamados", id)));
++  const result = await assertSucceeds(getDocs(scopedQuery(db, "a", "loja-a", "seller")));
++  if (result.docs.length !== 1 || result.docs[0].id !== "own") throw new Error("unexpected seller query results");
++  await assertFails(getDocs(query(collection(db, "chamados"), where("supermercado_id", "==", "loja-a"))));
++  await assertFails(getDocs(query(collection(db, "chamados"), where("empresa_id", "==", "a"), where("supermercado_id", "==", "loja-a"))));
++  await assertFails(getDocs(scopedQuery(db, "a", "loja-a", "seller2")));
++  await assertFails(getDoc(doc(user("inactive"), "chamados/inactive-own")));
++  await assertFails(getDoc(doc(environment.unauthenticatedContext().firestore(), "chamados/own")));
++});
++
++test("seller creation must bind authenticated UID and tenant; UID cannot be changed by a manager", async () => {
++  const db = user("seller");
++  await assertSucceeds(setDoc(doc(db, "chamados/new"), chamado("new", "seller")));
++  await assertFails(setDoc(doc(db, "chamados/no-uid"), chamado("no-uid", undefined)));
++  await assertFails(setDoc(doc(db, "chamados/fake-uid"), chamado("fake-uid", "seller2")));
++  await assertFails(setDoc(doc(db, "chamados/wrong-unit"), chamado("wrong-unit", "seller", "a", "loja-a2")));
++  await assertFails(updateDoc(doc(user("supervisor"), "chamados/other"), { solicitante_uid: "seller" }));
++  await assertFails(updateDoc(doc(user("supervisor"), "chamados/legacy"), { solicitante_uid: "seller" }));
++});
++
++test("separator, supervisor, operator and admins retain existing queue access", async () => {
++  for (const uid of ["separator", "supervisor", "operator"]) {
++    const db = user(uid);
++    await assertSucceeds(getDoc(doc(db, "chamados/other")));
++    await assertSucceeds(getDoc(doc(db, "chamados/legacy")));
++    await assertSucceeds(getDocs(query(collection(db, "chamados"), where("supermercado_id", "==", "loja-a"))));
++  }
++  await assertSucceeds(updateDoc(doc(user("separator"), "chamados/other"), { status: "Em separação" }));
++  await assertSucceeds(getDocs(query(collection(user("admin"), "chamados"), where("empresa_id", "==", "a"))));
++  await assertSucceeds(getDocs(collection(user("platform"), "chamados")));
++});
+diff --git a/src/App.tsx b/src/App.tsx
+index 1dbfb38..0fc9162 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -24,6 +24,7 @@ import EmpilhadeirasAdmin from "./components/EmpilhadeirasAdmin";
+ import ManutencoesAdmin from "./components/ManutencoesAdmin";
+ import ChamadoForm from "./components/ChamadoForm";
+ import ChamadoList from "./components/ChamadoList";
++import { PedidosSeparadosPreview } from "./components/PedidosSeparadosPreview";
+ import OperadorPanel, { type OperadorStatus } from "./components/OperadorPanel";
+ import OperadorLogin from "./components/OperadorLogin";
+ import NotificationToast from "./components/NotificationToast";
+@@ -821,7 +822,17 @@ export default function App() {
+     }
+   }, [canViewAllUnits]);
+ 
++  const usuarioUidAutenticado = authHydrated && auth?.currentUser && usuarioAtual &&
++    auth.currentUser.uid === usuarioAtual.id ? auth.currentUser.uid : null;
+   const chamadosVisiveis = useMemo(() => {
++    if (permissions.canTrackOwnChamados && perfilAcesso === "Televendas") {
++      if (!usuarioUidAutenticado || !empresaId || !supermercadoId) return [];
++      return chamados.filter((chamado) =>
++        chamado.solicitante_uid === usuarioUidAutenticado &&
++        chamado.empresa_id === empresaId && chamado.supermercado_id === supermercadoId &&
++        !(chamado.categoria === "televendas" || chamado.tipo_servico === "Atendimento Televendas")
++      );
++    }
+     if (permissions.canTrackOwnChamados && operadorNome) {
+       return chamados.filter((chamado) => chamado.solicitante_nome === operadorNome);
+     }
+@@ -831,7 +842,7 @@ export default function App() {
+     }
+ 
+     return [];
+-  }, [chamados, operadorNome, permissions]);
++  }, [chamados, usuarioUidAutenticado, empresaId, supermercadoId, perfilAcesso, operadorNome, permissions]);
+ 
+   const defaultViewForCurrentUser = perfilAcesso ? getViewByPerfil(perfilAcesso) : "geral";
+   const safeFallbackView: View =
+@@ -2602,6 +2613,14 @@ export default function App() {
+           </div>
+         )}
+ 
++        {perfilAcesso === "Televendas" && isAuthenticated && (
++          <PedidosSeparadosPreview
++            usuarioUid={usuarioUidAutenticado}
++            empresaId={empresaId}
++            supermercadoId={supermercadoId}
++          />
++        )}
++
+         {(permissions.canTrackOwnChamados || permissions.canViewUnitQueue || permissions.canViewAllUnits) && (
+           <>
+         {syncError && (
+diff --git a/src/components/PedidosSeparadosPreview.tsx b/src/components/PedidosSeparadosPreview.tsx
+index 9cda135..678722d 100644
+--- a/src/components/PedidosSeparadosPreview.tsx
++++ b/src/components/PedidosSeparadosPreview.tsx
+@@ -1,71 +1,92 @@
+-// Prévia isolada: não integra consultas nem garante autorização no servidor.
+-// Antes de conectar ao painel, proteger leitura e regras no backend/Firestore.
+-import type { ReactNode } from "react";
+-
+-type Item = {
+-  produto: string;
+-  unidadeMedida: string;
+-  quantidadeSolicitada: number;
+-  quantidadeEncontrada: number;
+-  quantidadeFaltante: number;
+-};
+-
+-type Pedido = {
+-  id: string;
+-  solicitante_uid?: string | null;
+-  empresa_id: string;
+-  supermercado_id: string;
+-  categoria: string;
+-  status: string;
+-  numero_pedido: string | null;
+-  cliente: string | null;
+-  itens?: Item[] | null;
+-  motivo_incompleto?: string | null;
+-};
++import { useEffect, useState } from "react";
++import { collection, onSnapshot, query, where } from "firebase/firestore";
++import { db } from "../config/firebase";
++import type { Chamado, ItemTelevendas } from "../types/chamado";
++import { filtrarPedidosProprios, quantidadesParaExibicao } from "../utils/pedidosProprios";
+ 
+ type Props = {
+-  pedidos: Pedido[];
+   usuarioUid: string | null;
+   empresaId: string | null;
+   supermercadoId: string | null;
+ };
+ 
+-// Defesa em profundidade, não substitui as regras de acesso no banco.
+-export function filtrarPedidosProprios({ pedidos, usuarioUid, empresaId, supermercadoId }: Props): Pedido[] {
+-  if (!usuarioUid || !empresaId || !supermercadoId) return [];
+-  return pedidos.filter((p) =>
+-    p.solicitante_uid === usuarioUid && p.empresa_id === empresaId &&
+-    p.supermercado_id === supermercadoId && p.categoria === "televendas" &&
+-    ["Pronto", "Incompleto", "Finalizado"].includes(p.status)
+-  );
+-}
++type Pedido = Partial<Chamado> & { id: string };
++type Resultado = { chave: string; pedidos: Pedido[]; erro: string | null; carregando: boolean };
++
++// A consulta é deliberadamente restrita pelo UID e pelo vínculo de empresa/unidade.
++// As regras do Firestore precisam impor as mesmas restrições no servidor.
++export function PedidosSeparadosPreview({ usuarioUid, empresaId, supermercadoId }: Props) {
++  const chave = usuarioUid && empresaId && supermercadoId
++    ? JSON.stringify([usuarioUid, empresaId, supermercadoId]) : "";
++  const [resultado, setResultado] = useState<Resultado>({ chave: "", pedidos: [], erro: null, carregando: false });
++
++  useEffect(() => {
++    if (!chave || !usuarioUid || !empresaId || !supermercadoId || !db) return;
++    let ativo = true;
++    setResultado({ chave, pedidos: [], erro: null, carregando: true });
++    const pedidosQuery = query(
++      collection(db, "chamados"),
++      where("solicitante_uid", "==", usuarioUid),
++      where("empresa_id", "==", empresaId),
++      where("supermercado_id", "==", supermercadoId),
++    );
++    const unsubscribe = onSnapshot(pedidosQuery, (snapshot) => {
++      if (!ativo) return;
++      const pedidos = snapshot.docs.map((documento) => ({ ...documento.data(), id: documento.id } as Pedido));
++      setResultado({ chave, pedidos, erro: null, carregando: false });
++    }, () => {
++      if (ativo) setResultado({ chave, pedidos: [], erro: "Não foi possível carregar seus pedidos. Verifique a conexão e as permissões de acesso.", carregando: false });
++    });
++    return () => { ativo = false; unsubscribe(); };
++  }, [chave, usuarioUid, empresaId, supermercadoId]);
++
++  const atual = resultado.chave === chave ? resultado : null;
++  const pedidos = filtrarPedidosProprios(atual?.pedidos ?? [], usuarioUid, empresaId, supermercadoId);
+ 
+-export function PedidosSeparadosPreview(props: Props): ReactNode {
+-  const pedidos = filtrarPedidosProprios(props);
+   return (
+-    <section aria-labelledby="pedidos-separados-titulo" className="space-y-3">
+-      <h2 id="pedidos-separados-titulo" className="text-lg font-semibold">Meus pedidos separados</h2>
+-      {pedidos.length === 0 && <p className="text-sm text-slate-600">Nenhum pedido para mostrar.</p>}
+-      {pedidos.map((pedido) => (
+-        <article key={pedido.id} className="rounded-lg border border-slate-200 bg-white p-4">
+-          <div className="flex flex-wrap items-center justify-between gap-2">
+-            <h3 className="font-semibold">Pedido {pedido.numero_pedido || "sem número"}</h3>
+-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium">{pedido.status}</span>
+-          </div>
+-          {pedido.cliente && <p className="mt-1 text-sm">Cliente: {pedido.cliente}</p>}
+-          {pedido.itens?.length ? (
+-            <ul className="mt-3 divide-y divide-slate-100">
+-              {pedido.itens.map((item, index) => (
+-                <li key={index} className="py-2 text-sm">
+-                  <p className="font-medium">{item.produto}</p>
+-                  <p>Solicitado: {item.quantidadeSolicitada} {item.unidadeMedida} · Encontrado: {item.quantidadeEncontrada} · Falta: {item.quantidadeFaltante}</p>
+-                </li>
+-              ))}
+-            </ul>
+-          ) : <p className="mt-3 text-sm text-slate-600">Itens não disponíveis.</p>}
+-          {pedido.motivo_incompleto && <p className="mt-3 text-sm">Motivo: {pedido.motivo_incompleto}</p>}
+-        </article>
+-      ))}
++    <section aria-labelledby="pedidos-separados-titulo" className="mb-6 space-y-3">
++      <div>
++        <h2 id="pedidos-separados-titulo" className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">Meus pedidos de televendas</h2>
++        <p className="mt-1 text-sm text-slate-600">Acompanhe a separação dos seus pedidos. Visualização somente leitura.</p>
++      </div>
++      {!chave ? <p className="text-sm text-slate-600">Entre com uma conta vinculada à empresa e à unidade para acompanhar seus pedidos.</p>
++        : !db ? <p className="text-sm text-slate-600">A consulta de pedidos exige conexão com o Firebase.</p>
++        : !atual || atual.carregando ? <p role="status" className="text-sm text-slate-600">Carregando seus pedidos…</p>
++        : atual.erro ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{atual.erro}</p>
++        : pedidos.length === 0 ? <p className="text-sm text-slate-600">Nenhum pedido para mostrar.</p>
++        : pedidos.map((pedido) => (
++          <article key={pedido.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
++            <div className="flex flex-wrap items-center justify-between gap-2">
++              <h3 className="font-bold text-slate-900">Pedido {pedido.numero_pedido || "sem número"}</h3>
++              {pedido.status && <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">{pedido.status}</span>}
++            </div>
++            {pedido.cliente && <p className="mt-1 text-sm text-slate-700">Cliente: {pedido.cliente}</p>}
++            {pedido.operador_nome && <p className="mt-1 text-sm text-slate-700">Responsável: {pedido.operador_nome}</p>}
++            {Array.isArray(pedido.itens) && pedido.itens.length > 0 ? (
++              <ul className="mt-3 divide-y divide-slate-100">
++                {pedido.itens.filter((item): item is ItemTelevendas => Boolean(item && typeof item === "object")).map((item, index) => {
++                  const qtd = quantidadesParaExibicao(pedido.status, item);
++                  return (
++                    <li key={`${item.produto}-${index}`} className="py-2 text-sm text-slate-700">
++                      <p className="font-semibold text-slate-900">{item.produto}</p>
++                      <p>Solicitado: {qtd.solicitado} {item.unidadeMedida || ""}</p>
++                      <p>Encontrado: {qtd.encontrado} · Faltante: {qtd.faltante}</p>
++                    </li>
++                  );
++                })}
++              </ul>
++            ) : pedido.produto ? (
++              <div className="mt-3 text-sm text-slate-700">
++                <p>Produto: {pedido.produto}</p>
++                {pedido.quantidade && <p>Quantidade solicitada: {pedido.quantidade}</p>}
++                <p>Encontrado e faltante: não confirmados.</p>
++              </div>
++            ) : <p className="mt-3 text-sm text-slate-600">Itens não disponíveis.</p>}
++            {pedido.motivo_incompleto && <p className="mt-3 text-sm text-slate-700">Motivo: {pedido.motivo_incompleto}</p>}
++            {pedido.observacao_operador && <p className="mt-2 text-sm text-slate-700">Observação do responsável: {pedido.observacao_operador}</p>}
++            {pedido.observacoes && <p className="mt-2 text-sm text-slate-700">Observação do pedido: {pedido.observacoes}</p>}
++          </article>
++        ))}
+     </section>
+   );
+ }
+diff --git a/src/hooks/useChamados.ts b/src/hooks/useChamados.ts
+index 533a2a8..91a3135 100644
+--- a/src/hooks/useChamados.ts
++++ b/src/hooks/useChamados.ts
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useCallback } from "react";
+ import { v4 as uuidv4 } from "uuid";
++import { onAuthStateChanged } from "firebase/auth";
+ import type {
+   CategoriaChamado,
+   Chamado,
+@@ -112,6 +113,9 @@ function normalizeChamado(data: Partial<Chamado>, fallbackId: string): Chamado {
+       typeof data.solicitante_nome === "string" && data.solicitante_nome.trim()
+         ? data.solicitante_nome
+         : "Solicitante",
++    ...(typeof data.solicitante_uid === "string" && data.solicitante_uid
++      ? { solicitante_uid: data.solicitante_uid }
++      : {}),
+     setor: typeof data.setor === "string" && data.setor.trim() ? data.setor : "Setor não informado",
+     local_exato:
+       typeof (data as Partial<Chamado>).local_exato === "string" &&
+@@ -324,7 +328,12 @@ function canAccessChamado(chamado: Chamado, scope: ChamadoScope): boolean {
+   return chamado.supermercado_id === scope.supermercadoId;
+ }
+ 
+-function applyScope(chamados: Chamado[], scope: ChamadoScope): Chamado[] {
++function applyScope(chamados: Chamado[], scope: ChamadoScope, uid: string | null): Chamado[] {
++  if (scope.perfil === "Televendas") {
++    if (!uid || !scope.empresaId || !scope.supermercadoId) return [];
++    return chamados.filter((c) => c.empresa_id === scope.empresaId
++      && c.supermercado_id === scope.supermercadoId && c.solicitante_uid === uid);
++  }
+   if (scope.canViewAllCompanies) return chamados;
+   if (!scope.empresaId) return [];
+   const chamadosEmpresa = chamados.filter((c) => c.empresa_id === scope.empresaId);
+@@ -378,11 +387,17 @@ function getEquipamentoPayload(
+ }
+ 
+ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
+-  const [chamados, setChamados] = useState<Chamado[]>(() => loadChamados());
++  const [chamados, setChamados] = useState<Chamado[]>(() => db ? [] : loadChamados());
++  const [authUid, setAuthUid] = useState<string | null>(() => auth?.currentUser?.uid ?? null);
+   const [filterStatus, setFilterStatus] = useState<FilterStatus>("Todos");
+   const [syncError, setSyncError] = useState<string | null>(null);
+   const isRemoteSyncEnabled = db !== null;
+ 
++  useEffect(() => {
++    if (!auth) return;
++    return onAuthStateChanged(auth, (user) => setAuthUid(user?.uid ?? null));
++  }, []);
++
+   useEffect(() => {
+     if (!isRemoteSyncEnabled) {
+       saveChamados(chamados);
+@@ -392,12 +407,21 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
+   useEffect(() => {
+     if (isRemoteSyncEnabled && db) {
+       setSyncError(null);
++      setChamados([]);
++      if (scope.perfil === "Televendas" && (!authUid || !scope.empresaId || !scope.supermercadoId)) {
++        return;
++      }
+       if (!scope.canViewAllCompanies && !scope.empresaId) {
+         setChamados([]);
+         return;
+       }
+ 
+-      const chamadosQuery = scope.canViewAllCompanies
++      const chamadosQuery = scope.perfil === "Televendas"
++        ? query(collection(db, CHAMADOS_COLLECTION),
++            where("empresa_id", "==", scope.empresaId),
++            where("supermercado_id", "==", scope.supermercadoId),
++            where("solicitante_uid", "==", authUid))
++        : scope.canViewAllCompanies
+         ? query(collection(db, CHAMADOS_COLLECTION))
+         : !scope.canViewAllUnits && scope.supermercadoId
+           ? query(
+@@ -417,6 +441,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
+           setChamados(sortChamados(remoteChamados));
+         },
+         (error: FirestoreError) => {
++          setChamados([]);
+           const code = error.code ? ` (${error.code})` : "";
+           setSyncError(
+             `Falha ao sincronizar chamados com o Firebase${code}. Verifique login, perfil e regras do Firestore.`
+@@ -439,7 +464,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
+ 
+     window.addEventListener("storage", onStorage);
+     return () => window.removeEventListener("storage", onStorage);
+-  }, [isRemoteSyncEnabled, scope.canViewAllCompanies, scope.empresaId, scope.supermercadoId]);
++  }, [isRemoteSyncEnabled, scope.canViewAllCompanies, scope.canViewAllUnits, scope.empresaId, scope.supermercadoId, scope.perfil, authUid]);
+ 
+   useEffect(() => {
+     if (isRemoteSyncEnabled) return;
+@@ -1096,7 +1121,7 @@ export function useChamados(scope: ChamadoScope, callbacks?: ChamadoCallbacks) {
+     [chamados, scope]
+   );
+ 
+-  const chamadosEscopo = applyScope(chamados, scope);
++  const chamadosEscopo = applyScope(chamados, scope, authUid);
+ 
+   const chamadosFiltrados = sortChamados(
+     filterStatus === "Todos"
+diff --git a/src/utils/pedidosProprios.test.ts b/src/utils/pedidosProprios.test.ts
+new file mode 100644
+index 0000000..55df82d
+--- /dev/null
++++ b/src/utils/pedidosProprios.test.ts
+@@ -0,0 +1,19 @@
++import { strict as assert } from "node:assert";
++import { test } from "node:test";
++import { filtrarPedidosProprios, quantidadesParaExibicao } from "./pedidosProprios.ts";
++
++test("pedidos são filtrados por UID e vínculos, incluindo em andamento", () => {
++  const base = { id: "1", solicitante_uid: "uid-a", empresa_id: "empresa", supermercado_id: "unidade", categoria: "televendas" as const, status: "Em separação" as const };
++  const pedidos = [base, { ...base, id: "2", solicitante_uid: "uid-b", solicitante_nome: "Mesmo nome" }, { ...base, id: "3", empresa_id: "outra" }, { ...base, id: "4", supermercado_id: "outra" }, { ...base, id: "5", solicitante_uid: null }, { ...base, id: "6", categoria: "operacional" as const }];
++  assert.deepEqual(filtrarPedidosProprios(pedidos, "uid-a", "empresa", "unidade").map((p) => p.id), ["1"]);
++  assert.deepEqual(filtrarPedidosProprios(pedidos, null, "empresa", "unidade"), []);
++});
++
++test("zero inicial não é apresentado como falta conferida", () => {
++  const item = { quantidadeSolicitada: 5, quantidadeEncontrada: 0, quantidadeFaltante: 5 };
++  for (const status of ["Aberto", "Em separação", "Finalizado", "Cancelado"] as const) {
++    assert.deepEqual(quantidadesParaExibicao(status, item), { solicitado: 5, encontrado: "Não confirmado", faltante: "Não confirmado" });
++  }
++  assert.deepEqual(quantidadesParaExibicao("Incompleto", item), { solicitado: 5, encontrado: 0, faltante: 5 });
++  assert.deepEqual(quantidadesParaExibicao("Pronto", { ...item, quantidadeEncontrada: 5, quantidadeFaltante: 0 }), { solicitado: 5, encontrado: 5, faltante: 0 });
++});
+diff --git a/src/utils/pedidosProprios.ts b/src/utils/pedidosProprios.ts
+new file mode 100644
+index 0000000..70482f2
+--- /dev/null
++++ b/src/utils/pedidosProprios.ts
+@@ -0,0 +1,33 @@
++import type { Chamado, ItemTelevendas } from "../types/chamado";
++
++type Pedido = Partial<Chamado> & { id: string };
++
++// Filtro adicional de apresentação, não substitui autorização no servidor.
++export function filtrarPedidosProprios(
++  pedidos: Pedido[], usuarioUid: string | null, empresaId: string | null, supermercadoId: string | null,
++): Pedido[] {
++  if (!usuarioUid || !empresaId || !supermercadoId) return [];
++  return pedidos.filter((pedido) =>
++    pedido.solicitante_uid === usuarioUid && pedido.empresa_id === empresaId &&
++    pedido.supermercado_id === supermercadoId &&
++    (pedido.categoria === "televendas" || pedido.tipo_servico === "Atendimento Televendas")
++  ).sort((a, b) => (b.criado_em || "").localeCompare(a.criado_em || ""));
++}
++
++// O modelo antigo inicializa encontrado e faltante com zeros antes da conferência.
++// Apenas Pronto/Incompleto indicam gravação da conferência pela ação de separação.
++// Nos demais estados, um zero (inclusive em Finalizado/Cancelado legados) é ambíguo.
++export function quantidadesParaExibicao(status: Chamado["status"] | undefined, item: Partial<ItemTelevendas>) {
++  const numero = (value: unknown): number | null =>
++    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
++  const solicitado = numero(item.quantidadeSolicitada);
++  const encontrado = numero(item.quantidadeEncontrada);
++  const faltante = numero(item.quantidadeFaltante);
++  const conferido = status === "Pronto" || status === "Incompleto";
++  const encontradoVisivel = encontrado !== null && (conferido || encontrado > 0);
++  return {
++    solicitado: solicitado ?? "Não informado",
++    encontrado: encontradoVisivel ? encontrado : "Não confirmado",
++    faltante: encontradoVisivel && faltante !== null ? faltante : "Não confirmado",
++  };
++}
